@@ -31,8 +31,8 @@ export function RestaurantCard({ r, index, home, distance, selected, onSelect }:
       <div
         className={`card${selected ? " selected" : ""}`}
         style={{ animationDelay: `${index * 70}ms` }}
-        onMouseEnter={() => onSelect(r.id)}
-        onFocus={() => onSelect(r.id)}
+        // Souris uniquement : sur mobile, le début d'un scroll déclencherait la sélection.
+        onPointerEnter={(e) => e.pointerType === "mouse" && onSelect(r.id)}
       >
         <span className="rank">{index + 1}</span>
         <a className="card-link" href={r.url} target="_blank" rel="noopener noreferrer">

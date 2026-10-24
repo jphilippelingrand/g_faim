@@ -23,8 +23,10 @@ export function RestaurantCard({ r, index, home, distance, selected, onSelect }:
 
       <Pressable
         style={styles.main}
-        onPressIn={() => onSelect(r.id)}
-        onPress={() => Linking.openURL(r.url)}
+        onPress={() => {
+          onSelect(r.id);
+          Linking.openURL(r.url);
+        }}
         accessibilityRole="link"
         accessibilityHint="Ouvre la fiche Google Maps"
       >

@@ -258,8 +258,13 @@ input:focus { border-color: var(--accent); }
   position: relative;
   animation: pop .35s ease-out both;
 }
-.card:hover, .card.selected { border-color: var(--accent); }
+.card.selected { border-color: var(--accent); }
+@media (hover: hover) {
+  .card:hover { border-color: var(--accent); }
+}
 .card.selected { box-shadow: 0 0 0 1px var(--accent); }
+
+.card-link, .go { -webkit-tap-highlight-color: transparent; }
 
 .card-link {
   display: grid;
@@ -281,7 +286,10 @@ input:focus { border-color: var(--accent); }
   color: var(--accent);
   transition: background .15s, color .15s, transform .15s;
 }
-.go:hover, .go:focus-visible { background: var(--accent); color: #fff; transform: scale(1.08); }
+.go:active, .go:focus-visible { background: var(--accent); color: #fff; transform: scale(1.08); }
+@media (hover: hover) {
+  .go:hover { background: var(--accent); color: #fff; transform: scale(1.08); }
+}
 
 .rank {
   position: absolute;
