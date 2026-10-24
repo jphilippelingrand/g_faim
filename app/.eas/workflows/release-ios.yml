@@ -1,0 +1,25 @@
+# Publier une nouvelle version iOS : git push origin main:release
+# → build de production chez EAS, puis envoi sur App Store Connect / TestFlight.
+# Prérequis : repo GitHub relié au projet EAS (base directory : app) et
+# certificats iOS déjà créés par un premier build lancé en local.
+name: Release iOS
+
+on:
+  push:
+    branches: ['release']
+
+jobs:
+  build_ios:
+    name: Build iOS (production)
+    type: build
+    params:
+      platform: ios
+      profile: production
+
+  submit_ios:
+    name: Envoi App Store Connect
+    type: submit
+    needs: [build_ios]
+    params:
+      build_id: ${{ needs.build_ios.outputs.build_id }}
+      profile: production
