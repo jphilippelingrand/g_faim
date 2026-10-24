@@ -45,6 +45,11 @@ const config: ExpoConfig = {
     ],
     "expo-font",
   ],
+  extra: {
+    eas: {
+      projectId: "f818409b-8c89-47e6-abef-dc5e62d0ed87",
+    },
+  },
 };
 
 export default config;
