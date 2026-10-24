@@ -21,6 +21,8 @@ export const TOP_N = 5;
 // Écarte les 5,0★ à 3 avis qui squatteraient le podium.
 const MIN_REVIEWS = 10;
 const START_RADIUS = 200;
+// Au démarrage, on n'élargit pas au-delà (pire cas : 6 étapes) ; dézoomer permet d'aller plus loin.
+const MAX_START_RADIUS = 6400;
 // Limite de searchNearby.
 export const MAX_RADIUS = 50_000;
 
@@ -87,27 +89,54 @@ function isOpenNow(place: google.maps.places.Place, now = new Date()): boolean |
   });
 }
 
-/**
- * Restos notés et ouverts en ce moment dans le cercle (max 20, limite de l'API).
- * searchNearby ne trie pas par note : le classement se fait dans rankTop.
- */
-export async function searchRestaurants({ center, radius }: Area): Promise<Restaurant[]> {
-  const { Place, SearchNearbyRankPreference } = await importLibrary<google.maps.PlacesLibrary>("places");
+const FIELDS = [
+  "id", "displayName", "rating", "userRatingCount", "location",
+  "googleMapsURI", "priceLevel", "primaryTypeDisplayName", "photos",
+  "businessStatus", "currentOpeningHours", "regularOpeningHours", "utcOffsetMinutes",
+];
 
-  const { places } = await Place.searchNearby({
-    fields: [
-      "id", "displayName", "rating", "userRatingCount", "location",
-      "googleMapsURI", "priceLevel", "primaryTypeDisplayName", "photos",
-      "businessStatus", "currentOpeningHours", "regularOpeningHours", "utcOffsetMinutes",
-    ],
-    locationRestriction: { center, radius: Math.min(radius, MAX_RADIUS) },
-    includedPrimaryTypes: ["restaurant"],
-    maxResultCount: 20,
-    rankPreference: SearchNearbyRankPreference.POPULARITY,
-  });
+/** Le carré qui contient le cercle (searchByText n'accepte que des rectangles). */
+function circleBounds({ center, radius }: Area): google.maps.LatLngBoundsLiteral {
+  const dLat = radius / 111_320;
+  const dLng = radius / (111_320 * Math.cos((center.lat * Math.PI) / 180));
+  return { north: center.lat + dLat, south: center.lat - dLat, east: center.lng + dLng, west: center.lng - dLng };
+}
+
+/**
+ * Restos notés et ouverts en ce moment dans le cercle. Deux recherches en parallèle, fusionnées :
+ * - searchNearby : les 20 plus populaires, mais ouverts ou non (la nuit, souvent presque tous fermés) ;
+ * - searchByText filtré par Google sur « ouvert maintenant » : 20 restos ouverts, même à 1 h du matin.
+ * Aucune ne trie par note : le classement se fait dans rankTop.
+ */
+export async function searchRestaurants(area: Area): Promise<Restaurant[]> {
+  const { Place, SearchNearbyRankPreference } = await importLibrary<google.maps.PlacesLibrary>("places");
+  const radius = Math.min(area.radius, MAX_RADIUS);
+
+  const responses = await Promise.allSettled([
+    Place.searchNearby({
+      fields: FIELDS,
+      locationRestriction: { center: area.center, radius },
+      includedPrimaryTypes: ["restaurant"],
+      maxResultCount: 20,
+      rankPreference: SearchNearbyRankPreference.POPULARITY,
+    }),
+    Place.searchByText({
+      fields: FIELDS,
+      textQuery: "restaurant",
+      includedType: "restaurant",
+      useStrictTypeFiltering: true,
+      isOpenNow: true,
+      locationRestriction: circleBounds({ center: area.center, radius }),
+      maxResultCount: 20,
+    }),
+  ]);
+  const ok = responses.filter((r) => r.status === "fulfilled").map((r) => r.value.places);
+  if (!ok.length) throw (responses[0] as PromiseRejectedResult).reason;
+  const places = [...new Map(ok.flat().map((p) => [p.id, p])).values()];
 
   return places
     .filter((p) => p.rating != null && p.location)
+    .filter((p) => distanceMeters(area.center, { lat: p.location!.lat(), lng: p.location!.lng() }) <= radius)
     // Fermés définitivement / temporairement, ou fermés à cette heure-ci. Horaires inconnus : on garde.
     .filter((p) => (p.businessStatus ?? "OPERATIONAL") === "OPERATIONAL" && isOpenNow(p) !== false)
     .map((p) => ({
@@ -123,12 +152,12 @@ export async function searchRestaurants({ center, radius }: Area): Promise<Resta
     }));
 }
 
-/** Double le rayon à partir de 200 m jusqu'à avoir TOP_N restos classables. */
+/** Double le rayon à partir de 200 m jusqu'à avoir TOP_N restos classables (ou atteindre MAX_START_RADIUS). */
 export async function searchUntilTop(center: LatLng): Promise<{ list: Restaurant[]; area: Area }> {
-  for (let radius = START_RADIUS; ; radius = Math.min(radius * 2, MAX_RADIUS)) {
+  for (let radius = START_RADIUS; ; radius *= 2) {
     const area = { center, radius };
     const list = await searchRestaurants(area);
-    if (rankTop(list).length >= TOP_N || radius >= MAX_RADIUS) return { list, area };
+    if (rankTop(list).length >= TOP_N || radius >= MAX_START_RADIUS) return { list, area };
   }
 }
 
