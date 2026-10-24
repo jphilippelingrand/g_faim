@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Fond plein (compatible "maskable" : le perso tient dans les 80 % centraux) -->
+  <rect width="512" height="512" fill="#fbf6ef"/>
+  <circle cx="256" cy="256" r="256" fill="#e2583e" opacity=".12"/>
+  <g transform="translate(256 270) scale(1.55) translate(-120 -150)">
+    <!-- robe -->
+    <path d="M92 84 Q120 76 148 84 L166 220 L74 220 Z" fill="#e2583e"/>
+    <!-- ventre -->
+    <ellipse cx="120" cy="168" rx="60" ry="52" fill="#c94a33"/>
+    <ellipse cx="104" cy="150" rx="22" ry="12" fill="#fff" opacity=".14"/>
+    <path d="M78 178 q10.5 -10 21 0 t21 0 t21 0 t21 0" fill="none" stroke="#2b211c" stroke-opacity=".3" stroke-width="4" stroke-linecap="round"/>
+    <!-- ondes -->
+    <g fill="none" stroke="#e2583e" stroke-width="5" stroke-linecap="round">
+      <path d="M50 150 q-9 18 0 36"/><path d="M36 142 q-13 26 0 52"/>
+      <path d="M190 150 q9 18 0 36"/><path d="M204 142 q13 26 0 52"/>
+    </g>
+    <!-- bras -->
+    <path d="M94 92 Q66 120 78 150" fill="none" stroke="#f3c9a8" stroke-width="10" stroke-linecap="round"/>
+    <path d="M146 92 Q174 120 162 150" fill="none" stroke="#f3c9a8" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="80" cy="152" r="8" fill="#f3c9a8"/><circle cx="160" cy="152" r="8" fill="#f3c9a8"/>
+    <!-- tête -->
+    <circle cx="120" cy="22" r="14" fill="#6b4a3a"/>
+    <circle cx="120" cy="54" r="28" fill="#f3c9a8"/>
+    <path d="M92 50 Q96 24 120 24 Q144 24 148 50 Q136 36 120 38 Q104 36 92 50 Z" fill="#6b4a3a"/>
+    <circle cx="100" cy="66" r="5" fill="#f29b8a"/><circle cx="140" cy="66" r="5" fill="#f29b8a"/>
+    <g fill="none" stroke="#2b211c" stroke-width="2.5" stroke-linecap="round"><path d="M100 46 l11 -4"/><path d="M140 46 l-11 -4"/></g>
+    <circle cx="108" cy="55" r="3" fill="#2b211c"/><circle cx="132" cy="55" r="3" fill="#2b211c"/>
+    <ellipse cx="120" cy="71" rx="4.5" ry="6" fill="#2b211c"/>
+  </g>
+</svg>

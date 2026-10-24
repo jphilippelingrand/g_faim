@@ -15,3 +15,9 @@ Prototype React + Vite : à l'ouverture, l'app prend ta position et affiche sur 
 - **Classement** : `Place.searchNearby` ne trie pas par note et renvoie au plus 20 lieux (les plus populaires du cercle). On écarte ceux qui ont moins de 10 avis, puis on trie par note puis nombre d'avis.
 
 Si la géolocalisation est refusée, un champ adresse apparaît (géocodé via Google).
+
+## Sur iPhone (PWA)
+
+Ouvre le site dans **Safari** → bouton Partager → **Sur l'écran d'accueil**. L'app s'ouvre ensuite en plein écran avec son icône.
+
+Les icônes sont générées depuis `public/icon.svg` (192, 512 et 180 px pour iOS).
