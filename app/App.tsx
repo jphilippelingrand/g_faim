@@ -5,7 +5,7 @@ import * as Location from "expo-location";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { Lady, type Mood } from "./src/components/Lady";
 import { RestaurantCard } from "./src/components/RestaurantCard";
@@ -26,6 +26,8 @@ import { colors, fonts } from "./src/theme";
 SplashScreen.preventAutoHideAsync();
 
 type Phase = "locating" | "searching" | "done" | "error";
+
+const PRIVACY_URL = "https://g-faim.vercel.app/privacy";
 
 // En dessous de cette fraction de la zone fouillée, un zoom avant relance la recherche.
 const ZOOM_IN_RATIO = 0.6;
@@ -222,7 +224,12 @@ export default function App() {
             </View>
           )}
 
-          <Text style={styles.footer}>Données Google Maps · touche la dame 👆</Text>
+          <Text style={styles.footer}>
+            Données Google Maps · touche la dame 👆 ·{" "}
+            <Text style={styles.footerLink} onPress={() => Linking.openURL(PRIVACY_URL)} accessibilityRole="link">
+              Confidentialité
+            </Text>
+          </Text>
         </ScrollView>
       </SafeAreaView>
     </SafeAreaProvider>
@@ -255,4 +262,5 @@ const styles = StyleSheet.create({
   results: { gap: 14, paddingTop: 8, paddingLeft: 8 },
   stale: { opacity: 0.5 },
   footer: { fontFamily: fonts.body, fontSize: 12, color: colors.muted, textAlign: "center", marginTop: 24 },
+  footerLink: { textDecorationLine: "underline" },
 });

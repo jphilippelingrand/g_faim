@@ -318,6 +318,7 @@ input:focus { border-color: var(--accent); }
 }
 
 footer { text-align: center; font-size: .75rem; color: var(--muted); padding: 16px; }
+footer a { color: inherit; }
 
 @media (max-width: 420px) {
   h1 { font-size: 2.1rem; }

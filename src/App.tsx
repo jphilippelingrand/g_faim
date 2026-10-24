@@ -185,7 +185,9 @@ export default function App() {
         )}
       </main>
 
-      <footer>Données Google Maps · clique sur la dame 👆</footer>
+      <footer>
+        Données Google Maps · clique sur la dame 👆 · <a href="/privacy">Confidentialité</a>
+      </footer>
     </>
   );
 }
