@@ -1,0 +1,330 @@
+:root {
+  --bg: #fbf6ef;
+  --card: #ffffff;
+  --ink: #2b211c;
+  --muted: #8a7b70;
+  --accent: #e2583e;
+  --accent-soft: #fde3da;
+  --line: #eadfd3;
+  --skin: #f3c9a8;
+  --hair: #6b4a3a;
+  --blush: #f29b8a;
+  --dress: #e2583e;
+  --dress-dark: #c94a33;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.5 "Inter", system-ui, sans-serif;
+}
+
+#root { min-height: 100vh; display: flex; flex-direction: column; }
+
+main {
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  flex: 1;
+}
+
+header { text-align: center; }
+
+h1 {
+  font-family: "Fraunces", Georgia, serif;
+  font-weight: 700;
+  font-size: 2.6rem;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.tagline { margin: 4px 0 24px; color: var(--muted); }
+
+/* ============ La petite dame ============ */
+
+.lady {
+  --dur: 2.6s;
+  position: relative;
+  display: inline-block;
+  background: none;
+  border: 0;
+  padding: 36px 0 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.lady[data-mood="starving"] { --dur: 0.9s; }
+.lady[data-mood="happy"] { --dur: 3.4s; }
+
+.lady svg { display: block; overflow: visible; }
+
+.lady .figure,
+.lady .belly,
+.lady .waves path,
+.lady .ripple,
+.lady .navel,
+.lady .mouth {
+  transform-box: view-box;
+  animation-duration: var(--dur);
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
+
+/* Tout le corps tressaute pendant le gargouillis */
+.lady .figure { animation-name: shake; transform-origin: 120px 258px; }
+
+/* Le ventre se déforme comme du flan */
+.lady .belly { animation-name: rumble; transform-origin: 120px 200px; }
+
+/* Une vague qui traverse le ventre */
+.lady .ripple { animation-name: ripple; transform-origin: 120px 178px; }
+.lady .navel { animation-name: navel; }
+.lady .mouth { animation-name: gasp; transform-origin: 120px 71px; }
+
+/* Les ((( ))) qui partent du ventre */
+.lady .waves path { animation-name: wave; opacity: 0; }
+.lady .waves path:nth-child(2) { animation-delay: 60ms; }
+.lady .waves path:nth-child(3) { animation-delay: 120ms; }
+.lady .waves-left path { transform-origin: 70px 168px; }
+.lady .waves-right path { transform-origin: 170px 168px; }
+
+@keyframes shake {
+  0%, 40%, 100% { transform: none; }
+  4%  { transform: translateX(-2px) rotate(-1deg); }
+  8%  { transform: translateX(2px) rotate(1deg); }
+  12% { transform: translateX(-2px) rotate(-.6deg); }
+  16% { transform: translateX(2px) rotate(.6deg); }
+  22% { transform: translateX(-1px); }
+  28% { transform: translateX(1px); }
+}
+
+@keyframes rumble {
+  0%, 42%, 100% { transform: scale(1, 1); }
+  5%  { transform: scale(1.16, .86); }
+  10% { transform: scale(.9, 1.12) translateY(-3px); }
+  15% { transform: scale(1.12, .9); }
+  20% { transform: scale(.94, 1.06) translateY(-2px); }
+  26% { transform: scale(1.07, .95); }
+  32% { transform: scale(.98, 1.02); }
+  37% { transform: scale(1.02, .99); }
+}
+
+@keyframes ripple {
+  0%, 40%, 100% { transform: translateX(0) scaleY(1); }
+  10% { transform: translateX(-6px) scaleY(1.8); }
+  20% { transform: translateX(6px) scaleY(.6); }
+  30% { transform: translateX(-3px) scaleY(1.4); }
+}
+
+@keyframes navel {
+  0%, 40%, 100% { transform: none; }
+  8%  { transform: translate(-4px, 2px); }
+  16% { transform: translate(4px, -2px); }
+  24% { transform: translate(-2px, 1px); }
+}
+
+@keyframes gasp {
+  0%, 40%, 100% { transform: scale(1); }
+  8%, 28% { transform: scale(1.5, 1.9); }
+}
+
+@keyframes wave {
+  0%, 45%, 100% { opacity: 0; transform: scale(.7); }
+  6%  { opacity: 1; transform: scale(1); }
+  30% { opacity: .8; transform: scale(1.12); }
+}
+
+/* GRROOOUUBBLL façon BD */
+.grr {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%) rotate(-6deg);
+  font-family: "Fraunces", Georgia, serif;
+  font-style: italic;
+  font-weight: 900;
+  font-size: 1.7rem;
+  letter-spacing: -0.02em;
+  color: var(--accent);
+  -webkit-text-stroke: 1px var(--ink);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.grr span {
+  display: inline-block;
+  opacity: 0;
+  animation: letter var(--dur) ease-out infinite;
+}
+
+@keyframes letter {
+  0%, 48%, 100% { opacity: 0; transform: translateY(8px) scale(.5); }
+  6%  { opacity: 1; transform: translateY(-8px) scale(1.25); }
+  12% { transform: translateY(3px) scale(.95); }
+  18% { transform: translateY(-3px) scale(1.05); }
+  24% { transform: none; }
+  38% { opacity: 1; transform: none; }
+}
+
+/* Elle bave quand elle a trouvé */
+.lady .drool { animation: drool 1.6s ease-in infinite; transform-box: fill-box; transform-origin: top; }
+@keyframes drool {
+  0%, 20% { transform: scaleY(.3); opacity: 1; }
+  80% { transform: scaleY(1.4); opacity: 1; }
+  100% { transform: scaleY(1.6); opacity: 0; }
+}
+
+/* ============ Carte ============ */
+
+.map {
+  height: 340px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--accent-soft);
+}
+
+.pin {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  border: 2.5px solid #fff;
+  box-shadow: 0 2px 6px rgb(0 0 0 / .25);
+  font: 700 .9rem/25px "Fraunces", Georgia, serif;
+  text-align: center;
+  transition: transform .15s, background .15s;
+}
+.pin.selected { background: var(--ink); transform: scale(1.3); }
+
+.home-pin {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #3b82f6;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 0 rgb(59 130 246 / .5);
+  animation: pulse 2s infinite;
+  transform: translateY(50%);
+}
+@keyframes pulse {
+  70% { box-shadow: 0 0 0 14px rgb(59 130 246 / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(59 130 246 / 0); }
+}
+
+input[type="text"] {
+  font: inherit;
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  outline: none;
+}
+input:focus { border-color: var(--accent); }
+
+.address { display: flex; gap: 8px; margin-bottom: 16px; }
+.address input { flex: 1; min-width: 0; }
+.address button {
+  font: 700 1rem "Fraunces", Georgia, serif;
+  background: var(--accent);
+  color: #fff;
+  border: 0;
+  border-radius: 10px;
+  padding: 0 18px;
+  cursor: pointer;
+}
+
+.status { min-height: 1.5em; text-align: center; color: var(--muted); margin: 20px 0 12px; }
+.status.error { color: var(--accent); }
+
+/* ============ Résultats ============ */
+
+.results { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; transition: opacity .2s; }
+.results.stale { opacity: .5; }
+
+.card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  position: relative;
+  animation: pop .35s ease-out both;
+}
+.card:hover, .card.selected { border-color: var(--accent); }
+.card.selected { box-shadow: 0 0 0 1px var(--accent); }
+
+.card-link {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 14px;
+  align-items: center;
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+}
+
+.go {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  transition: background .15s, color .15s, transform .15s;
+}
+.go:hover, .go:focus-visible { background: var(--accent); color: #fff; transform: scale(1.08); }
+
+.rank {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--bg);
+  font: 700 .85rem/26px "Fraunces", Georgia, serif;
+  text-align: center;
+}
+
+.thumb {
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: var(--accent-soft);
+  display: grid;
+  place-items: center;
+  font-size: 1.8rem;
+}
+
+.card h2 { font-family: "Fraunces", Georgia, serif; font-size: 1.15rem; margin: 0; line-height: 1.25; }
+.meta { font-size: .85rem; color: var(--muted); margin-top: 2px; }
+.rating { color: var(--ink); font-weight: 500; }
+.star { color: var(--accent); }
+
+@keyframes pop {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+footer { text-align: center; font-size: .75rem; color: var(--muted); padding: 16px; }
+
+@media (max-width: 420px) {
+  h1 { font-size: 2.1rem; }
+  .grr { font-size: 1.35rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lady *, .card, .home-pin { animation: none !important; }
+  .grr span { opacity: 1; }
+}
