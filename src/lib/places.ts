@@ -64,8 +64,31 @@ export function distanceMeters(a: LatLng, b: LatLng): number {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
+const WEEK_MINUTES = 7 * 24 * 60;
+
 /**
- * Tous les restos notés dans le cercle (max 20, limite de l'API).
+ * Ouvert en ce moment, d'après les horaires du jour (exceptions comprises) et le fuseau du resto.
+ * undefined si Google ne connaît pas les horaires. (Place.isOpen() existe, mais seulement en bêta.)
+ */
+function isOpenNow(place: google.maps.places.Place, now = new Date()): boolean | undefined {
+  const hours = place.currentOpeningHours ?? place.regularOpeningHours;
+  if (!hours?.periods.length || place.utcOffsetMinutes == null) return undefined;
+
+  // Minute de la semaine à l'heure locale du resto, 0 = dimanche 00:00 comme dans l'API.
+  const local = new Date(now.getTime() + place.utcOffsetMinutes * 60_000);
+  const t = local.getUTCDay() * 1440 + local.getUTCHours() * 60 + local.getUTCMinutes();
+
+  return hours.periods.some(({ open, close }) => {
+    if (!close) return true; // 24h/24
+    const start = open.day * 1440 + open.hour * 60 + open.minute;
+    let end = close.day * 1440 + close.hour * 60 + close.minute;
+    if (end <= start) end += WEEK_MINUTES; // passe minuit dans la nuit de samedi à dimanche
+    return (t >= start && t < end) || (t + WEEK_MINUTES >= start && t + WEEK_MINUTES < end);
+  });
+}
+
+/**
+ * Restos notés et ouverts en ce moment dans le cercle (max 20, limite de l'API).
  * searchNearby ne trie pas par note : le classement se fait dans rankTop.
  */
 export async function searchRestaurants({ center, radius }: Area): Promise<Restaurant[]> {
@@ -75,6 +98,7 @@ export async function searchRestaurants({ center, radius }: Area): Promise<Resta
     fields: [
       "id", "displayName", "rating", "userRatingCount", "location",
       "googleMapsURI", "priceLevel", "primaryTypeDisplayName", "photos",
+      "businessStatus", "currentOpeningHours", "regularOpeningHours", "utcOffsetMinutes",
     ],
     locationRestriction: { center, radius: Math.min(radius, MAX_RADIUS) },
     includedPrimaryTypes: ["restaurant"],
@@ -84,6 +108,8 @@ export async function searchRestaurants({ center, radius }: Area): Promise<Resta
 
   return places
     .filter((p) => p.rating != null && p.location)
+    // Fermés définitivement / temporairement, ou fermés à cette heure-ci. Horaires inconnus : on garde.
+    .filter((p) => (p.businessStatus ?? "OPERATIONAL") === "OPERATIONAL" && isOpenNow(p) !== false)
     .map((p) => ({
       id: p.id,
       name: p.displayName ?? "Sans nom",

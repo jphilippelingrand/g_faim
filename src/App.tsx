@@ -114,7 +114,7 @@ export default function App() {
   if (phase === "locating") status = "Je te localise…";
   else if (phase === "searching") status = "Je renifle les cuisines du coin…";
   else if (phase === "error") status = error ?? "";
-  else if (!top.length) status = "Rien de bien noté par ici… dézoome la carte ?";
+  else if (!top.length) status = "Rien d'ouvert et bien noté par ici… dézoome la carte ?";
   else status = `Top ${top.length} dans un rayon de ${formatDistance(area?.radius ?? 0)} · dézoome pour voir plus loin`;
 
   async function submitAddress(e: FormEvent) {
