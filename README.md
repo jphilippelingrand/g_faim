@@ -21,3 +21,11 @@ Si la géolocalisation est refusée, un champ adresse apparaît (géocodé via G
 Ouvre le site dans **Safari** → bouton Partager → **Sur l'écran d'accueil**. L'app s'ouvre ensuite en plein écran avec son icône.
 
 Les icônes sont générées depuis `public/icon.svg` (192, 512 et 180 px pour iOS).
+
+## App iOS (Expo) — dossier `app/`
+
+App native React Native (Expo SDK 58), même logique que la web app : carte Google (`react-native-maps`), Places API (New) en REST, la petite dame en SVG animé, vibrations.
+
+- **Clé Google dédiée** : restreinte à l'app iOS `com.jphilippelingrand.gfaim`, APIs **Maps SDK for iOS** + **Places API (New)**. À mettre dans `app/.env` (voir `app/.env.example`) et dans les variables d'environnement EAS.
+- **Tester vite** : `cd app && npx expo start`, puis scanner le QR code avec Expo Go. Dans Expo Go la carte est Apple Maps (Google Maps n'y est pas embarqué) ; les vrais builds utilisent Google Maps.
+- **Builds / App Store** : `npx eas-cli@latest build -p ios --profile development|production`, puis `npx eas-cli@latest submit -p ios`. Pas besoin d'Xcode : tout se compile chez EAS.
