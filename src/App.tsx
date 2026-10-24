@@ -18,6 +18,9 @@ import {
 
 type Phase = "locating" | "searching" | "done" | "error";
 
+// En dessous de cette fraction de la zone fouillée, un zoom avant relance la recherche.
+const ZOOM_IN_RATIO = 0.6;
+
 export default function App() {
   const [home, setHome] = useState<LatLng | null>(null);
   const [places, setPlaces] = useState<Restaurant[]>([]);
@@ -82,12 +85,15 @@ export default function App() {
     run(() => searchUntilTop(home), true);
   }, [home, run]);
 
-  // L'utilisateur dézoome (ou se déplace) au-delà de la zone fouillée : on cherche sur toute la vue.
+  // On recherche sur la vue quand l'utilisateur dézoome / se déplace au-delà de la zone fouillée,
+  // ou quand il zoome assez pour que la vue soit nettement plus petite que cette zone.
   const onViewportChange = useCallback(
     (view: Area) => {
       const covered = coveredArea.current;
       if (!covered) return;
-      if (distanceMeters(view.center, covered.center) + view.radius <= covered.radius * 1.05) return;
+      const inside = distanceMeters(view.center, covered.center) + view.radius <= covered.radius * 1.05;
+      const zoomedIn = view.radius < covered.radius * ZOOM_IN_RATIO;
+      if (inside && !zoomedIn) return;
       coveredArea.current = view;
       run(async () => ({ list: await searchRestaurants(view), area: view }), false);
     },

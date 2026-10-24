@@ -11,7 +11,7 @@ Prototype React + Vite : à l'ouverture, l'app prend ta position et affiche sur 
 ## Comment ça cherche
 
 - **Au démarrage** : recherche à 200 m, et on double le rayon (400, 800, 1600 m…) tant qu'on n'a pas 5 restos classables. La carte se cadre ensuite sur toi + les 5.
-- **Quand tu dézoomes** (ou déplaces la carte) au-delà de la zone déjà fouillée (cercle rouge), on relance une recherche sur le plus grand cercle visible. Zoomer ne relance rien.
+- **Quand tu dézoomes** (ou déplaces la carte) au-delà de la zone déjà fouillée (cercle rouge), on relance une recherche sur le plus grand cercle visible. Pareil quand tu zoomes assez pour que la vue fasse moins de 60 % de la zone fouillée.
 - **Classement** : `Place.searchNearby` ne trie pas par note et renvoie au plus 20 lieux (les plus populaires du cercle). On écarte ceux qui ont moins de 10 avis, puis on trie par note puis nombre d'avis.
 
 Si la géolocalisation est refusée, un champ adresse apparaît (géocodé via Google).
