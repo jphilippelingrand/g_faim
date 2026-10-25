@@ -1,7 +1,7 @@
 /**
  * Prend les 5 captures de l'app sur le simulateur iOS, dans chaque langue, et les dépose dans raw/<langue>/
- * pour generate.mjs. Pilote l'app par liens profonds (gfaim://?cuisine=…&mode=surprise&sheet=2) : le
- * simulateur ne sait pas toucher l'écran.
+ * pour generate.mjs. Pilote l'app par l'argument de lancement -deeplink "cuisine=…&mode=surprise&sheet=2" :
+ * le simulateur ne sait pas toucher l'écran, et un gfaim:// ouvre une demande de confirmation.
  *
  *   node capture.mjs [chemin/vers/Groubl.app] [fr en es]
  *
@@ -30,7 +30,10 @@ if (!existsSync(APP)) throw new Error(`App simulateur introuvable : ${APP}`);
 // Un simulateur dédié, recréé à chaque fois pour partir d'un état propre.
 const types = JSON.parse(sh("list", "devicetypes", "-j")).devicetypes;
 const type = types.find((t) => t.name === DEVICE) ?? types.filter((t) => /iPhone .* Pro$/.test(t.name)).at(-1);
-const runtime = JSON.parse(sh("list", "runtimes", "-j")).runtimes.filter((r) => r.platform === "iOS" && r.isAvailable).at(-1);
+// Le runtime le plus récent qui accepte ce modèle (iOS 27.1, par exemple, n'existe que pour l'iPhone Duo).
+const runtime = JSON.parse(sh("list", "runtimes", "-j"))
+  .runtimes.filter((r) => r.platform === "iOS" && r.isAvailable && r.supportedDeviceTypes?.some((d) => d.identifier === type.identifier))
+  .at(-1);
 console.log(`Simulateur : ${type.name}, ${runtime.name}`);
 
 for (const lang of LANGS.length ? LANGS : Object.keys(LOCALES)) {
@@ -47,37 +50,34 @@ for (const lang of LANGS.length ? LANGS : Object.keys(LOCALES)) {
       sh("io", udid, "screenshot", "--type=png", out + name);
       console.log(`  ${lang}/${name}`);
     };
-    const launch = async ([lat, lng]) => {
+    const launch = ([lat, lng], query = "") => {
       sh("location", udid, "set", `${lat},${lng}`);
       try {
         sh("terminate", udid, BUNDLE);
       } catch {
         /* l'app ne tournait pas encore */
       }
-      sh("launch", udid, BUNDLE, "-AppleLanguages", `(${lang})`, "-AppleLocale", LOCALES[lang]);
+      sh("launch", udid, BUNDLE, "-AppleLanguages", `(${lang})`, "-AppleLocale", LOCALES[lang], ...(query ? ["-deeplink", query] : []));
     };
-    const open = (query) => sh("openurl", udid, `gfaim://?${query}`);
 
     // 1. La dame pendant la recherche (juste après le lancement), puis 2. la carte et ses 5 pastilles.
-    await launch(PLACES.paris);
+    launch(PLACES.paris);
     await wait(1200);
     shot("01-recherche.png");
     await wait(9000);
     shot("02-carte.png");
 
     // 4. Mode surprise, 5. le panneau ouvert sur la liste.
-    open("mode=surprise");
-    await wait(4000);
+    launch(PLACES.paris, "mode=surprise");
+    await wait(8000);
     shot("04-surprise.png");
-    open("mode=top&sheet=2");
-    await wait(3500);
+    launch(PLACES.paris, "sheet=2");
+    await wait(8000);
     shot("05-liste.png");
 
     // 3. Une spécialité du coin : les crêpes à Rennes.
-    await launch(PLACES.rennes);
-    await wait(8000);
-    open(`cuisine=${CUISINE}&sheet=1`);
-    await wait(7000);
+    launch(PLACES.rennes, `cuisine=${CUISINE}&sheet=1`);
+    await wait(12000);
     shot("03-cuisines.png");
   } finally {
     try {

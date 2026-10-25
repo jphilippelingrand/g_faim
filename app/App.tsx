@@ -6,7 +6,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import BottomSheet, { BottomSheetScrollView, type BottomSheetScrollViewMethods } from "@gorhom/bottom-sheet";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Linking, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { Linking, Platform, Pressable, Settings, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useSharedValue } from "react-native-reanimated";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -110,6 +110,8 @@ function Main() {
   // À 40 %, la carte garde assez de hauteur pour ne pas trop dézoomer au cadrage.
   const snapPoints = useMemo(() => [SHEET_MIN, Math.round(screenH * 0.4), Math.round(screenH * 0.9)], [screenH]);
   const [sheetIndex, setSheetIndex] = useState(1);
+  // Hauteur demandée par un lien avant que le panneau existe (polices pas encore chargées).
+  const [startSheet, setStartSheet] = useState(1);
   // Haut du panneau, suivi en continu par le dé flottant.
   const sheetTop = useSharedValue(screenH);
   const listY = useRef(0);
@@ -140,7 +142,8 @@ function Main() {
 
   // Liens profonds gfaim://?cuisine=poutine&mode=fast&sheet=2 : ouvrent l'app dans un état donné
   // (cuisine choisie dès qu'elle est proposée, mode top/fast/surprise, hauteur du panneau 0/1/2).
-  // surprise=1/0 reste compris (anciens liens). Servent aussi
+  // surprise=1/0 reste compris (anciens liens). Même chose au lancement avec l'argument -deeplink "mode=fast&sheet=2"
+  // (iOS le range dans les préférences) : le simulateur demande confirmation à chaque gfaim://, pas au lancement. Servent aussi
   // à automatiser les captures App Store sur le simulateur, qui ne sait pas toucher l'écran.
   const pendingCuisine = useRef<string | null>(null);
   useEffect(() => {
@@ -156,9 +159,20 @@ function Main() {
       }
       if (params.cuisine !== undefined) pendingCuisine.current = params.cuisine || null;
       if (params.cuisine === "") setCategory(null);
-      if (params.sheet !== undefined) sheet.current?.snapToIndex(Number(params.sheet));
+      if (params.sheet !== undefined) {
+        const index = Number(params.sheet);
+        if (sheet.current) sheet.current.snapToIndex(index);
+        else {
+          setStartSheet(index);
+          setSheetIndex(index);
+        }
+      }
     };
     Linking.getInitialURL().then(apply);
+    if (Platform.OS === "ios") {
+      const arg = Settings.get("deeplink");
+      if (typeof arg === "string") apply(`gfaim://?${arg}`);
+    }
     const sub = Linking.addEventListener("url", ({ url }) => apply(url));
     return () => sub.remove();
   }, []);
@@ -321,7 +335,7 @@ function Main() {
 
       <BottomSheet
         ref={sheet}
-        index={1}
+        index={startSheet}
         snapPoints={snapPoints}
         onChange={setSheetIndex}
         animatedPosition={sheetTop}
