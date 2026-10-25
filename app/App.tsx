@@ -99,8 +99,9 @@ function Main() {
   const sheet = useRef<BottomSheet>(null);
   const insets = useSafeAreaInsets();
   const { height: screenH } = useWindowDimensions();
-  // Hauteurs du panneau : replié (dame + catégories), moitié, presque plein écran.
-  const snapPoints = useMemo(() => [SHEET_MIN, Math.round(screenH * 0.55), Math.round(screenH * 0.9)], [screenH]);
+  // Hauteurs du panneau : replié (catégories), ouvert (à l'ouverture), presque plein écran.
+  // À 40 %, la carte garde assez de hauteur pour ne pas trop dézoomer au cadrage.
+  const snapPoints = useMemo(() => [SHEET_MIN, Math.round(screenH * 0.4), Math.round(screenH * 0.9)], [screenH]);
   const [sheetIndex, setSheetIndex] = useState(1);
   // Haut du panneau, suivi en continu par le dé flottant.
   const sheetTop = useSharedValue(screenH);
@@ -253,11 +254,10 @@ function Main() {
 
       <DiceButton
         on={surprise}
-        onRoll={() => {
-          setSurprise(true);
-          setSeed(Date.now());
+        onToggle={() => {
+          if (!surprise) setSeed(Date.now());
+          setSurprise(!surprise);
         }}
-        onClose={() => setSurprise(false)}
         sheetTop={sheetTop}
         screenHeight={screenH}
       />
