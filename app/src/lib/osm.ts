@@ -265,13 +265,18 @@ function labelFor(key: string): { emoji: string; label: string; query: string } 
 // Les mêmes fichiers que le site, servis par le CDN de Vercel : un nouveau calcul ne demande pas de mise à jour de l'app.
 const CUISINES_URL = "https://www.groubl.com/cuisines";
 
+// Le site met la version du calcul dans l'adresse ; l'app, publiée pour des mois, ne peut pas la connaître.
+// La date du jour change l'adresse chaque jour : nouveaux pays vus sous 24 h, et un « introuvable » d'avant
+// l'ajout d'un pays ne reste pas en cache plus d'une journée.
+const DAY = new Date().toISOString().slice(0, 10);
+
 const tiles = new Map<string, Promise<CuisineNode | null>>();
 
 /** Fichier du carré de 10° (null hors des zones couvertes). */
 function getTile(key: string): Promise<CuisineNode | null> {
   let tile = tiles.get(key);
   if (!tile) {
-    tile = fetch(`${CUISINES_URL}/${key}.json`).then((r) =>
+    tile = fetch(`${CUISINES_URL}/${key}.json?v=${DAY}`).then((r) =>
       // Zone non couverte : 404 (on vérifie aussi le type, au cas où le site renverrait une page).
       r.ok && r.headers.get("content-type")?.includes("json") ? (r.json() as Promise<CuisineNode>) : null,
     );
