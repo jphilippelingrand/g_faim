@@ -23,37 +23,37 @@ const SIZES = {
 };
 
 // Une capture par diapositive, prise sur l'iPhone dans la langue concernée.
-const RAW = ["01-recherche.png", "02-carte.png", "03-cuisines.png", "04-surprise.png", "05-liste.png"];
+const RAW = ["01-carte.png", "02-liste.png", "03-cuisines.png", "04-rapide.png", "05-surprise.png"];
 
 const TEXT = {
   fr: {
     tagline: "Les meilleures tables ouvertes, juste à côté.",
     slides: [
       ["Ton ventre gargouille ?", "Groubl trouve les meilleures tables ouvertes autour de toi."],
-      ["Les 5 meilleures, là, maintenant", "Classées par note Google, uniquement celles qui sont ouvertes."],
+      ["Les 5 meilleures, là, maintenant", "Classées par note Google, ouvertes uniquement. Un tap pour l'itinéraire."],
       ["Les spécialités du coin", "Poutine, crêpes, basque… selon l'endroit où tu es."],
+      ["Une faim pressée ?", "Sur le pouce : fast-foods et sandwicheries bien notés, au plus près."],
       ["Laisse le hasard choisir", "Le mode surprise tire 5 restos au pif."],
-      ["Un tap, et c'est parti", "L'itinéraire s'ouvre en un geste."],
     ],
   },
   en: {
     tagline: "The best open tables, right around the corner.",
     slides: [
       ["Tummy rumbling?", "Groubl finds the best open restaurants around you."],
-      ["The top 5, right here, right now", "Ranked by Google rating, open places only."],
+      ["The top 5, right here, right now", "Ranked by Google rating, open places only. One tap for directions."],
       ["Local specialties", "Poutine, crêpes, Basque food… depending on where you are."],
+      ["In a hurry?", "Quick bite: well-rated fast food and sandwiches, as close as it gets."],
       ["Let chance decide", "Surprise mode picks 5 restaurants at random."],
-      ["One tap and you're off", "Directions open in a single tap."],
     ],
   },
   es: {
     tagline: "Las mejores mesas abiertas, a la vuelta de la esquina.",
     slides: [
       ["¿Te ruge la barriga?", "Groubl encuentra los mejores restaurantes abiertos cerca de ti."],
-      ["Los 5 mejores, aquí y ahora", "Ordenados por nota de Google, solo los que están abiertos."],
+      ["Los 5 mejores, aquí y ahora", "Ordenados por nota de Google, solo abiertos. Un toque para llegar."],
       ["Especialidades locales", "Poutine, crepes, cocina vasca… según dónde estés."],
+      ["¿Con prisa?", "Algo rápido: comida rápida y bocadillos bien valorados, lo más cerca posible."],
       ["Deja que el azar elija", "El modo sorpresa elige 5 restaurantes al azar."],
-      ["Un toque y en marcha", "Cómo llegar, en un solo gesto."],
     ],
   },
 };

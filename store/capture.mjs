@@ -60,20 +60,18 @@ for (const lang of LANGS.length ? LANGS : Object.keys(LOCALES)) {
       sh("launch", udid, BUNDLE, "-AppleLanguages", `(${lang})`, "-AppleLocale", LOCALES[lang], ...(query ? ["-deeplink", query] : []));
     };
 
-    // 1. La dame pendant la recherche (juste après le lancement), puis 2. la carte et ses 5 pastilles.
-    launch(PLACES.paris);
-    await wait(1200);
-    shot("01-recherche.png");
-    await wait(9000);
-    shot("02-carte.png");
-
-    // 4. Mode surprise, 5. le panneau ouvert sur la liste.
-    launch(PLACES.paris, "mode=surprise");
-    await wait(8000);
-    shot("04-surprise.png");
-    launch(PLACES.paris, "sheet=2");
-    await wait(8000);
-    shot("05-liste.png");
+    // Paris : 1. la carte et ses 5 pastilles, 2. la liste (panneau ouvert en grand),
+    // 4. le mode rapide, 5. le mode surprise. Chaque lancement relance la recherche.
+    for (const [name, query] of [
+      ["01-carte.png", ""],
+      ["02-liste.png", "sheet=2"],
+      ["04-rapide.png", "mode=fast"],
+      ["05-surprise.png", "mode=surprise"],
+    ]) {
+      launch(PLACES.paris, query);
+      await wait(10000);
+      shot(name);
+    }
 
     // 3. Une spécialité du coin : les crêpes à Rennes.
     launch(PLACES.rennes, `cuisine=${CUISINE}&sheet=1`);

@@ -106,9 +106,12 @@ function Main() {
   const sheet = useRef<BottomSheet>(null);
   const insets = useSafeAreaInsets();
   const { height: screenH } = useWindowDimensions();
-  // Hauteurs du panneau : replié (catégories), ouvert (à l'ouverture), presque plein écran.
+  // Hauteurs du panneau : replié (catégories), ouvert (à l'ouverture), ouvert en grand jusque sous le bandeau.
   // À 40 %, la carte garde assez de hauteur pour ne pas trop dézoomer au cadrage.
-  const snapPoints = useMemo(() => [SHEET_MIN, Math.round(screenH * 0.4), Math.round(screenH * 0.9)], [screenH]);
+  const snapPoints = useMemo(
+    () => [SHEET_MIN, Math.round(screenH * 0.4), Math.round(screenH - insets.top - TOP_BAR)],
+    [screenH, insets.top],
+  );
   const [sheetIndex, setSheetIndex] = useState(1);
   // Hauteur demandée par un lien avant que le panneau existe (polices pas encore chargées).
   const [startSheet, setStartSheet] = useState(1);
