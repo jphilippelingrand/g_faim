@@ -94,6 +94,8 @@ const LABELS: Record<string, [emoji: string, fr: string, en: string, es: string,
   smoked_meat: ["🥩", "Smoked meat", "Smoked meat", "Smoked meat"],
   shawarma: ["🥙", "Shawarma", "Shawarma", "Shawarma"],
   barbecue: ["🍖", "Barbecue", "BBQ", "Barbacoa"],
+  tibetan: ["🥟", "Tibétain", "Tibetan", "Tibetano", R],
+  canadian: ["🍁", "Canadien", "Canadian", "Canadiense", R],
 };
 
 const RESTAURANT = { fr: "restaurant", en: "restaurant", es: "restaurante" };

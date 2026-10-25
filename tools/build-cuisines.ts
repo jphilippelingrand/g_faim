@@ -14,7 +14,10 @@ import { cellKey, LEVELS, type CategoryEntry, type CuisineNode } from "../src/li
 
 const CONFIG = {
   countries: ["france", "canada"],
-  // Zones où l'on descend jusqu'au niveau le plus fin (0,05°) : [lat min, lng min, lat max, lng max].
+  // Une région de 0,5° avec au moins ce nombre de restos est découpée en quartiers de 0,05° (~5 km) :
+  // toutes les grandes villes, sans liste à tenir à jour.
+  refineMinRestaurants: 500,
+  // Zones à découper quand même, sous le seuil : [lat min, lng min, lat max, lng max].
   refine: [
     { name: "Montréal", bbox: [45.4, -73.98, 45.71, -73.47] },
     { name: "Pays basque", bbox: [42.95, -1.8, 43.6, -0.9] },
@@ -37,7 +40,7 @@ const MIN_COUNT = 3;
 const IGNORED = new Set(["yes", "coffee_shop", "ice_cream", "cake", "donut", "tea", "juice", "international", "local"]);
 
 type Counts = Map<string, number>;
-type Tree = { count: number; cuisines: Counts; children: Map<string, Tree> };
+type Tree = { count: number; cuisines: Counts; children: Map<string, Tree>; forced?: boolean };
 
 const newTree = (): Tree => ({ count: 0, cuisines: new Map(), children: new Map() });
 
@@ -90,14 +93,15 @@ async function addCountry(tiles: Map<string, Tree>, country: string): Promise<nu
     if (!point) continue;
     const [lng, lat] = point;
 
-    // Le resto compte dans sa zone à chaque niveau (le plus fin seulement dans les zones affinées).
-    const depth = inRefinedArea(lat, lng) ? LEVELS.length : LEVELS.length - 1;
+    // Le resto compte dans sa zone à chaque niveau ; on décide à l'écriture où garder le plus fin.
+    const forced = inRefinedArea(lat, lng);
     let level: Map<string, Tree> = tiles;
-    for (let l = 0; l < depth; l++) {
+    for (let l = 0; l < LEVELS.length; l++) {
       const key = cellKey(lat, lng, l);
       let node = level.get(key);
       if (!node) level.set(key, (node = newTree()));
       node.count++;
+      if (forced) node.forced = true;
       for (const c of cuisines) node.cuisines.set(c, (node.cuisines.get(c) ?? 0) + 1);
       level = node.children;
     }
@@ -137,10 +141,14 @@ function categoriesFor(cuisines: Counts, world: Baseline): CategoryEntry[] {
   return [...distinctive.map((c): CategoryEntry => [c.key, 1]), ...common.map((c): CategoryEntry => [c.key])];
 }
 
-function toNode(tree: Tree, world: Baseline): CuisineNode {
+function toNode(tree: Tree, world: Baseline, level = 0): CuisineNode {
   const node: CuisineNode = { count: tree.count, categories: categoriesFor(tree.cuisines, world) };
-  const subs = [...tree.children].filter(([, child]) => child.count >= CONFIG.minRestaurants);
-  if (subs.length) node.sub_regions = Object.fromEntries(subs.sort().map(([k, child]) => [k, toNode(child, world)]));
+  // Les régions (niveau 1) ne sont découpées en quartiers que si elles sont denses ou forcées.
+  const split = level === 0 || (level === 1 && (tree.count >= CONFIG.refineMinRestaurants || tree.forced));
+  const subs = split ? [...tree.children].filter(([, child]) => child.count >= CONFIG.minRestaurants) : [];
+  if (subs.length) {
+    node.sub_regions = Object.fromEntries(subs.sort().map(([k, child]) => [k, toNode(child, world, level + 1)]));
+  }
   return node;
 }
 
