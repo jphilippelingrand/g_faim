@@ -6,7 +6,7 @@ const GOOGLE_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 export const BUNDLE_ID = "com.jphilippelingrand.gfaim";
 
 const config: ExpoConfig = {
-  name: "J'ai faim",
+  name: "Groubl",
   slug: "g-faim",
   scheme: "gfaim",
   // Vient du tag git avec le workflow EAS (« v1.0.2 » → 1.0.2) ; sinon (build lancé à la main), cette valeur.
@@ -42,7 +42,7 @@ const config: ExpoConfig = {
     [
       "expo-location",
       {
-        locationWhenInUsePermission: "J'ai faim utilise ta position pour trouver les meilleurs restos ouverts autour de toi.",
+        locationWhenInUsePermission: "Groubl utilise ta position pour trouver les meilleurs restos ouverts autour de toi.",
       },
     ],
     ["react-native-maps", { iosGoogleMapsApiKey: GOOGLE_KEY, androidGoogleMapsApiKey: GOOGLE_KEY }],

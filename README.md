@@ -1,4 +1,4 @@
-# J'ai faim
+# Groubl
 
 Prototype React + Vite : à l'ouverture, l'app prend ta position et affiche sur une carte Google les 5 restaurants les mieux notés autour de toi.
 

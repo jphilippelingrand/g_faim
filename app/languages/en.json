@@ -1,6 +1,6 @@
 {
   "ios": {
-    "CFBundleDisplayName": "I'm hungry",
-    "NSLocationWhenInUseUsageDescription": "J'ai faim uses your location to find the best open restaurants around you."
+    "CFBundleDisplayName": "Groubl",
+    "NSLocationWhenInUseUsageDescription": "Groubl uses your location to find the best open restaurants around you."
   }
 }

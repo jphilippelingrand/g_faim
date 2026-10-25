@@ -12,21 +12,21 @@ const DIST = "dist";
 const LANGS = {
   fr: {
     locale: "fr_FR",
-    name: "J'ai faim",
+    name: "Groubl",
     description: "Les 5 meilleures tables ouvertes, juste à côté.",
-    imageAlt: "La petite dame de J'ai faim, le ventre qui gargouille",
+    imageAlt: "La petite dame de Groubl, le ventre qui gargouille",
   },
   en: {
     locale: "en_US",
-    name: "I'm hungry",
+    name: "Groubl",
     description: "The 5 best open tables, right around the corner.",
-    imageAlt: "The little lady from I'm hungry, with a rumbling tummy",
+    imageAlt: "The little lady from Groubl, with a rumbling tummy",
   },
   es: {
     locale: "es_ES",
-    name: "Tengo hambre",
+    name: "Groubl",
     description: "Las 5 mejores mesas abiertas, a la vuelta de la esquina.",
-    imageAlt: "La señora de Tengo hambre, con la barriga rugiendo",
+    imageAlt: "La señora de Groubl, con la barriga rugiendo",
   },
 };
 
