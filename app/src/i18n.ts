@@ -16,6 +16,7 @@ export const lang: Lang =
 export const locale = { fr: "fr-FR", en: "en-US", es: "es-ES" }[lang];
 
 const fr = {
+  closeSurprise: "Revenir au classement par note",
   support: "Support",
   menu: "Menu",
   cuisineType: "Type de cuisine",
@@ -52,6 +53,7 @@ const fr = {
 type Dict = typeof fr;
 
 const en: Dict = {
+  closeSurprise: "Back to the top rated",
   support: "Support",
   menu: "Menu",
   cuisineType: "Type of cuisine",
@@ -86,6 +88,7 @@ const en: Dict = {
 };
 
 const es: Dict = {
+  closeSurprise: "Volver a los mejor valorados",
   support: "Soporte",
   menu: "Menú",
   cuisineType: "Tipo de cocina",

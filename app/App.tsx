@@ -6,11 +6,12 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import BottomSheet, { BottomSheetScrollView, type BottomSheetScrollViewMethods } from "@gorhom/bottom-sheet";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { Linking, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { useSharedValue } from "react-native-reanimated";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
-import { type Mood } from "./src/components/Lady";
-import { LadyMenu } from "./src/components/LadyMenu";
+import { DiceButton } from "./src/components/DiceButton";
+import { Lady, type Mood } from "./src/components/Lady";
 import { CategoryBar } from "./src/components/CategoryBar";
 import { RestaurantCard } from "./src/components/RestaurantCard";
 import { RestaurantMap } from "./src/components/RestaurantMap";
@@ -27,7 +28,7 @@ import {
   type Restaurant,
 } from "./src/lib/places";
 import { colors, fonts } from "./src/theme";
-import { t } from "./src/i18n";
+import { lang, t } from "./src/i18n";
 import { MAX_SHOWN, neighborhoodCategories, type Category } from "./src/lib/osm";
 
 SplashScreen.preventAutoHideAsync();
@@ -36,6 +37,7 @@ type Phase = "locating" | "searching" | "done" | "error";
 
 // Mise en page : hauteur de la barre du haut (sous l'encoche, la dame y tient) et du panneau replié (catégories).
 const TOP_BAR = 72;
+const SITE = "https://www.groubl.com";
 const SHEET_MIN = 190;
 
 // En dessous de cette fraction de la zone fouillée, un zoom avant relance la recherche.
@@ -100,6 +102,8 @@ function Main() {
   // Hauteurs du panneau : replié (dame + catégories), moitié, presque plein écran.
   const snapPoints = useMemo(() => [SHEET_MIN, Math.round(screenH * 0.55), Math.round(screenH * 0.9)], [screenH]);
   const [sheetIndex, setSheetIndex] = useState(1);
+  // Haut du panneau, suivi en continu par le dé flottant.
+  const sheetTop = useSharedValue(screenH);
   const listY = useRef(0);
   const cardY = useRef(new Map<string, number>());
 
@@ -176,11 +180,6 @@ function Main() {
     if (y != null) scroll.current?.scrollTo({ y: listY.current + y - 16, animated: true });
   }, []);
 
-  const toggleSurprise = (on: boolean) => {
-    setSurprise(on);
-    setSeed(Date.now());
-  };
-
   const top = useMemo(() => (surprise ? pickRandom(places, seed) : rankTop(places)), [places, surprise, seed]);
 
   // 4 cuisines au plus ; la cuisine choisie reste affichée même si elle sort du top en bougeant la carte.
@@ -238,20 +237,28 @@ function Main() {
       )}
 
       <View style={[styles.topBar, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
-        <LadyMenu
-          mood={mood}
-          surprise={surprise}
-          onSurprise={toggleSurprise}
-          onReroll={() => setSeed(Date.now())}
-          top={topBarHeight + 8}
-        />
+        <View style={styles.ladyBadge}>
+          <Lady mood={mood} surprise={surprise} width={58} />
+        </View>
       </View>
+
+      <DiceButton
+        on={surprise}
+        onRoll={() => {
+          setSurprise(true);
+          setSeed(Date.now());
+        }}
+        onClose={() => setSurprise(false)}
+        sheetTop={sheetTop}
+        screenHeight={screenH}
+      />
 
       <BottomSheet
         ref={sheet}
         index={1}
         snapPoints={snapPoints}
         onChange={setSheetIndex}
+        animatedPosition={sheetTop}
         backgroundStyle={styles.sheetBackground}
         handleIndicatorStyle={styles.sheetHandle}
         enableDynamicSizing={false}
@@ -298,7 +305,17 @@ function Main() {
             </View>
           )}
 
-          <Text style={styles.footer}>{t("footer")}</Text>
+          <Text style={styles.footer}>
+            {t("footer")}
+            {"\n"}
+            <Text style={styles.footerLink} onPress={() => Linking.openURL(`${SITE}/${lang}/privacy`)} accessibilityRole="link">
+              {t("privacy")}
+            </Text>
+            {"  ·  "}
+            <Text style={styles.footerLink} onPress={() => Linking.openURL(`${SITE}/${lang}/support`)} accessibilityRole="link">
+              {t("support")}
+            </Text>
+          </Text>
         </BottomSheetScrollView>
       </BottomSheet>
     </View>
@@ -350,5 +367,19 @@ const styles = StyleSheet.create({
   goButtonText: { color: "#fff", fontFamily: fonts.title, fontSize: 16 },
   results: { gap: 14, paddingTop: 8, paddingLeft: 8 },
   stale: { opacity: 0.5 },
-  footer: { fontFamily: fonts.body, fontSize: 12, color: colors.muted, textAlign: "center", marginTop: 24 },
+  footer: { fontFamily: fonts.body, fontSize: 12, lineHeight: 20, color: colors.muted, textAlign: "center", marginTop: 24 },
+  footerLink: { textDecorationLine: "underline" },
+  ladyBadge: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "rgba(251, 246, 239, 0.95)",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    overflow: "hidden",
+    shadowColor: colors.ink,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
 });
