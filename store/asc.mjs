@@ -15,6 +15,8 @@ import { homedir } from "node:os";
 const APPLY = process.argv.includes("--apply");
 // Pour n'envoyer que la version, le build et les textes (ex. tant que les captures sont provisoires).
 const SKIP_SCREENSHOTS = process.argv.includes("--skip-screenshots");
+// Pour ne toucher que certaines langues : --locales en-AU,en-CA
+const ONLY = process.argv.includes("--locales") ? process.argv[process.argv.indexOf("--locales") + 1].split(",") : null;
 const BUILD = process.argv.includes("--build") ? process.argv[process.argv.indexOf("--build") + 1] : null;
 const BUNDLE_ID = "com.jphilippelingrand.gfaim";
 // Numéro de version par défaut de l'app (app.config.ts : APP_VERSION || "x.y.z").
@@ -24,7 +26,12 @@ const STORE = JSON.parse(readFileSync(new URL("../app/store.config.json", import
 // Dossier généré → type d'écran de l'API. L'API n'a pas (encore) de type iPhone Duo : ces captures-là
 // se déposent à la main sur le site d'App Store Connect.
 const DISPLAY_TYPES = { "iphone-6.9": "APP_IPHONE_67", "iphone-6.3": "APP_IPHONE_61" };
-const LOCALE_DIRS = { "fr-FR": "fr", "en-US": "en", "es-ES": "es" };
+const LOCALE_DIRS = { "fr-FR": "fr", "en-US": "en", "en-AU": "en", "en-CA": "en", "es-ES": "es" };
+// Langues de la fiche sans textes à elles : celles de la langue indiquée.
+const SAME_AS = { "en-AU": "en-US", "en-CA": "en-US" };
+const INFO = Object.fromEntries(
+  [...Object.entries(STORE.info), ...Object.entries(SAME_AS).map(([l, src]) => [l, STORE.info[src]])].filter(([l]) => !ONLY || ONLY.includes(l)),
+);
 
 // ---------------------------------------------------------------- API
 
@@ -80,6 +87,11 @@ const { data: versions } = await api("GET", `/v1/apps/${app.id}/appStoreVersions
 const version = versions.find((v) => ["PREPARE_FOR_SUBMISSION", "DEVELOPER_REJECTED", "REJECTED", "METADATA_REJECTED"].includes(v.attributes.appStoreState ?? v.attributes.appVersionState));
 if (!version) throw new Error("Aucune version modifiable (en préparation) trouvée.");
 console.log(`\nVersion : ${version.attributes.versionString} → ${VERSION}`);
+if (STORE.copyright && version.attributes.copyright !== STORE.copyright) {
+  await write(`copyright « ${STORE.copyright} »`, "PATCH", `/v1/appStoreVersions/${version.id}`, {
+    data: { type: "appStoreVersions", id: version.id, attributes: { copyright: STORE.copyright } },
+  });
+}
 if (version.attributes.versionString !== VERSION) {
   await write(`renommer en ${VERSION}`, "PATCH", `/v1/appStoreVersions/${version.id}`, {
     data: { type: "appStoreVersions", id: version.id, attributes: { versionString: VERSION } },
@@ -106,7 +118,7 @@ const { data: infoLocs } = await api("GET", `/v1/appInfos/${appInfo.id}/appInfoL
 const { data: versionLocs } = await api("GET", `/v1/appStoreVersions/${version.id}/appStoreVersionLocalizations`);
 
 const localizationIds = {};
-for (const [locale, t] of Object.entries(STORE.info)) {
+for (const [locale, t] of Object.entries(INFO)) {
   console.log(`\n${locale}`);
   const infoAttrs = { name: t.title, subtitle: t.subtitle, privacyPolicyUrl: t.privacyPolicyUrl };
   const infoLoc = infoLocs.find((l) => l.attributes.locale === locale);
@@ -175,7 +187,7 @@ async function uploadScreenshot(setId, file) {
 }
 
 console.log(`\nCaptures${SKIP_SCREENSHOTS ? " : ignorées (--skip-screenshots)" : ""}`);
-for (const [locale, dir] of SKIP_SCREENSHOTS ? [] : Object.entries(LOCALE_DIRS)) {
+for (const [locale, dir] of SKIP_SCREENSHOTS ? [] : Object.entries(LOCALE_DIRS).filter(([l]) => l in INFO)) {
   for (const [folder, displayType] of Object.entries(DISPLAY_TYPES)) {
     const path = new URL(`./out/${dir}/${folder}/`, import.meta.url).pathname;
     if (!existsSync(path)) continue;
