@@ -4,9 +4,11 @@ import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from "react";
-import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import BottomSheet, { BottomSheetScrollView, type BottomSheetScrollViewMethods } from "@gorhom/bottom-sheet";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Linking, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Lady, type Mood } from "./src/components/Lady";
 import { CategoryBar } from "./src/components/CategoryBar";
 import { RestaurantCard } from "./src/components/RestaurantCard";
@@ -34,6 +36,11 @@ type Phase = "locating" | "searching" | "done" | "error";
 
 const PRIVACY_URL = `https://www.groubl.com/${lang}/privacy`;
 
+// Mise en page : hauteur de la barre du haut (sous la zone de l'encoche), panneau replié, taille de la dame.
+const TOP_BAR = 60;
+const SHEET_MIN = 250;
+const LADY_WIDTH = 92;
+
 // En dessous de cette fraction de la zone fouillée, un zoom avant relance la recherche.
 const ZOOM_IN_RATIO = 0.6;
 
@@ -44,7 +51,8 @@ async function getPosition(): Promise<LatLng> {
   return { latitude: coords.latitude, longitude: coords.longitude };
 }
 
-export default function App() {
+/** L'écran : carte plein écran, barre du haut, et un panneau qu'on tire du bas (dame, catégories, restos). */
+function Main() {
   const [fontsLoaded, fontError] = useFonts({ Fraunces_700Bold, Fraunces_900Black_Italic, Inter_400Regular, Inter_500Medium });
   useEffect(() => {
     if (fontsLoaded || fontError) SplashScreen.hide();
@@ -88,7 +96,13 @@ export default function App() {
       .catch((err) => console.warn("Catégories indisponibles", err));
   }, []);
 
-  const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
+  const scroll = useRef<BottomSheetScrollViewMethods>(null);
+  const sheet = useRef<BottomSheet>(null);
+  const insets = useSafeAreaInsets();
+  const { height: screenH } = useWindowDimensions();
+  // Hauteurs du panneau : replié (dame + catégories), moitié, presque plein écran.
+  const snapPoints = useMemo(() => [SHEET_MIN, Math.round(screenH * 0.55), Math.round(screenH * 0.9)], [screenH]);
+  const [sheetIndex, setSheetIndex] = useState(1);
   const listY = useRef(0);
   const cardY = useRef(new Map<string, number>());
 
@@ -159,9 +173,16 @@ export default function App() {
   const onSelectFromMap = useCallback((id: string) => {
     setSelectedId(id);
     Haptics.selectionAsync();
+    // Ouvre le panneau à mi-hauteur et fait défiler jusqu'au resto.
+    sheet.current?.snapToIndex(1);
     const y = cardY.current.get(id);
-    if (y != null) scroll.current?.scrollTo({ y: listY.current + y - 120, animated: true });
+    if (y != null) scroll.current?.scrollTo({ y: listY.current + y - 16, animated: true });
   }, []);
+
+  const toggleSurprise = (on: boolean) => {
+    setSurprise(on);
+    setSeed(Date.now());
+  };
 
   const top = useMemo(() => (surprise ? pickRandom(places, seed) : rankTop(places)), [places, surprise, seed]);
 
@@ -173,13 +194,12 @@ export default function App() {
   const busy = phase === "locating" || phase === "searching";
   const mood: Mood = busy ? "starving" : phase === "done" && top.length ? "happy" : "hungry";
 
+  // Ligne de statut seulement quand il y a quelque chose à dire ; sinon, l'accroche.
   let status = "";
   if (phase === "locating") status = t("locating");
   else if (phase === "searching") status = t("searching");
   else if (phase === "error") status = error ?? "";
   else if (!top.length) status = t("nothingOpen");
-  else if (surprise) status = t("randomWithin", { n: top.length, radius: formatDistance(area?.radius ?? 0) });
-  else status = t("topWithin", { n: top.length, radius: formatDistance(area?.radius ?? 0) });
 
   async function submitAddress() {
     if (!address.trim()) return;
@@ -198,53 +218,61 @@ export default function App() {
 
   if (!fontsLoaded && !fontError) return null;
 
+  const topBarHeight = insets.top + TOP_BAR;
+
   return (
-    <SafeAreaProvider>
+    <View style={styles.screen}>
       <StatusBar style="dark" />
-      <SafeAreaView style={styles.safe} edges={["top"]}>
-        <ScrollView ref={scroll} contentContainerStyle={styles.content}>
-          <View style={styles.header}>
-            <ShuffleToggle
-              on={surprise}
-              onChange={(on) => {
-                setSurprise(on);
-                setSeed(Date.now());
-              }}
-            />
-            <Lady mood={mood} surprise={surprise} />
-            <Text style={styles.title}>{t("appName")}</Text>
-            <Text style={styles.tagline}>
-              {surprise ? t("taglineSurprise") : t("tagline")}
-            </Text>
+
+      {home ? (
+        <RestaurantMap
+          home={home}
+          results={top}
+          area={area}
+          fitKey={fitKey}
+          selectedId={selectedId}
+          onSelect={onSelectFromMap}
+          onViewportChange={onViewportChange}
+          // Panneau plein écran : la carte est cachée, on garde le cadrage de la position moitié.
+          insets={{ top: topBarHeight, bottom: snapPoints[Math.min(sheetIndex, 1)] }}
+        />
+      ) : (
+        <View style={styles.mapPlaceholder} />
+      )}
+
+      <View style={[styles.topBar, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
+        <View style={styles.titlePill}>
+          <Text style={styles.title}>{t("appName")}</Text>
+        </View>
+        <ShuffleToggle style={styles.shuffle} on={surprise} onChange={toggleSurprise} />
+      </View>
+
+      <BottomSheet
+        ref={sheet}
+        index={1}
+        snapPoints={snapPoints}
+        onChange={setSheetIndex}
+        backgroundStyle={styles.sheetBackground}
+        handleIndicatorStyle={styles.sheetHandle}
+        enableDynamicSizing={false}
+      >
+        <BottomSheetScrollView ref={scroll} contentContainerStyle={styles.sheetContent}>
+          <View style={styles.sheetHeader}>
+            <Lady mood={mood} surprise={surprise} width={LADY_WIDTH} />
+            <View style={styles.sheetHeaderText}>
+              <Text style={styles.tagline}>{surprise ? t("taglineSurprise") : t("tagline")}</Text>
+              {status !== "" && <Text style={[styles.status, phase === "error" && styles.statusError]}>{status}</Text>}
+              {surprise && phase === "done" && top.length > 0 && (
+                <Text style={styles.reroll} onPress={() => setSeed(Date.now())} accessibilityRole="button">
+                  ↻ {t("reroll")}
+                </Text>
+              )}
+            </View>
           </View>
 
           {shownCategories.length > 0 && (
             <CategoryBar categories={shownCategories} selected={category} onSelect={setCategory} />
           )}
-
-          {home && (
-            <RestaurantMap
-              home={home}
-              results={top}
-              area={area}
-              fitKey={fitKey}
-              selectedId={selectedId}
-              onSelect={onSelectFromMap}
-              onViewportChange={onViewportChange}
-            />
-          )}
-
-          <Text style={[styles.status, phase === "error" && styles.statusError]}>
-            {status}
-            {surprise && phase === "done" && top.length > 0 && (
-              <>
-                {" · "}
-                <Text style={styles.reroll} onPress={() => setSeed(Date.now())} accessibilityRole="button">
-                  {t("reroll")}
-                </Text>
-              </>
-            )}
-          </Text>
 
           {askAddress && (
             <View style={styles.address}>
@@ -255,8 +283,8 @@ export default function App() {
                 value={address}
                 onChangeText={setAddress}
                 onSubmitEditing={submitAddress}
+                onFocus={() => sheet.current?.snapToIndex(2)}
                 returnKeyType="search"
-                autoFocus
               />
               <Pressable style={styles.goButton} onPress={submitAddress}>
                 <Text style={styles.goButtonText}>{t("go")}</Text>
@@ -287,21 +315,56 @@ export default function App() {
               {t("privacy")}
             </Text>
           </Text>
-        </ScrollView>
-      </SafeAreaView>
+        </BottomSheetScrollView>
+      </BottomSheet>
+    </View>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <GestureHandlerRootView style={styles.screen}>
+        <Main />
+      </GestureHandlerRootView>
     </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.bg },
-  content: { paddingHorizontal: 16, paddingBottom: 32 },
-  header: { alignItems: "center", position: "relative" },
-  title: { fontFamily: fonts.title, fontSize: 40, color: colors.ink, letterSpacing: -0.8, marginTop: 4 },
-  tagline: { fontFamily: fonts.body, fontSize: 15, color: colors.muted, marginTop: 4, marginBottom: 20 },
-  status: { fontFamily: fonts.body, fontSize: 14, color: colors.muted, textAlign: "center", marginTop: 16, marginBottom: 14 },
+  screen: { flex: 1, backgroundColor: colors.bg },
+  mapPlaceholder: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: colors.accentSoft },
+  topBar: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+  },
+  titlePill: {
+    backgroundColor: "rgba(251, 246, 239, 0.94)",
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    shadowColor: colors.ink,
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  title: { fontFamily: fonts.title, fontSize: 22, color: colors.ink, letterSpacing: -0.4 },
+  shuffle: { position: "relative" },
+  sheetBackground: { backgroundColor: colors.bg, borderRadius: 24 },
+  sheetHandle: { backgroundColor: colors.line, width: 44 },
+  sheetContent: { paddingHorizontal: 16, paddingBottom: 48 },
+  sheetHeader: { flexDirection: "row", alignItems: "flex-end", gap: 12, marginTop: -18, marginBottom: 12 },
+  sheetHeaderText: { flex: 1, paddingBottom: 14, gap: 4 },
+  tagline: { fontFamily: fonts.title, fontSize: 18, color: colors.ink, lineHeight: 22 },
+  status: { fontFamily: fonts.body, fontSize: 14, color: colors.muted },
   statusError: { color: colors.accent },
-  reroll: { color: colors.accent, textDecorationLine: "underline" },
+  reroll: { fontFamily: fonts.medium, fontSize: 14, color: colors.accent },
   address: { flexDirection: "row", gap: 8, marginBottom: 16 },
   input: {
     flex: 1,

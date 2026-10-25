@@ -1,13 +1,21 @@
 import * as Haptics from "expo-haptics";
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { colors, fonts } from "../theme";
 import { t } from "../i18n";
 
 
 /** Interrupteur du mode surprise ; un appui long affiche une bulle d'explication. */
-export function ShuffleToggle({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+export function ShuffleToggle({
+  on,
+  onChange,
+  style,
+}: {
+  on: boolean;
+  onChange: (on: boolean) => void;
+  style?: StyleProp<ViewStyle>;
+}) {
   const [tip, setTip] = useState(false);
   useEffect(() => {
     if (!tip) return;
@@ -16,7 +24,7 @@ export function ShuffleToggle({ on, onChange }: { on: boolean; onChange: (on: bo
   }, [tip]);
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, style]}>
       <Pressable
         style={[styles.button, on && styles.buttonOn]}
         onPress={() => {

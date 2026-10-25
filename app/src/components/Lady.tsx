@@ -16,6 +16,7 @@ const PIF_LOOP = 1400;
 // Où flottent les « ? » autour de la tête en mode surprise.
 const QUESTION_POS = [{ left: "22%", fontSize: 22 }, { left: "70%", fontSize: 17 }, { left: "60%", fontSize: 25 }] as const;
 
+// Taille par défaut ; la dame se dessine à n'importe quelle largeur (prop width), tout est proportionnel.
 const W = 200;
 const H = 225;
 const VIEWBOX = "0 0 240 270";
@@ -24,7 +25,10 @@ const VIEWBOX = "0 0 240 270";
  * Même dessin que la version web, découpé en calques superposés (corps, ondes, ventre, bras)
  * pour animer le ventre et les ondes indépendamment. Tous les calques partagent le même viewBox.
  */
-export function Lady({ mood, surprise = false }: { mood: Mood; surprise?: boolean }) {
+export function Lady({ mood, surprise = false, width = W }: { mood: Mood; surprise?: boolean; width?: number }) {
+  const k = width / W;
+  const ladyW = width;
+  const ladyH = H * k;
   // Un tap la fait gargouiller à fond pendant un instant.
   const [poked, setPoked] = useState(false);
   useEffect(() => {
@@ -116,10 +120,10 @@ export function Lady({ mood, surprise = false }: { mood: Mood; surprise?: boolea
   const happy = effective === "happy";
 
   return (
-    <Pressable onPress={poke} accessibilityLabel={t("ladyLabel")} style={styles.wrap}>
+    <Pressable onPress={poke} accessibilityLabel={t("ladyLabel")} style={[styles.wrap, { paddingTop: 34 * k }]}>
       <View style={styles.grr} pointerEvents="none">
         {surprise ? (
-          <Animated.Text style={[styles.letter, styles.pif, { transform: [{ translateY: pif.bob }, { rotate: pif.tilt }] }]}>
+          <Animated.Text style={[styles.letter, styles.pif, { fontSize: 26 * k }, { transform: [{ translateY: pif.bob }, { rotate: pif.tilt }] }]}>
             {t("ladyPif")}
           </Animated.Text>
         ) : (
@@ -128,7 +132,7 @@ export function Lady({ mood, surprise = false }: { mood: Mood; surprise?: boolea
             return (
               <Animated.Text
                 key={i}
-                style={[styles.letter, { opacity: l.opacity, transform: [{ translateY: l.translateY }, { scale: l.scale }] }]}
+                style={[styles.letter, { fontSize: 26 * k, opacity: l.opacity, transform: [{ translateY: l.translateY }, { scale: l.scale }] }]}
               >
                 {ch}
               </Animated.Text>
@@ -142,16 +146,16 @@ export function Lady({ mood, surprise = false }: { mood: Mood; surprise?: boolea
           <Animated.Text
             key={i}
             pointerEvents="none"
-            style={[styles.question, QUESTION_POS[i], { opacity: q.opacity, transform: [{ translateY: q.translateY }] }]}
+            style={[styles.question, { top: 50 * k, left: QUESTION_POS[i].left, fontSize: QUESTION_POS[i].fontSize * k, opacity: q.opacity, transform: [{ translateY: q.translateY }] }]}
           >
             ?
           </Animated.Text>
         ))}
 
       <Animated.View style={{ transform: [{ perspective: 600 }, { rotateY: pif.spin }] }}>
-        <Animated.View style={[styles.figure, { transform: [{ translateX: anim.shakeX }, { rotate: anim.shakeRot }] }]}>
+        <Animated.View style={[styles.figure, { width: ladyW, height: ladyH, transform: [{ translateX: anim.shakeX }, { rotate: anim.shakeRot }] }]}>
           {/* corps, tête, visage */}
-          <Svg width={W} height={H} viewBox={VIEWBOX} style={StyleSheet.absoluteFill}>
+          <Svg width={ladyW} height={ladyH} viewBox={VIEWBOX} style={StyleSheet.absoluteFill}>
             <Ellipse cx="100" cy="258" rx="16" ry="7" fill={colors.ink} />
             <Ellipse cx="140" cy="258" rx="16" ry="7" fill={colors.ink} />
             <Path d="M92 84 Q120 76 148 84 L172 252 L68 252 Z" fill={colors.dress} />
@@ -197,7 +201,7 @@ export function Lady({ mood, surprise = false }: { mood: Mood; surprise?: boolea
 
           {!happy && !surprise && (
             <Animated.View style={[StyleSheet.absoluteFill, styles.mouthOrigin, { transform: [{ scaleY: anim.mouth }] }]}>
-              <Svg width={W} height={H} viewBox={VIEWBOX}>
+              <Svg width={ladyW} height={ladyH} viewBox={VIEWBOX}>
                 <Ellipse cx="120" cy="71" rx="4" ry="5" fill={colors.ink} />
               </Svg>
             </Animated.View>
@@ -207,7 +211,7 @@ export function Lady({ mood, surprise = false }: { mood: Mood; surprise?: boolea
           <Animated.View
             style={[StyleSheet.absoluteFill, styles.bellyOrigin, { opacity: anim.waveOpacity, transform: [{ scale: anim.waveScale }] }]}
           >
-            <Svg width={W} height={H} viewBox={VIEWBOX}>
+            <Svg width={ladyW} height={ladyH} viewBox={VIEWBOX}>
               <G fill="none" stroke={colors.accent} strokeWidth="4" strokeLinecap="round">
                 <Path d="M52 150 q-9 18 0 36" />
                 <Path d="M38 142 q-13 26 0 52" />
@@ -227,7 +231,7 @@ export function Lady({ mood, surprise = false }: { mood: Mood; surprise?: boolea
               { transform: [{ translateY: anim.bellyLift }, { scaleX: anim.bellyX }, { scaleY: anim.bellyY }] },
             ]}
           >
-            <Svg width={W} height={H} viewBox={VIEWBOX}>
+            <Svg width={ladyW} height={ladyH} viewBox={VIEWBOX}>
               <Ellipse cx="120" cy="168" rx="60" ry="52" fill={colors.dressDark} />
               <Ellipse cx="104" cy="150" rx="22" ry="12" fill="#fff" opacity={0.12} />
               <Path d="M76 178 q11 -10 22 0 t22 0 t22 0 t22 0" fill="none" stroke={colors.ink} strokeOpacity={0.25} strokeWidth="3" strokeLinecap="round" />
@@ -236,7 +240,7 @@ export function Lady({ mood, surprise = false }: { mood: Mood; surprise?: boolea
           </Animated.View>
 
           {/* bras, mains posées sur le ventre */}
-          <Svg width={W} height={H} viewBox={VIEWBOX} style={StyleSheet.absoluteFill}>
+          <Svg width={ladyW} height={ladyH} viewBox={VIEWBOX} style={StyleSheet.absoluteFill}>
             <Path d="M94 92 Q66 120 78 150" fill="none" stroke={colors.skin} strokeWidth="10" strokeLinecap="round" />
             <Path d="M146 92 Q174 120 162 150" fill="none" stroke={colors.skin} strokeWidth="10" strokeLinecap="round" />
             <Circle cx="80" cy="152" r="8" fill={colors.skin} />
@@ -250,7 +254,7 @@ export function Lady({ mood, surprise = false }: { mood: Mood; surprise?: boolea
 
 const styles = StyleSheet.create({
   wrap: { alignItems: "center", paddingTop: 34 },
-  figure: { width: W, height: H, transformOrigin: "50% 95%" },
+  figure: { transformOrigin: "50% 95%" },
   // Centres de déformation, en % du viewBox 240×270 : ventre (120, 200), bouche (120, 71).
   bellyOrigin: { transformOrigin: "50% 74%" },
   mouthOrigin: { transformOrigin: "50% 26%" },

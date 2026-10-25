@@ -18,6 +18,8 @@ type Props = {
   selectedId: string | null;
   onSelect: (id: string) => void;
   onViewportChange: (view: Area) => void;
+  /** Hauteur cachée par la barre du haut et par le panneau du bas : la carte s'y adapte (logo Google visible, recadrage). */
+  insets: { top: number; bottom: number };
 };
 
 /** Plus grand cercle centré sur la carte qui tient dans la vue. */
@@ -30,7 +32,7 @@ function viewportCircle(region: Region): Area {
   };
 }
 
-export function RestaurantMap({ home, results, area, fitKey, selectedId, onSelect, onViewportChange }: Props) {
+export function RestaurantMap({ home, results, area, fitKey, selectedId, onSelect, onViewportChange, insets }: Props) {
   const map = useRef<MapView>(null);
   // Les changements de vue déclenchés par nos propres recadrages ne doivent pas relancer de recherche.
   const ignoreUntil = useRef(0);
@@ -45,16 +47,18 @@ export function RestaurantMap({ home, results, area, fitKey, selectedId, onSelec
       { latitude: 2 * home.latitude - p.latitude, longitude: 2 * home.longitude - p.longitude },
     ]);
     map.current.fitToCoordinates([home, ...points], {
-      edgePadding: { top: 40, right: 40, bottom: 40, left: 40 },
+      edgePadding: { top: insets.top + 40, right: 40, bottom: insets.bottom + 40, left: 40 },
       animated: true,
     });
   }, [fitKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <View style={styles.wrap}>
+    <View style={StyleSheet.absoluteFill}>
       <MapView
         ref={map}
         style={StyleSheet.absoluteFill}
+        // Le logo Google et le centre de la carte restent dans la partie visible, au-dessus du panneau.
+        mapPadding={{ top: insets.top, right: 0, bottom: insets.bottom, left: 0 }}
         provider={IS_EXPO_GO ? undefined : PROVIDER_GOOGLE}
         initialRegion={{ ...home, latitudeDelta: 0.006, longitudeDelta: 0.006 }}
         showsUserLocation
@@ -97,14 +101,6 @@ export function RestaurantMap({ home, results, area, fitKey, selectedId, onSelec
 }
 
 const styles = StyleSheet.create({
-  wrap: {
-    height: 320,
-    borderRadius: 16,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.accentSoft,
-  },
   pin: {
     width: 30,
     height: 30,
