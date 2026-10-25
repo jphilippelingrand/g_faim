@@ -198,6 +198,7 @@ h1 {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
+.categories button.distinctive { border-color: var(--accent); color: var(--accent); }
 .categories button.active { background: var(--ink); border-color: var(--ink); color: var(--bg); }
 @media (hover: hover) {
   .categories button:hover:not(.active) { border-color: var(--accent); }

@@ -3,6 +3,7 @@ import { Lady, type Mood } from "./components/Lady";
 import { RestaurantCard } from "./components/RestaurantCard";
 import { RestaurantMap } from "./components/RestaurantMap";
 import { hasApiKey } from "./lib/google";
+import { neighborhoodCategories, type Category } from "./lib/osm";
 import {
   distanceMeters,
   formatDistance,
@@ -11,9 +12,7 @@ import {
   rankTop,
   searchRestaurants,
   searchUntilTop,
-  topCategories,
   type Area,
-  type Category,
   type LatLng,
   type Restaurant,
 } from "./lib/places";
@@ -26,7 +25,7 @@ const ZOOM_IN_RATIO = 0.6;
 export default function App() {
   const [home, setHome] = useState<LatLng | null>(null);
   const [places, setPlaces] = useState<Restaurant[]>([]);
-  // Catégories proposées : calculées sur les recherches « toutes cuisines », gardées pendant qu'on filtre.
+  // Cuisines du quartier (OSM), recalculées sur les recherches « toutes cuisines », gardées pendant qu'on filtre.
   const [categories, setCategories] = useState<Category[]>([]);
   const [category, setCategory] = useState<Category | null>(null);
   const [area, setArea] = useState<Area | null>(null);
@@ -44,8 +43,6 @@ export default function App() {
   const requestId = useRef(0);
   // Zone déjà fouillée (ou en cours) : lue depuis le handler de la carte, d'où la ref.
   const coveredArea = useRef<Area | null>(null);
-  // Tous les restos vus pendant la session (recherches « toutes cuisines ») : les catégories s'affinent en explorant.
-  const seen = useRef(new Map<string, Restaurant>());
   const categoryRef = useRef(category);
   useEffect(() => {
     categoryRef.current = category;
@@ -65,8 +62,10 @@ export default function App() {
       coveredArea.current = area;
       setPlaces(list);
       if (!filtered) {
-        list.forEach((r) => seen.current.set(r.id, r));
-        setCategories(topCategories([...seen.current.values()]));
+        // Les catégories sont un plus : si OSM ne répond pas, on garde les précédentes.
+        neighborhoodCategories(area.center, area.radius)
+          .then((cats) => id === requestId.current && setCategories(cats))
+          .catch((err) => console.warn("Catégories OSM indisponibles", err));
       }
       setArea(area);
       setSelectedId(null);
@@ -162,17 +161,18 @@ export default function App() {
         {categories.length > 0 && (
           <div className="categories" role="radiogroup" aria-label="Type de cuisine">
             {[null, ...categories].map((c) => {
-              const active = (c?.type ?? null) === (category?.type ?? null);
+              const active = (c?.key ?? null) === (category?.key ?? null);
               return (
                 <button
-                  key={c?.type ?? "all"}
+                  key={c?.key ?? "all"}
                   type="button"
                   role="radio"
                   aria-checked={active}
-                  className={active ? "active" : ""}
+                  className={[active && "active", c?.distinctive && "distinctive"].filter(Boolean).join(" ")}
+                  title={c?.distinctive ? "Spécialité du coin" : undefined}
                   onClick={() => setCategory(active ? null : c)}
                 >
-                  {c ? c.label : "Tout"}
+                  {c ? (c.distinctive ? `✦ ${c.label}` : c.label) : "Tout"}
                 </button>
               );
             })}
@@ -226,7 +226,11 @@ export default function App() {
       </main>
 
       <footer>
-        Données Google Maps · clique sur la dame 👆 · <a href="/privacy">Confidentialité</a>
+        Données Google Maps · cuisines ©{" "}
+        <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">
+          OpenStreetMap
+        </a>{" "}
+        · clique sur la dame 👆 · <a href="/privacy">Confidentialité</a>
       </footer>
     </>
   );

@@ -1,4 +1,5 @@
 import { importLibrary } from "./google";
+import type { Category } from "./osm";
 
 export type LatLng = { lat: number; lng: number };
 
@@ -11,8 +12,6 @@ export type Restaurant = {
   rating: number;
   reviews: number;
   type: string;
-  /** Type Google (ex. "sushi_restaurant"), sert aux catégories. */
-  primaryType: string;
   /** Ouvert en ce moment ; undefined si Google ne connaît pas les horaires. */
   open?: boolean;
   price: string;
@@ -20,9 +19,6 @@ export type Restaurant = {
   photo?: string;
   location: LatLng;
 };
-
-/** Une catégorie de cuisine, tirée des types Google des restos trouvés. */
-export type Category = { type: string; label: string; count: number };
 
 export const TOP_N = 5;
 // Écarte les 5,0★ à 3 avis qui squatteraient le podium.
@@ -98,7 +94,7 @@ function isOpenNow(place: google.maps.places.Place, now = new Date()): boolean |
 
 const FIELDS = [
   "id", "displayName", "rating", "userRatingCount", "location",
-  "googleMapsURI", "priceLevel", "primaryType", "primaryTypeDisplayName", "photos",
+  "googleMapsURI", "priceLevel", "primaryTypeDisplayName", "photos",
   "businessStatus", "currentOpeningHours", "regularOpeningHours", "utcOffsetMinutes",
 ];
 
@@ -119,24 +115,32 @@ export async function searchRestaurants(area: Area, category?: Category | null):
   const { Place, SearchNearbyRankPreference } = await importLibrary<google.maps.PlacesLibrary>("places");
   const radius = Math.min(area.radius, MAX_RADIUS);
 
-  const responses = await Promise.allSettled([
-    Place.searchNearby({
-      fields: FIELDS,
-      locationRestriction: { center: area.center, radius },
-      includedPrimaryTypes: [category?.type ?? "restaurant"],
-      maxResultCount: 20,
-      rankPreference: SearchNearbyRankPreference.POPULARITY,
-    }),
-    Place.searchByText({
-      fields: FIELDS,
-      textQuery: category?.label ?? "restaurant",
-      includedType: category?.type ?? "restaurant",
-      useStrictTypeFiltering: true,
-      isOpenNow: true,
-      locationRestriction: circleBounds({ center: area.center, radius }),
-      maxResultCount: 20,
-    }),
-  ]);
+  const bounds = circleBounds({ center: area.center, radius });
+  const responses = await Promise.allSettled(
+    category
+      ? // Une cuisine (venue d'OSM) : recherche Google par mot-clé, comme on le taperait dans Maps.
+        [true, false].map((isOpenNow) =>
+          Place.searchByText({ fields: FIELDS, textQuery: category.query, isOpenNow, locationRestriction: bounds, maxResultCount: 20 }),
+        )
+      : [
+          Place.searchNearby({
+            fields: FIELDS,
+            locationRestriction: { center: area.center, radius },
+            includedPrimaryTypes: ["restaurant"],
+            maxResultCount: 20,
+            rankPreference: SearchNearbyRankPreference.POPULARITY,
+          }),
+          Place.searchByText({
+            fields: FIELDS,
+            textQuery: "restaurant",
+            includedType: "restaurant",
+            useStrictTypeFiltering: true,
+            isOpenNow: true,
+            locationRestriction: bounds,
+            maxResultCount: 20,
+          }),
+        ],
+  );
   const ok = responses.filter((r) => r.status === "fulfilled").map((r) => r.value.places);
   if (!ok.length) throw (responses[0] as PromiseRejectedResult).reason;
   const places = [...new Map(ok.flat().map((p) => [p.id, p])).values()];
@@ -153,7 +157,6 @@ export async function searchRestaurants(area: Area, category?: Category | null):
       rating: p.rating!,
       reviews: p.userRatingCount ?? 0,
       type: p.primaryTypeDisplayName ?? "",
-      primaryType: p.primaryType ?? "",
       open: isOpenNow(p),
       price: p.priceLevel ? PRICE[p.priceLevel] ?? "" : "",
       url: p.googleMapsURI ?? "",
@@ -190,29 +193,3 @@ export function formatDistance(m: number): string {
     : `${Math.round(m)} m`;
 }
 
-// Types trop vagues pour faire une catégorie.
-const GENERIC_TYPES = new Set(["restaurant", "food", "establishment", "point_of_interest"]);
-const MAX_CATEGORIES = 8;
-
-/** "Restaurant de sushis" → "Sushis", "Restaurant servant le petit-déjeuner" → "Petit-déjeuner", "Pizzeria" → "Pizzeria". */
-function shortLabel(displayName: string): string {
-  const s = displayName.replace(/^restaurant\s+(servant\s+(le\s+|la\s+|les\s+)?|de\s+|d'|des\s+|du\s+)?/i, "").trim() || displayName;
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-/**
- * Les cuisines les plus représentées parmi les restos vus autour, ouverts ou non : elles décrivent
- * le quartier. Rien n'est codé en dur : à Bayonne ça fait ressortir le basque, dans le 9e le français.
- */
-export function topCategories(list: Restaurant[]): Category[] {
-  const byType = new Map<string, Category>();
-  for (const r of list.filter(hasEnoughReviews)) {
-    if (!r.primaryType || GENERIC_TYPES.has(r.primaryType) || !r.type) continue;
-    const c = byType.get(r.primaryType) ?? { type: r.primaryType, label: shortLabel(r.type), count: 0 };
-    c.count++;
-    byType.set(r.primaryType, c);
-  }
-  return [...byType.values()]
-    .sort((a, b) => b.count - a.count)
-    .slice(0, MAX_CATEGORIES);
-}
