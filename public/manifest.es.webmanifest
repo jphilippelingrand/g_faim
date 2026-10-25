@@ -3,7 +3,7 @@
   "short_name": "Tengo hambre",
   "description": "Las 5 mejores mesas abiertas, a la vuelta de la esquina.",
   "lang": "es",
-  "start_url": "/",
+  "start_url": "/es",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",

@@ -8,6 +8,9 @@ export type Lang = (typeof LANGS)[number];
 const STORAGE_KEY = "jai-faim:lang";
 
 function detectLang(): Lang {
+  // La langue est dans l'adresse (/fr, /en, /es) ; la racine / redirige déjà vers la bonne.
+  const fromUrl = location.pathname.split("/")[1];
+  if (LANGS.includes(fromUrl as Lang)) return fromUrl as Lang;
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (LANGS.includes(saved as Lang)) return saved as Lang;
@@ -30,7 +33,7 @@ export function setLang(next: Lang) {
   } catch {
     /* pas grave : le choix ne sera juste pas retenu */
   }
-  location.reload();
+  location.assign(`/${next}${location.search}`);
 }
 
 const fr = {
@@ -158,3 +161,9 @@ export function t(key: keyof Dict, vars: Record<string, string | number> = {}): 
 document.title = t("appName");
 document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute("content", t("appName"));
 document.querySelector('link[rel="manifest"]')?.setAttribute("href", `/manifest.${lang}.webmanifest`);
+// Retient la langue de l'adresse, pour que groubl.com tout court y renvoie la prochaine fois.
+try {
+  localStorage.setItem(STORAGE_KEY, lang);
+} catch {
+  /* stockage indisponible */
+}

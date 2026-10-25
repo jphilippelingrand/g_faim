@@ -3,7 +3,7 @@
   "short_name": "I'm hungry",
   "description": "The 5 best open tables, right around the corner.",
   "lang": "en",
-  "start_url": "/",
+  "start_url": "/en",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",

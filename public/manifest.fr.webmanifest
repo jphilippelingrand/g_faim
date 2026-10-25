@@ -3,7 +3,7 @@
   "short_name": "J'ai faim",
   "description": "Les 5 meilleures tables ouvertes, juste à côté.",
   "lang": "fr",
-  "start_url": "/",
+  "start_url": "/fr",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
