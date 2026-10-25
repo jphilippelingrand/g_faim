@@ -30,7 +30,7 @@ SplashScreen.preventAutoHideAsync();
 
 type Phase = "locating" | "searching" | "done" | "error";
 
-const PRIVACY_URL = "https://g-faim.vercel.app/privacy";
+const PRIVACY_URL = "https://www.groubl.com/privacy";
 
 // En dessous de cette fraction de la zone fouillée, un zoom avant relance la recherche.
 const ZOOM_IN_RATIO = 0.6;
