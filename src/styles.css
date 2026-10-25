@@ -241,6 +241,38 @@ h1 {
   30% { opacity: .8; transform: scale(1.12); }
 }
 
+/* Mode surprise : pirouette à l'activation, petits « ? » qui flottent autour de la tête */
+.lady.twirl svg { animation: twirl .8s cubic-bezier(.5, 0, .3, 1.3); }
+@keyframes twirl {
+  from { transform: perspective(600px) rotateY(0); }
+  to { transform: perspective(600px) rotateY(360deg); }
+}
+.lady .huh { position: absolute; top: 40px; left: 0; right: 0; height: 80px; pointer-events: none; }
+.lady .huh span {
+  position: absolute;
+  font: 900 italic 1.4rem "Fraunces", Georgia, serif;
+  color: #e0a024;
+  opacity: 0;
+  animation: huh 2.4s ease-out infinite;
+}
+.lady .huh span:nth-child(1) { left: 22%; animation-delay: 0s; }
+.lady .huh span:nth-child(2) { left: 70%; animation-delay: .8s; font-size: 1.1rem; }
+.lady .huh span:nth-child(3) { left: 60%; animation-delay: 1.6s; font-size: 1.6rem; }
+@keyframes huh {
+  0% { opacity: 0; transform: translateY(30px) rotate(-10deg) scale(.6); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-20px) rotate(12deg) scale(1.1); }
+}
+.lady.surprise .grr { color: #e0a024; }
+.grr .space { width: .35em; }
+/* « AU PIF ! » reste affiché (c'est le signal du mode), avec une vague qui parcourt les lettres. */
+.lady.surprise .grr span { opacity: 1; animation: pif 1.4s ease-in-out infinite; }
+@keyframes pif {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  30% { transform: translateY(-6px) rotate(-4deg); }
+  60% { transform: translateY(1px) rotate(3deg); }
+}
+
 /* GRROOOUUBBLL façon BD */
 .grr {
   position: absolute;
@@ -493,7 +525,7 @@ footer a { color: inherit; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .lady *, .card, .home-pin { animation: none !important; }
+  .lady *, .lady svg, .card, .home-pin { animation: none !important; }
   .grr span { opacity: 1; }
 }
 

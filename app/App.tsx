@@ -183,7 +183,7 @@ export default function App() {
                 setSeed(Date.now());
               }}
             />
-            <Lady mood={mood} />
+            <Lady mood={mood} surprise={surprise} />
             <Text style={styles.title}>J'ai faim</Text>
             <Text style={styles.tagline}>
               {surprise ? "5 tables au hasard, juste à côté." : "Les 5 meilleures tables, juste à côté."}

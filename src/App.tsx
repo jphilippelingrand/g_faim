@@ -167,7 +167,7 @@ export default function App() {
       <main>
         <header ref={heroRef}>
           <ShuffleToggle on={surprise} onChange={toggleSurprise} />
-          <Lady mood={mood} />
+          <Lady mood={mood} surprise={surprise} />
           <h1>J'ai faim</h1>
           <p className="tagline">{surprise ? "5 tables au hasard, juste à côté." : "Les 5 meilleures tables, juste à côté."}</p>
         </header>
