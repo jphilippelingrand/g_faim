@@ -57,6 +57,17 @@ export default function App() {
     categoryRef.current = category;
   }, [category]);
 
+  // Catégories de la zone visible : recalculées à chaque déplacement de la carte (le fichier de la
+  // zone est en cache, c'est instantané). Seule la dernière demande compte.
+  const categoriesRequest = useRef(0);
+  const refreshCategories = useCallback((view: Area) => {
+    const id = ++categoriesRequest.current;
+    neighborhoodCategories(view.center, view.radius)
+      .then((cats) => id === categoriesRequest.current && setCategories(cats))
+      // Les catégories sont un plus : si le fichier ne se charge pas, on garde les précédentes.
+      .catch((err) => console.warn("Catégories indisponibles", err));
+  }, []);
+
   const run = useCallback(async (
     search: () => Promise<{ list: Restaurant[]; area: Area }>,
     filtered: boolean,
@@ -70,12 +81,7 @@ export default function App() {
       if (id !== requestId.current) return;
       coveredArea.current = area;
       setPlaces(list);
-      if (!filtered) {
-        // Les catégories sont un plus : si OSM ne répond pas, on garde les précédentes.
-        neighborhoodCategories(area.center, area.radius)
-          .then((cats) => id === requestId.current && setCategories(cats))
-          .catch((err) => console.warn("Catégories OSM indisponibles", err));
-      }
+      if (!filtered) refreshCategories(area);
       setArea(area);
       setSelectedId(null);
       if (refit) setFitKey((k) => k + 1);
@@ -86,7 +92,7 @@ export default function App() {
       setPhase("error");
       setError((err as Error).message || t("oops"));
     }
-  }, []);
+  }, [refreshCategories]);
 
   // Dès l'ouverture : on récupère la position.
   useEffect(() => {
@@ -118,6 +124,7 @@ export default function App() {
     (view: Area) => {
       const covered = coveredArea.current;
       if (!covered) return;
+      refreshCategories(view);
       const inside = distanceMeters(view.center, covered.center) + view.radius <= covered.radius * 1.05;
       const zoomedIn = view.radius < covered.radius * ZOOM_IN_RATIO;
       if (inside && !zoomedIn) return;
@@ -125,7 +132,7 @@ export default function App() {
       const c = categoryRef.current;
       run(async () => ({ list: await searchRestaurants(view, c), area: view }), c != null, false);
     },
-    [run],
+    [run, refreshCategories],
   );
 
   const onSelectFromMap = useCallback((id: string) => {

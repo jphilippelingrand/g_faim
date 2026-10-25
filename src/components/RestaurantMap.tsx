@@ -66,6 +66,8 @@ export function RestaurantMap({ home, results, area, fitKey, selectedId, onSelec
         const view = viewportCircle(m);
         if (view) callbacks.current.onViewportChange(view);
       });
+      // Accès pour les tests manuels dans la console (retiré du build de production).
+      if (import.meta.env.DEV) (window as unknown as { __jaiFaimMap: google.maps.Map }).__jaiFaimMap = m;
       setMap(m);
     })();
     return () => {

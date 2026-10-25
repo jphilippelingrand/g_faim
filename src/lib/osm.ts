@@ -132,29 +132,21 @@ export const MAX_SHOWN = 4;
 
 /**
  * Catégories de la zone visible (pays, région ou quartier selon le zoom, ou la zone la plus fine
- * disponible). D'abord les spécialités, de cette zone et des zones qui la contiennent (la poutine
- * du Québec reste visible au Plateau) : celles qui ressortent au plus de niveaux en premier, la plus
- * régionale d'abord à égalité. Puis les cuisines les plus courantes de la zone.
+ * disponible) : d'abord ses spécialités, puis celles de sa région directe (la poutine de Montréal
+ * reste visible au Plateau), puis ses cuisines les plus courantes. On n'hérite jamais du carré de 10° :
+ * il couvre plusieurs provinces, ses spécialités remonteraient partout (la poutine à Toronto).
  */
 export async function neighborhoodCategories(center: LatLng, radius: number): Promise<Category[]> {
   const tile = await getTile(cellKey(center.lat, center.lng, 0));
   if (!tile) return [];
   const path = findPath(tile, center.lat, center.lng, levelForRadius(radius));
   const zone = path[path.length - 1];
+  const region = path.length > 2 ? path[path.length - 2] : null;
 
-  const specialties = new Map<string, { levels: number; broadest: number }>();
-  path.forEach((node, depth) => {
-    for (const [key, d] of node.categories) {
-      if (d !== 1) continue;
-      const s = specialties.get(key);
-      if (s) s.levels++;
-      else specialties.set(key, { levels: 1, broadest: depth });
-    }
-  });
+  const specialties = (node: CuisineNode | null) => node?.categories.filter(([, d]) => d === 1) ?? [];
   const ordered: CategoryEntry[] = [
-    ...[...specialties]
-      .sort(([, a], [, b]) => b.levels - a.levels || a.broadest - b.broadest)
-      .map(([key]): CategoryEntry => [key, 1]),
+    ...specialties(zone),
+    ...specialties(region),
     ...zone.categories.filter(([, d]) => d !== 1),
   ];
   const seen = new Set<string>();
