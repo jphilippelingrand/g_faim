@@ -1,0 +1,12 @@
+{
+  "name": "groubl-store-assets",
+  "private": true,
+  "type": "module",
+  "description": "Génère les visuels App Store (captures panoramiques, en-tête, résultats de recherche) à partir des vraies captures de l'app.",
+  "scripts": {
+    "build": "node generate.mjs"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^24.0.0"
+  }
+}
