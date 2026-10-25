@@ -26,8 +26,8 @@ export function SearchingLady({ visible, surprise, top, bottom }: Props) {
 
   return (
     <Animated.View style={[styles.zone, { top, bottom }, fade]} pointerEvents="none">
-      <View style={styles.halo}>
-        <Lady mood="starving" surprise={surprise} width={170} />
+      <View style={styles.shadow}>
+        <Lady mood="starving" surprise={surprise} width={190} />
       </View>
     </Animated.View>
   );
@@ -35,14 +35,11 @@ export function SearchingLady({ visible, surprise, top, bottom }: Props) {
 
 const styles = StyleSheet.create({
   zone: { position: "absolute", left: 0, right: 0, alignItems: "center", justifyContent: "center" },
-  // Un halo crème pour qu'elle se détache de la carte.
-  halo: {
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-    backgroundColor: "rgba(251, 246, 239, 0.88)",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingBottom: 16,
+  // Juste la dame : une ombre douce (sans fond, iOS l'applique à son dessin) la détache de la carte.
+  shadow: {
+    shadowColor: "#2b211c",
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
   },
 });
