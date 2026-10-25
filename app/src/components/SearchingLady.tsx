@@ -2,18 +2,19 @@ import { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { Lady } from "./Lady";
+import type { Mode } from "./ModePicker";
 
 type Props = {
   /** Recherche en cours : la dame apparaît, puis s'efface quand les restos arrivent. */
   visible: boolean;
-  surprise: boolean;
+  mode: Mode;
   /** Zone visible de la carte, entre le bandeau du haut et le panneau. */
   top: number;
   bottom: number;
 };
 
 /** La dame en grand au milieu de la carte, le ventre qui gargouille, seulement pendant la recherche. */
-export function SearchingLady({ visible, surprise, top, bottom }: Props) {
+export function SearchingLady({ visible, mode, top, bottom }: Props) {
   const opacity = useSharedValue(visible ? 1 : 0);
   useEffect(() => {
     opacity.set(withTiming(visible ? 1 : 0, { duration: visible ? 200 : 450 }));
@@ -27,7 +28,7 @@ export function SearchingLady({ visible, surprise, top, bottom }: Props) {
   return (
     <Animated.View style={[styles.zone, { top, bottom }, fade]} pointerEvents="none">
       <View style={styles.shadow}>
-        <Lady mood="starving" surprise={surprise} width={190} />
+        <Lady mood="starving" mode={mode} width={190} />
       </View>
     </Animated.View>
   );

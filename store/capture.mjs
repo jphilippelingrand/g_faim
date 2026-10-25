@@ -1,6 +1,6 @@
 /**
  * Prend les 5 captures de l'app sur le simulateur iOS, dans chaque langue, et les dépose dans raw/<langue>/
- * pour generate.mjs. Pilote l'app par liens profonds (gfaim://?cuisine=…&surprise=1&sheet=2) : le
+ * pour generate.mjs. Pilote l'app par liens profonds (gfaim://?cuisine=…&mode=surprise&sheet=2) : le
  * simulateur ne sait pas toucher l'écran.
  *
  *   node capture.mjs [chemin/vers/Groubl.app] [fr en es]
@@ -66,10 +66,10 @@ for (const lang of LANGS.length ? LANGS : Object.keys(LOCALES)) {
     shot("02-carte.png");
 
     // 4. Mode surprise, 5. le panneau ouvert sur la liste.
-    open("surprise=1");
+    open("mode=surprise");
     await wait(4000);
     shot("04-surprise.png");
-    open("surprise=0&sheet=2");
+    open("mode=top&sheet=2");
     await wait(3500);
     shot("05-liste.png");
 

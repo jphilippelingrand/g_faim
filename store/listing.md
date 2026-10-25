@@ -8,8 +8,8 @@ Commun à toutes les langues :
 - URL de confidentialité : https://www.groubl.com/privacy · URL de support : https://www.groubl.com/support
 - App Privacy : Localisation précise → fonctionnement de l'app, non liée à l'identité, pas de pistage. Rien d'autre.
 - Notes pour la vérification : « Aucun compte requis. L'app demande la localisation pour trouver les restaurants
-  ouverts à proximité ; si elle est refusée, on peut saisir une adresse. Le bouton « aléatoire » en haut à gauche
-  tire 5 restaurants au hasard. » (en anglais ci-dessous)
+  ouverts à proximité ; si elle est refusée, on peut saisir une adresse. Les trois emojis en haut à gauche
+  choisissent le mode : les meilleurs ⭐, sur le pouce ⚡, au hasard 🎲. » (en anglais ci-dessous)
 
 ---
 
@@ -28,6 +28,7 @@ Ton ventre gargouille ? Groubl trouve en un instant les 5 restaurants les mieux 
 • Dès l'ouverture, ta position et la carte, sans rien taper
 • Uniquement des restos ouverts maintenant, classés par note Google
 • Les spécialités du coin : poutine au Québec, crêpes en Bretagne, basque à Bayonne…
+• Sur le pouce : fast-foods, sandwicheries et vente à emporter bien notés, au plus près
 • Le mode surprise : 5 restos tirés au sort, bien notés ou pas, pour sortir des sentiers battus
 • Dézoome la carte pour chercher plus loin
 • Un bouton pour lancer l'itinéraire
@@ -55,6 +56,7 @@ Tummy rumbling? Groubl instantly finds the 5 best-rated restaurants that are ope
 • Opens straight to your location and the map, nothing to type
 • Only places open right now, ranked by Google rating
 • Local specialties: poutine in Québec, crêpes in Brittany, Basque food in Bayonne…
+• Quick bite: well-rated fast food, sandwich shops and takeaway, as close as it gets
 • Surprise mode: 5 restaurants picked at random, highly rated or not, to get off the beaten track
 • Zoom out the map to search further
 • One tap for directions
@@ -65,7 +67,7 @@ No account, no ads, no tracking.
 
 **What's new (1.0.1):** The very first version of Groubl!
 
-**Review notes:** No account needed. The app asks for location to find open restaurants nearby; if declined, an address can be typed instead. The shuffle button at the top left picks 5 restaurants at random.
+**Review notes:** No account needed. The app asks for location to find open restaurants nearby; if declined, an address can be typed instead. The three emojis at the top left pick the mode: top rated ⭐, quick bite ⚡, random 🎲.
 
 ---
 
@@ -84,6 +86,7 @@ No account, no ads, no tracking.
 • Se abre directamente en tu ubicación y el mapa, sin escribir nada
 • Solo sitios abiertos ahora, ordenados por la nota de Google
 • Especialidades locales: poutine en Quebec, crepes en Bretaña, cocina vasca en Bayona…
+• Algo rápido: comida rápida, bocadillos y para llevar bien valorados, lo más cerca posible
 • El modo sorpresa: 5 restaurantes al azar, bien valorados o no, para salirse de lo de siempre
 • Aleja el mapa para buscar más lejos
 • Un toque para ver cómo llegar

@@ -1,9 +1,10 @@
 import * as Haptics from "expo-haptics";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Pressable, StyleSheet, View } from "react-native";
 import Svg, { Circle, Ellipse, G, Path } from "react-native-svg";
 import { colors, fonts } from "../theme";
 import { t } from "../i18n";
+import type { Mode } from "./ModePicker";
 
 /** starving = ça gargouille non-stop (recherche) ; hungry = gros gargouillis réguliers ; happy = elle a trouvé, elle bave. */
 export type Mood = "starving" | "hungry" | "happy";
@@ -12,6 +13,8 @@ const DURATION: Record<Mood, number> = { starving: 900, hungry: 2600, happy: 340
 const GRR = "GRROOOUUBBLL";
 // Mode surprise : elle mange « au pif », les yeux bandés.
 const PIF_LOOP = 1400;
+// Mode rapide : un pas gauche + un pas droit.
+const RUN_LOOP = 420;
 
 // Où flottent les « ? » autour de la tête en mode surprise.
 const QUESTION_POS = [{ left: "22%", fontSize: 22 }, { left: "70%", fontSize: 17 }, { left: "60%", fontSize: 25 }] as const;
@@ -27,18 +30,20 @@ const VIEWBOX = "0 0 240 270";
  */
 export function Lady({
   mood,
-  surprise = false,
+  mode = "top",
   width = W,
   onPress,
   accessibilityLabel,
 }: {
   mood: Mood;
-  surprise?: boolean;
+  mode?: Mode;
   width?: number;
   /** Action au toucher, en plus du sursaut (ex. ouvrir un menu). */
   onPress?: () => void;
   accessibilityLabel?: string;
 }) {
+  const surprise = mode === "surprise";
+  const fast = mode === "fast";
   const k = width / W;
   const ladyW = width;
   const ladyH = H * k;
@@ -78,14 +83,48 @@ export function Lady({
     return () => loop.stop();
   }, [surprise, w]);
 
-  // Une pirouette (et une vibration) quand on active le mode surprise.
-  const [spin] = useState(() => new Animated.Value(0));
+  // Mode rapide : elle court vers nous (pas alternés, bras qui balancent, poussière).
+  const [stride] = useState(() => new Animated.Value(0));
   useEffect(() => {
-    if (!surprise) return;
+    if (!fast) return;
+    stride.setValue(0);
+    const loop = Animated.loop(Animated.timing(stride, { toValue: 1, duration: RUN_LOOP, easing: Easing.linear, useNativeDriver: true }));
+    loop.start();
+    return () => loop.stop();
+  }, [fast, stride]);
+
+  // Une pirouette (et une vibration) à chaque changement de mode, pas à l'affichage.
+  const [spin] = useState(() => new Animated.Value(0));
+  const firstMode = useRef(true);
+  useEffect(() => {
+    if (firstMode.current) {
+      firstMode.current = false;
+      return;
+    }
     spin.setValue(0);
     Animated.timing(spin, { toValue: 1, duration: 800, easing: Easing.bezier(0.5, 0, 0.3, 1.3), useNativeDriver: true }).start();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [surprise, spin]);
+  }, [mode, spin]);
+
+  const run = useMemo(() => {
+    const at = <T extends number | string>(input: number[], output: T[]) =>
+      stride.interpolate<T>({ inputRange: input, outputRange: output, extrapolate: "clamp" });
+    // Un pied se lève pendant que l'autre touche le sol ; la poussière part du pied qui vient de pousser.
+    const foot = (o: number) => at([0, 0.25, 0.5, 0.75, 1], o ? [0, 0, 0, -8, 0] : [0, -8, 0, 0, 0]);
+    const dust = (o: number) => ({
+      opacity: at(o ? [0.5, 0.55, 0.95] : [0, 0.05, 0.45], [0, 0.7, 0]),
+      scale: at(o ? [0.5, 0.95] : [0, 0.45], [0.4, 1.6]),
+    });
+    return {
+      bounce: at([0, 0.25, 0.5, 0.75, 1], [0, -4, 0, -4, 0]),
+      leftFoot: foot(0),
+      rightFoot: foot(1),
+      leftArm: at([0, 0.5, 1], ["14deg", "-14deg", "14deg"]),
+      rightArm: at([0, 0.5, 1], ["14deg", "-14deg", "14deg"]),
+      leftDust: dust(0),
+      rightDust: dust(1),
+    };
+  }, [stride]);
 
   const pif = useMemo(() => {
     const at = <T extends number | string>(v: Animated.Value, input: number[], output: T[]) =>
@@ -114,8 +153,8 @@ export function Lady({
       waveOpacity: at([0, 0.06, 0.3, 0.45, 1], [0, 1, 0.8, 0, 0]),
       waveScale: at([0, 0.06, 0.3, 0.45, 1], [0.7, 1, 1.12, 0.7, 0.7]),
       mouth: at([0, 0.08, 0.28, 0.4, 1], [1, 1.6, 1.6, 1, 1]),
-      letter: (i: number) => {
-        const d = (i * 35) / DURATION[effective];
+      letter: (i: number, step = 35) => {
+        const d = (i * step) / DURATION[effective];
         return {
           opacity: at([d, d + 0.06, d + 0.38, d + 0.48], [0, 1, 1, 0]),
           translateY: at([d, d + 0.06, d + 0.12, d + 0.18, d + 0.24], [8, -8, 3, -3, 0]),
@@ -141,8 +180,8 @@ export function Lady({
             {t("ladyPif")}
           </Animated.Text>
         ) : (
-          [...GRR].map((ch, i) => {
-            const l = anim.letter(i);
+          [...(fast ? t("ladyFast") : GRR)].map((ch, i) => {
+            const l = anim.letter(i, fast ? 40 : 35);
             return (
               <Animated.Text
                 key={i}
@@ -167,11 +206,26 @@ export function Lady({
         ))}
 
       <Animated.View style={{ transform: [{ perspective: 600 }, { rotateY: pif.spin }] }}>
-        <Animated.View style={[styles.figure, { width: ladyW, height: ladyH, transform: [{ translateX: anim.shakeX }, { rotate: anim.shakeRot }] }]}>
+        <Animated.View style={[styles.figure, { width: ladyW, height: ladyH, transform: [{ translateX: anim.shakeX }, { translateY: fast ? run.bounce : 0 }, { rotate: anim.shakeRot }] }]}>
+          {/* poussière (mode rapide) puis pieds, chacun son calque pour les pas */}
+          {fast &&
+            ([[80, run.leftDust], [160, run.rightDust]] as const).map(([cx, d]) => (
+              <Animated.View key={cx} style={[StyleSheet.absoluteFill, { transformOrigin: `${(cx / 240) * 100}% 95%`, opacity: d.opacity, transform: [{ scale: d.scale }] }]}>
+                <Svg width={ladyW} height={ladyH} viewBox={VIEWBOX}>
+                  <Circle cx={cx} cy="256" r="7" fill={colors.muted} />
+                </Svg>
+              </Animated.View>
+            ))}
+          {([[100, run.leftFoot], [140, run.rightFoot]] as const).map(([cx, lift]) => (
+            <Animated.View key={cx} style={[StyleSheet.absoluteFill, fast && { transform: [{ translateY: lift }] }]}>
+              <Svg width={ladyW} height={ladyH} viewBox={VIEWBOX}>
+                <Ellipse cx={cx} cy="258" rx="16" ry="7" fill={colors.ink} />
+              </Svg>
+            </Animated.View>
+          ))}
+
           {/* corps, tête, visage */}
           <Svg width={ladyW} height={ladyH} viewBox={VIEWBOX} style={StyleSheet.absoluteFill}>
-            <Ellipse cx="100" cy="258" rx="16" ry="7" fill={colors.ink} />
-            <Ellipse cx="140" cy="258" rx="16" ry="7" fill={colors.ink} />
             <Path d="M92 84 Q120 76 148 84 L172 252 L68 252 Z" fill={colors.dress} />
             <Circle cx="120" cy="22" r="14" fill={colors.hair} />
             <Circle cx="120" cy="54" r="28" fill={colors.skin} />
@@ -253,13 +307,20 @@ export function Lady({
             </Svg>
           </Animated.View>
 
-          {/* bras, mains posées sur le ventre */}
-          <Svg width={ladyW} height={ladyH} viewBox={VIEWBOX} style={StyleSheet.absoluteFill}>
-            <Path d="M94 92 Q66 120 78 150" fill="none" stroke={colors.skin} strokeWidth="10" strokeLinecap="round" />
-            <Path d="M146 92 Q174 120 162 150" fill="none" stroke={colors.skin} strokeWidth="10" strokeLinecap="round" />
-            <Circle cx="80" cy="152" r="8" fill={colors.skin} />
-            <Circle cx="160" cy="152" r="8" fill={colors.skin} />
-          </Svg>
+          {/* bras, mains posées sur le ventre ; en mode rapide, ils balancent depuis l'épaule */}
+          {(
+            [
+              ["M94 92 Q66 120 78 150", 80, styles.leftShoulder, run.leftArm],
+              ["M146 92 Q174 120 162 150", 160, styles.rightShoulder, run.rightArm],
+            ] as const
+          ).map(([d, cx, shoulder, swing]) => (
+            <Animated.View key={cx} style={[StyleSheet.absoluteFill, shoulder, fast && { transform: [{ rotate: swing }] }]}>
+              <Svg width={ladyW} height={ladyH} viewBox={VIEWBOX}>
+                <Path d={d} fill="none" stroke={colors.skin} strokeWidth="10" strokeLinecap="round" />
+                <Circle cx={cx} cy="152" r="8" fill={colors.skin} />
+              </Svg>
+            </Animated.View>
+          ))}
         </Animated.View>
       </Animated.View>
     </Pressable>
@@ -272,6 +333,9 @@ const styles = StyleSheet.create({
   // Centres de déformation, en % du viewBox 240×270 : ventre (120, 200), bouche (120, 71).
   bellyOrigin: { transformOrigin: "50% 74%" },
   mouthOrigin: { transformOrigin: "50% 26%" },
+  // Épaules (94, 92) et (146, 92) dans le viewBox 240×270.
+  leftShoulder: { transformOrigin: "39% 34%" },
+  rightShoulder: { transformOrigin: "61% 34%" },
   grr: {
     position: "absolute",
     top: 0,

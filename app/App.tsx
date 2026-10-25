@@ -11,7 +11,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useSharedValue } from "react-native-reanimated";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MapControls } from "./src/components/MapControls";
-import { ShuffleToggle } from "./src/components/ShuffleToggle";
+import { MODES, ModePicker, type Mode } from "./src/components/ModePicker";
 import { SearchingLady } from "./src/components/SearchingLady";
 import { CategoryBar } from "./src/components/CategoryBar";
 import { RestaurantCard } from "./src/components/RestaurantCard";
@@ -21,6 +21,7 @@ import {
   formatDistance,
   hasApiKey,
   pickRandom,
+  rankFast,
   rankTop,
   searchRestaurants,
   searchUntilTop,
@@ -63,8 +64,11 @@ function Main() {
   const [area, setArea] = useState<Area | null>(null);
   const [fitKey, setFitKey] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  // Mode surprise : tirage au sort au lieu du top par note ; la graine change à chaque « Autre tirage ».
-  const [surprise, setSurprise] = useState(false);
+  // Top par note, rapide (fast-foods et vente à emporter, la distance compte) ou surprise (tirage au
+  // sort ; la graine change à chaque changement de mode).
+  const [mode, setMode] = useState<Mode>("top");
+  const surprise = mode === "surprise";
+  const fast = mode === "fast";
   const [seed, setSeed] = useState(() => Date.now());
   // Cuisines de la zone visible (fichiers pré-calculés sur groubl.com) et cuisine choisie.
   const [categories, setCategories] = useState<Category[]>([]);
@@ -82,9 +86,11 @@ function Main() {
   // Zone déjà fouillée (ou en cours) : lue depuis le handler de la carte, d'où la ref.
   const coveredArea = useRef<Area | null>(null);
   const categoryRef = useRef(category);
+  const fastRef = useRef(fast);
   useEffect(() => {
     categoryRef.current = category;
-  }, [category]);
+    fastRef.current = fast;
+  }, [category, fast]);
 
   // Catégories de la zone visible, recalculées à chaque déplacement de la carte. Seule la dernière demande compte.
   const categoriesRequest = useRef(0);
@@ -132,8 +138,9 @@ function Main() {
     }
   }, [refreshCategories]);
 
-  // Liens profonds gfaim://?cuisine=poutine&surprise=1&sheet=2 : ouvrent l'app dans un état donné
-  // (cuisine choisie dès qu'elle est proposée, mode surprise, hauteur du panneau 0/1/2). Servent aussi
+  // Liens profonds gfaim://?cuisine=poutine&mode=fast&sheet=2 : ouvrent l'app dans un état donné
+  // (cuisine choisie dès qu'elle est proposée, mode top/fast/surprise, hauteur du panneau 0/1/2).
+  // surprise=1/0 reste compris (anciens liens). Servent aussi
   // à automatiser les captures App Store sur le simulateur, qui ne sait pas toucher l'écran.
   const pendingCuisine = useRef<string | null>(null);
   useEffect(() => {
@@ -142,8 +149,9 @@ function Main() {
       const params = Object.fromEntries(
         (url.split("?")[1] ?? "").split("&").filter(Boolean).map((kv) => kv.split("=").map(decodeURIComponent)),
       );
-      if (params.surprise !== undefined) {
-        setSurprise(params.surprise === "1");
+      const next = params.mode ?? (params.surprise !== undefined ? (params.surprise === "1" ? "surprise" : "top") : undefined);
+      if (MODES.includes(next as Mode)) {
+        setMode(next as Mode);
         setSeed(Date.now());
       }
       if (params.cuisine !== undefined) pendingCuisine.current = params.cuisine || null;
@@ -180,12 +188,13 @@ function Main() {
     };
   }, []);
 
-  // Position (ou cuisine) connue : on élargit depuis 200 m jusqu'à trouver 5 restos, puis on cadre la carte dessus.
+  // Position (ou cuisine, ou mode rapide) connue : on élargit depuis 200 m jusqu'à trouver 5 restos,
+  // puis on cadre la carte dessus.
   useEffect(() => {
     if (!home) return;
     coveredArea.current = null;
-    run(() => searchUntilTop(home, category), true);
-  }, [home, category, run]);
+    run(() => searchUntilTop(home, category, fast), true);
+  }, [home, category, fast, run]);
 
   // On recherche sur la vue quand l'utilisateur dézoome / se déplace au-delà de la zone fouillée,
   // ou quand il zoome assez pour que la vue soit nettement plus petite que cette zone.
@@ -199,7 +208,8 @@ function Main() {
       if (inside && !zoomedIn) return;
       coveredArea.current = view;
       const c = categoryRef.current;
-      run(async () => ({ list: await searchRestaurants(view, c), area: view }), false);
+      const f = fastRef.current;
+      run(async () => ({ list: await searchRestaurants(view, c, f), area: view }), false);
     },
     [run, refreshCategories],
   );
@@ -222,7 +232,10 @@ function Main() {
     if (y != null) scroll.current?.scrollTo({ y: listY.current + y - 16, animated: true });
   }, []);
 
-  const top = useMemo(() => (surprise ? pickRandom(places, seed) : rankTop(places)), [places, surprise, seed]);
+  const top = useMemo(
+    () => (surprise ? pickRandom(places, seed) : fast && home ? rankFast(places, home) : rankTop(places)),
+    [places, surprise, seed, fast, home],
+  );
 
   // 4 cuisines au plus ; la cuisine choisie reste affichée même si elle sort du top en bougeant la carte.
   const top4 = categories.slice(0, MAX_SHOWN);
@@ -280,7 +293,7 @@ function Main() {
       {/* La dame en grand, seulement pendant la recherche, au milieu de la partie visible de la carte. */}
       <SearchingLady
         visible={busy}
-        surprise={surprise}
+        mode={mode}
         top={topBarHeight}
         bottom={snapPoints[Math.min(sheetIndex, 1)]}
       />
@@ -290,13 +303,12 @@ function Main() {
           {t("appName")}
         </Text>
       </View>
-      {/* Mode surprise : à gauche du bandeau, comme sur le site. Hors du bandeau pour que sa bulle déborde dessous. */}
-      <ShuffleToggle
-        side="left"
-        style={{ top: insets.top + (TOP_BAR - 44) / 2, left: 16 }}
-        on={surprise}
-        onChange={(on) => {
-          setSurprise(on);
+      {/* Les trois modes, à gauche du bandeau. Hors du bandeau pour que le nom du mode déborde dessous. */}
+      <ModePicker
+        style={{ top: insets.top + (TOP_BAR - 42) / 2, left: 12 }}
+        mode={mode}
+        onChange={(next) => {
+          setMode(next);
           setSeed(Date.now());
         }}
       />
