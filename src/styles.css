@@ -496,3 +496,17 @@ footer a { color: inherit; }
   .lady *, .card, .home-pin { animation: none !important; }
   .grr span { opacity: 1; }
 }
+
+/* ============ Grand écran : liste à gauche, carte à droite (façon Google Maps) ============ */
+
+@media (min-width: 900px) {
+  /* Le panneau de gauche défile avec la page ; la carte est fixée sur tout le reste de l'écran. */
+  main, footer { width: 420px; max-width: none; margin: 0; box-sizing: border-box; }
+  main { padding: 24px 20px; }
+  .categories { margin-left: -20px; margin-right: -20px; padding-left: 20px; padding-right: 20px; }
+
+  .map-wrap { position: fixed; top: 0; right: 0; bottom: 0; left: 420px; margin: 0; }
+  .map { height: 100%; border: 0; border-left: 1px solid var(--line); border-radius: 0; }
+
+  .minibar { right: auto; width: 420px; margin: 0; }
+}
