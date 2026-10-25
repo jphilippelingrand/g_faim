@@ -1,7 +1,8 @@
 /**
  * Calcule les catégories de cuisine par zone à partir d'OpenStreetMap et écrit public/cuisines/*.json.
  *
- *   node tools/build-cuisines.ts
+ *   node tools/build-cuisines.ts            (pays de CONFIG)
+ *   node tools/build-cuisines.ts canada     (seulement ces pays)
  *
  * Prérequis : osmium (brew install osmium-tool) et les extraits Geofabrik dans data/osm/<pays>.osm.pbf.
  * À relancer tous les ~6 mois. Les fichiers produits sont sous licence ODbL (© contributeurs OSM).
@@ -25,7 +26,7 @@ const CONFIG = {
 const OSM_DIR = "data/osm";
 const OUT_DIR = "public/cuisines";
 const TAGINFO_URL =
-  "https://taginfo.openstreetmap.org/api/4/key/values?key=cuisine&page=1&rp=1000&sortname=count&sortorder=desc";
+  "https://taginfo.openstreetmap.org/api/4/key/values?key=cuisine&page=1&rp=999&sortname=count&sortorder=desc";
 
 const MAX_CATEGORIES = 8;
 const MAX_DISTINCTIVE = 3;
@@ -114,7 +115,7 @@ async function worldBaseline(): Promise<Baseline> {
   return {
     counts: new Map(json.data.map((d) => [d.value, d.count])),
     total: json.data.reduce((s, d) => s + d.count, 0),
-    // Une cuisine absente du top 1000 mondial est au plus aussi fréquente que la 1000e.
+    // Une cuisine absente du top 999 mondial est au plus aussi fréquente que la 999e.
     floor: json.data.at(-1)?.count ?? 1,
   };
 }
@@ -145,7 +146,8 @@ function toNode(tree: Tree, world: Baseline): CuisineNode {
 
 const world = await worldBaseline();
 const tiles = new Map<string, Tree>();
-for (const country of CONFIG.countries) {
+const countries = process.argv.length > 2 ? process.argv.slice(2) : CONFIG.countries;
+for (const country of countries) {
   console.log(`${country}…`);
   console.log(`  ${await addCountry(tiles, country)} restos avec une cuisine renseignée`);
 }
@@ -161,7 +163,7 @@ for (const [key, tree] of tiles) {
 writeFileSync(
   `${OUT_DIR}/README.md`,
   `# Catégories de cuisine par zone\n\nGénéré par \`tools/build-cuisines.ts\` le ${new Date().toISOString().slice(0, 10)} ` +
-    `à partir d'OpenStreetMap (${CONFIG.countries.join(", ")}).\n\n` +
+    `à partir d'OpenStreetMap (${countries.join(", ")}).\n\n` +
     `Données © contributeurs OpenStreetMap, disponibles sous licence ODbL : https://www.openstreetmap.org/copyright\n`,
 );
 console.log(`${written} fichiers écrits dans ${OUT_DIR}/`);

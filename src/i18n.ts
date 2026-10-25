@@ -34,6 +34,7 @@ export function setLang(next: Lang) {
 }
 
 const fr = {
+  appName: "J'ai faim",
   tagline: "Les 5 meilleures tables, juste à côté.",
   taglineSurprise: "5 tables au hasard, juste à côté.",
   locating: "Je te localise…",
@@ -72,6 +73,7 @@ const fr = {
 type Dict = typeof fr;
 
 const en: Dict = {
+  appName: "I'm hungry",
   tagline: "The 5 best tables, right around the corner.",
   taglineSurprise: "5 random tables, right around the corner.",
   locating: "Finding you…",
@@ -108,6 +110,7 @@ const en: Dict = {
 };
 
 const es: Dict = {
+  appName: "Tengo hambre",
   tagline: "Las 5 mejores mesas, a la vuelta de la esquina.",
   taglineSurprise: "5 mesas al azar, a la vuelta de la esquina.",
   locating: "Te estoy buscando…",
@@ -149,3 +152,9 @@ const dicts: Record<Lang, Dict> = { fr, en, es };
 export function t(key: keyof Dict, vars: Record<string, string | number> = {}): string {
   return dicts[lang][key].replace(/\{(\w+)\}/g, (_, v) => String(vars[v] ?? `{${v}}`));
 }
+
+// Nom de l'app dans la langue : onglet, nom sous l'icône quand on ajoute le site à l'écran d'accueil
+// (iOS lit apple-mobile-web-app-title, Android le manifest de la langue).
+document.title = t("appName");
+document.querySelector('meta[name="apple-mobile-web-app-title"]')?.setAttribute("content", t("appName"));
+document.querySelector('link[rel="manifest"]')?.setAttribute("href", `/manifest.${lang}.webmanifest`);

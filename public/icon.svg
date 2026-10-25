@@ -1,8 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Fond plein (compatible "maskable" : le perso tient dans les 80 % centraux) -->
+  <!-- Fond crème uni jusqu'aux bords (iOS et Android arrondissent eux-mêmes les coins) -->
   <rect width="512" height="512" fill="#fbf6ef"/>
-  <circle cx="256" cy="256" r="256" fill="#e2583e" opacity=".12"/>
-  <g transform="translate(256 270) scale(1.55) translate(-120 -150)">
+  <g transform="translate(256 262) scale(1.9) translate(-120 -114)">
     <!-- robe -->
     <path d="M92 84 Q120 76 148 84 L166 220 L74 220 Z" fill="#e2583e"/>
     <!-- ventre -->

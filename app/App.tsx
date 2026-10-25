@@ -185,7 +185,7 @@ export default function App() {
               }}
             />
             <Lady mood={mood} surprise={surprise} />
-            <Text style={styles.title}>J'ai faim</Text>
+            <Text style={styles.title}>{t("appName")}</Text>
             <Text style={styles.tagline}>
               {surprise ? t("taglineSurprise") : t("tagline")}
             </Text>

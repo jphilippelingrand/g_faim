@@ -34,7 +34,7 @@ export function MiniBar({
         aria-label={t("backToTop")}
       >
         <img src="/icon.svg" alt="" width={34} height={34} />
-        <span>J'ai faim</span>
+        <span>{t("appName")}</span>
       </button>
       <ShuffleToggle on={surprise} onChange={onSurprise} />
     </div>
