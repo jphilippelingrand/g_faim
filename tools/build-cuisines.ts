@@ -9,11 +9,10 @@
  */
 import { execFileSync } from "node:child_process";
 import { createReadStream, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { createInterface } from "node:readline";
 import { cellKey, LEVELS, type CategoryEntry, type CuisineNode } from "../src/lib/cuisineGrid.ts";
 
 const CONFIG = {
-  countries: ["france", "canada"],
+  countries: ["france", "canada", "usa", "spain", "england", "germany", "belgium", "italy"],
   // Une région de 0,5° avec au moins ce nombre de restos est découpée en quartiers de 0,05° (~5 km) :
   // toutes les grandes villes, sans liste à tenir à jour.
   refineMinRestaurants: 500,
@@ -28,6 +27,7 @@ const CONFIG = {
 
 const OSM_DIR = "data/osm";
 const OUT_DIR = "public/cuisines";
+const VERSION_FILE = "src/lib/cuisinesVersion.ts";
 const TAGINFO_URL =
   "https://taginfo.openstreetmap.org/api/4/key/values?key=cuisine&page=1&rp=999&sortname=count&sortorder=desc";
 
@@ -46,6 +46,9 @@ const IGNORED = new Set([
   "yes", "coffee_shop", "ice_cream", "cake", "donut", "tea", "juice", "international", "local", "fast_food", "snack",
   "traditional", "european", "lunch", "buffet", "healthy", "organic", "universitaire", "western", "meat", "eggs",
   "dessert", "bakery", "pastry", "popcorn", "milkshake", "teahouse", "trucker", "roadhouse", "fusion", "pub", "irish_pub",
+  "fast food", "bar", "beer", "drinks", "coffee", "cafe", "smoothie", "slushy", "cookies", "sweets", "chocolate",
+  "shaved_ice", "health_food", "dinner", "modern", "eclectic", "home_style_cooking", "small_plates", "beef",
+  "canteen", "student", "dining_hall", "cafeteria", "home_style", "snow_cone", "pork",
 ]);
 // Variantes d'écriture d'une même cuisine, ramenées à une seule valeur.
 const ALIASES: Record<string, string> = {
@@ -53,6 +56,10 @@ const ALIASES: Record<string, string> = {
   hot_pot: "hotpot", noodles: "noodle", savoyarde: "savoyard", nepal: "nepalese", italian_pizza: "pizza",
   fried_chicken: "chicken", gastronomique: "fine_dining", bistronomique: "bistro", savory_pancakes: "galette",
   "canadian-chinese": "chinese", "tex-mex": "tex_mex",
+  brazillian: "brazilian", el_salvadoran: "salvadoran", soul: "soul_food", bowls: "bowl", "döner": "kebab",
+  english: "british", croque: "croque-monsieur", bratwurst: "sausage", grilled_chicken: "chicken",
+  escalope: "schnitzel", steak: "steak_house", mongolian_grill: "mongolian", chips: "friture", romana: "pizza",
+  jause: "brotzeit", peking: "chinese", new_american: "american", coney_island: "hot_dog", taco: "tacos", hamburger: "burger",
 };
 
 type Counts = Map<string, number>;
@@ -95,12 +102,26 @@ function extractRestaurants(country: string): string {
   return out;
 }
 
+/**
+ * Lignes d'un fichier, coupées sur \n seulement : readline coupe aussi sur U+2028, que JSON autorise
+ * dans une chaîne (des descriptions OSM en contiennent).
+ */
+async function* readLines(file: string): AsyncGenerator<string> {
+  let rest = "";
+  for await (const chunk of createReadStream(file, { encoding: "utf8" })) {
+    const lines = (rest + chunk).split("\n");
+    rest = lines.pop()!;
+    yield* lines;
+  }
+  if (rest) yield rest;
+}
+
 async function addCountry(tiles: Map<string, Tree>, country: string): Promise<number> {
   const file = extractRestaurants(country);
   const totals: Counts = new Map();
   countryTotals.set(country, totals);
   let n = 0;
-  for await (const line of createInterface({ input: createReadStream(file) })) {
+  for await (const line of readLines(file)) {
     if (!line.trim()) continue;
     const feature = JSON.parse(line);
     const props = feature.properties ?? {};
@@ -220,5 +241,11 @@ writeFileSync(
   `# Catégories de cuisine par zone\n\nGénéré par \`tools/build-cuisines.ts\` le ${new Date().toISOString().slice(0, 10)} ` +
     `à partir d'OpenStreetMap (${countries.join(", ")}).\n\n` +
     `Données © contributeurs OpenStreetMap, disponibles sous licence ODbL : https://www.openstreetmap.org/copyright\n`,
+);
+// Ajoutée aux URLs par le site : le navigateur ignore ses anciennes copies (y compris un 404 d'avant ce calcul).
+writeFileSync(
+  VERSION_FILE,
+  `// Généré par tools/build-cuisines.ts : version des fichiers public/cuisines, changée à chaque calcul.\n` +
+    `export const CUISINES_VERSION = "${Date.now().toString(36)}";\n`,
 );
 console.log(`${written} fichiers écrits dans ${OUT_DIR}/`);

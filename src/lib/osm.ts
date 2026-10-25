@@ -1,5 +1,6 @@
 import { lang } from "../i18n";
 import { cellKey, findPath, levelForRadius, type CategoryEntry, type CuisineNode } from "./cuisineGrid";
+import { CUISINES_VERSION } from "./cuisinesVersion";
 import type { LatLng } from "./places";
 
 /**
@@ -152,6 +153,97 @@ const LABELS: Record<string, [emoji: string, fr: string, en: string, es: string,
   oyster: ["🦪", "Huîtres", "Oysters", "Ostras"],
   panisses: ["🍟", "Panisses", "Panisses", "Panisses"],
   "croque-monsieur": ["🥪", "Croque-monsieur", "Croque-monsieur", "Croque-monsieur"],
+  // États-Unis
+  hawaiian: ["🌺", "Hawaïen", "Hawaiian", "Hawaiano", R],
+  southern: ["🍗", "Cuisine du Sud", "Southern", "Comida sureña"],
+  soul_food: ["🍗", "Soul food", "Soul food", "Soul food"],
+  lowcountry: ["🦐", "Lowcountry", "Lowcountry", "Lowcountry"],
+  new_mexican: ["🌶️", "Néo-mexicain", "New Mexican", "Nuevomexicano", R],
+  southwestern: ["🌵", "Sud-Ouest américain", "Southwestern", "Del suroeste", R],
+  californian: ["🥑", "Californien", "Californian", "Californiano", R],
+  chili: ["🌶️", "Chili", "Chili", "Chili"],
+  cheesesteak: ["🥪", "Cheesesteak", "Cheesesteak", "Cheesesteak"],
+  kolache: ["🥐", "Kolaches", "Kolaches", "Kolaches"],
+  catfish: ["🐟", "Poisson-chat", "Catfish", "Bagre"],
+  crab: ["🦀", "Crabe", "Crab", "Cangrejo"],
+  lobster: ["🦞", "Homard", "Lobster", "Langosta"],
+  shrimp: ["🦐", "Crevettes", "Shrimp", "Gambas"],
+  teriyaki: ["🍱", "Teriyaki", "Teriyaki", "Teriyaki"],
+  hibachi: ["🔥", "Teppanyaki", "Hibachi", "Teppanyaki"],
+  burrito: ["🌯", "Burritos", "Burritos", "Burritos"],
+  "açaí": ["🫐", "Açaí", "Açaí", "Açaí"],
+  fried_dough: ["🍩", "Beignets", "Fried dough", "Buñuelos"],
+  cuban: ["🌴", "Cubain", "Cuban", "Cubano", R],
+  salvadoran: ["🫓", "Salvadorien", "Salvadoran", "Salvadoreño", R],
+  puerto_rican: ["🌴", "Portoricain", "Puerto Rican", "Puertorriqueño", R],
+  dominican: ["🌴", "Dominicain", "Dominican", "Dominicano", R],
+  guyanese: ["🌴", "Guyanien", "Guyanese", "Guyanés", R],
+  honduran: ["🫓", "Hondurien", "Honduran", "Hondureño", R],
+  nicaraguan: ["🫓", "Nicaraguayen", "Nicaraguan", "Nicaragüense", R],
+  colombian: ["🫓", "Colombien", "Colombian", "Colombiano", R],
+  venezuelan: ["🫓", "Vénézuélien", "Venezuelan", "Venezolano", R],
+  ecuadorian: ["🌶️", "Équatorien", "Ecuadorian", "Ecuatoriano", R],
+  argentinian: ["🥩", "Argentin", "Argentinian", "Argentino", R],
+  empanada: ["🥟", "Empanadas", "Empanadas", "Empanadas"],
+  // Royaume-Uni et Irlande
+  british: ["🫖", "Britannique", "British", "Británico", R],
+  irish: ["☘️", "Irlandais", "Irish", "Irlandés", R],
+  pie_and_mash: ["🥧", "Pie and mash", "Pie and mash", "Pie and mash"],
+  pasty: ["🥟", "Pasties", "Pasties", "Pasties"],
+  curry: ["🍛", "Curry", "Curry", "Curry"],
+  // Allemagne et Autriche
+  bavarian: ["🥨", "Bavarois", "Bavarian", "Bávaro", R],
+  swabian: ["🍝", "Souabe", "Swabian", "Suabo", R],
+  franconian: ["🍺", "Franconien", "Franconian", "Franconio", R],
+  hessian: ["🍎", "Hessois", "Hessian", "Hesiano", R],
+  thuringian: ["🌭", "Thuringien", "Thuringian", "Turingio", R],
+  austrian: ["🥩", "Autrichien", "Austrian", "Austriaco", R],
+  pretzel: ["🥨", "Bretzels", "Pretzels", "Pretzels"],
+  sausage: ["🌭", "Saucisses", "Sausages", "Salchichas"],
+  currywurst: ["🌭", "Currywurst", "Currywurst", "Currywurst"],
+  schnitzel: ["🥩", "Schnitzel", "Schnitzel", "Escalope"],
+  brotzeit: ["🥨", "Brotzeit", "Brotzeit", "Brotzeit"],
+  buschenschank: ["🍷", "Buschenschank", "Buschenschank", "Buschenschank"],
+  alpine_hut: ["🏔️", "Refuge", "Alpine hut", "Refugio"],
+  // Espagne
+  catalan: ["🥘", "Catalan", "Catalan", "Catalán", R],
+  galician: ["🐙", "Galicien", "Galician", "Gallego", R],
+  asturian: ["🍏", "Asturien", "Asturian", "Asturiano", R],
+  valencian: ["🥘", "Valencien", "Valencian", "Valenciano", R],
+  basque_ciderhouse: ["🍏", "Cidrerie basque", "Basque cider house", "Sidrería"],
+  paella: ["🥘", "Paella", "Paella", "Paella"],
+  churro: ["🥖", "Churros", "Churros", "Churros"],
+  "calçotada": ["🧅", "Calçotada", "Calçotada", "Calçotada"],
+  brasas: ["🔥", "Grillades", "Grill", "Brasas"],
+  // Italie
+  sardinian: ["🐑", "Sarde", "Sardinian", "Sardo", R],
+  sicilian: ["🍋", "Sicilien", "Sicilian", "Siciliano", R],
+  ligurian: ["🌿", "Ligure", "Ligurian", "Ligur", R],
+  piedmontese: ["🍷", "Piémontais", "Piedmontese", "Piamontés", R],
+  emilian: ["🍝", "Émilien", "Emilian", "Emiliano", R],
+  piadina: ["🫓", "Piadina", "Piadina", "Piadina"],
+  "5_e_5": ["🥪", "Cinque e cinque", "Cinque e cinque", "Cinque e cinque"],
+  // Europe centrale et de l'Est, Balkans
+  balkan: ["🍖", "Balkanique", "Balkan", "Balcánico", R],
+  croatian: ["🐟", "Croate", "Croatian", "Croata", R],
+  czech: ["🍺", "Tchèque", "Czech", "Checo", R],
+  hungarian: ["🌶️", "Hongrois", "Hungarian", "Húngaro", R],
+  russian: ["🥟", "Russe", "Russian", "Ruso", R],
+  jewish: ["🥯", "Juif", "Jewish", "Judío", R],
+  // Asie, Moyen-Orient, Afrique
+  afghan: ["🍢", "Afghan", "Afghan", "Afgano", R],
+  uzbek: ["🍚", "Ouzbek", "Uzbek", "Uzbeko", R],
+  mongolian: ["🔥", "Mongol", "Mongolian", "Mongol", R],
+  burmese: ["🍜", "Birman", "Burmese", "Birmano", R],
+  indonesian: ["🍛", "Indonésien", "Indonesian", "Indonesio", R],
+  sri_lankan: ["🍛", "Sri-lankais", "Sri Lankan", "Esrilanqués", R],
+  iraqi: ["🍢", "Irakien", "Iraqi", "Iraquí", R],
+  egyptian: ["🧆", "Égyptien", "Egyptian", "Egipcio", R],
+  sudanese: ["🍲", "Soudanais", "Sudanese", "Sudanés", R],
+  somali: ["🍲", "Somalien", "Somali", "Somalí", R],
+  nigerian: ["🍲", "Nigérian", "Nigerian", "Nigeriano", R],
+  gyros: ["🥙", "Gyros", "Gyros", "Gyros"],
+  lahmacun: ["🫓", "Lahmacun", "Lahmacun", "Lahmacun"],
 };
 
 const RESTAURANT = { fr: "restaurant", en: "restaurant", es: "restaurante" };
@@ -175,7 +267,7 @@ const tiles = new Map<string, Promise<CuisineNode | null>>();
 function getTile(key: string): Promise<CuisineNode | null> {
   let tile = tiles.get(key);
   if (!tile) {
-    tile = fetch(`/cuisines/${key}.json`).then((r) =>
+    tile = fetch(`/cuisines/${key}.json?v=${CUISINES_VERSION}`).then((r) =>
       // Vite et Vercel renvoient la page d'accueil pour un fichier absent : on vérifie le type.
       r.ok && r.headers.get("content-type")?.includes("json") ? (r.json() as Promise<CuisineNode>) : null,
     );

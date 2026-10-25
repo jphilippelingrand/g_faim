@@ -69,12 +69,14 @@ header { text-align: center; position: relative; }
   -webkit-tap-highlight-color: transparent;
 }
 .minibar-home img { border-radius: 50%; }
-/* Dans la barre, le bouton surprise suit le flux (il est en absolu dans l'en-tête) */
-.minibar .shuffle { position: relative; }
 
 /* ============ Mode surprise ============ */
 
-.shuffle { position: absolute; top: 0; right: 0; z-index: 2; }
+.shuffle { position: relative; z-index: 2; }
+/* Dans l'en-tête, en haut à gauche ; la bulle s'ouvre donc vers la droite. */
+header .shuffle { position: absolute; top: 0; left: 0; }
+header .shuffle-tip { left: 0; right: auto; }
+header .shuffle-tip::before { left: 16px; right: auto; }
 .shuffle-button {
   position: relative;
   display: grid;
@@ -137,14 +139,6 @@ header { text-align: center; position: relative; }
 .shuffle-tip.visible { opacity: 1; transform: none; }
 
 
-
-h1 {
-  font-family: "Fraunces", Georgia, serif;
-  font-weight: 700;
-  font-size: 2.6rem;
-  margin: 0;
-  letter-spacing: -0.02em;
-}
 
 .tagline { margin: 4px 0 24px; color: var(--muted); }
 
@@ -555,7 +549,6 @@ footer a { color: inherit; }
 .langs button[aria-current="true"] { border-color: var(--line); background: var(--card); color: var(--ink); }
 
 @media (max-width: 420px) {
-  h1 { font-size: 2.1rem; }
   .grr { font-size: 1.35rem; }
 }
 

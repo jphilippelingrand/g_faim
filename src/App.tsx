@@ -182,7 +182,6 @@ export default function App() {
         <header ref={heroRef}>
           <ShuffleToggle on={surprise} onChange={toggleSurprise} />
           <Lady mood={mood} surprise={surprise} />
-          <h1>{t("appName")}</h1>
           <p className="tagline">{surprise ? t("taglineSurprise") : t("tagline")}</p>
         </header>
 
