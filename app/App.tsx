@@ -10,8 +10,8 @@ import { Linking, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, V
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useSharedValue } from "react-native-reanimated";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
-import { DiceButton } from "./src/components/DiceButton";
-import { Lady, type Mood } from "./src/components/Lady";
+import { MapControls } from "./src/components/MapControls";
+import { SearchingLady } from "./src/components/SearchingLady";
 import { CategoryBar } from "./src/components/CategoryBar";
 import { RestaurantCard } from "./src/components/RestaurantCard";
 import { RestaurantMap } from "./src/components/RestaurantMap";
@@ -35,8 +35,8 @@ SplashScreen.preventAutoHideAsync();
 
 type Phase = "locating" | "searching" | "done" | "error";
 
-// Mise en page : hauteur de la barre du haut (sous l'encoche, la dame y tient) et du panneau replié (catégories).
-const TOP_BAR = 72;
+// Mise en page : hauteur du bandeau du haut (sous l'encoche) et du panneau replié (catégories).
+const TOP_BAR = 52;
 const SITE = "https://www.groubl.com";
 const SHEET_MIN = 190;
 
@@ -172,7 +172,7 @@ function Main() {
     [run, refreshCategories],
   );
 
-  // Toucher la dame : reprend la position GPS (on a pu bouger) et relance la recherche depuis le plus petit
+  // Bouton ➤ : reprend la position GPS (on a pu bouger) et relance la recherche depuis le plus petit
   // rayon, carte recentrée sur soi, comme à l'ouverture. Sans position (refusée), on repart de la dernière connue.
   const recenter = useCallback(() => {
     if (!home) return;
@@ -198,7 +198,6 @@ function Main() {
     category && !top4.some((c) => c.key === category.key) ? [...top4.slice(0, MAX_SHOWN - 1), category] : top4;
 
   const busy = phase === "locating" || phase === "searching";
-  const mood: Mood = busy ? "starving" : phase === "done" && top.length ? "happy" : "hungry";
 
   // Ligne de statut seulement quand il y a quelque chose à dire ; sinon, l'accroche.
   let status = "";
@@ -246,18 +245,27 @@ function Main() {
         <View style={styles.mapPlaceholder} />
       )}
 
-      <View style={[styles.topBar, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
-        <View style={styles.ladyBadge}>
-          <Lady mood={mood} surprise={surprise} width={58} onPress={recenter} accessibilityLabel={t("recenter")} />
-        </View>
+      {/* La dame en grand, seulement pendant la recherche, au milieu de la partie visible de la carte. */}
+      <SearchingLady
+        visible={busy}
+        surprise={surprise}
+        top={topBarHeight}
+        bottom={snapPoints[Math.min(sheetIndex, 1)]}
+      />
+
+      <View style={[styles.banner, { paddingTop: insets.top, height: topBarHeight }]}>
+        <Text style={styles.bannerTitle} accessibilityRole="header">
+          {t("appName")}
+        </Text>
       </View>
 
-      <DiceButton
-        on={surprise}
-        onToggle={() => {
+      <MapControls
+        surprise={surprise}
+        onToggleSurprise={() => {
           if (!surprise) setSeed(Date.now());
           setSurprise(!surprise);
         }}
+        onRecenter={recenter}
         sheetTop={sheetTop}
         screenHeight={screenH}
       />
@@ -344,16 +352,18 @@ export default function App() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   mapPlaceholder: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: colors.accentSoft },
-  topBar: {
+  banner: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
-    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
+    justifyContent: "center",
+    backgroundColor: "rgba(251, 246, 239, 0.94)",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.line,
   },
+  bannerTitle: { fontFamily: fonts.title, fontSize: 24, color: colors.ink, letterSpacing: -0.5 },
   sheetBackground: { backgroundColor: colors.bg, borderRadius: 24 },
   sheetHandle: { backgroundColor: colors.line, width: 44 },
   sheetContent: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 48 },
@@ -378,17 +388,4 @@ const styles = StyleSheet.create({
   stale: { opacity: 0.5 },
   footer: { fontFamily: fonts.body, fontSize: 12, lineHeight: 20, color: colors.muted, textAlign: "center", marginTop: 24 },
   footerLink: { textDecorationLine: "underline" },
-  ladyBadge: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "rgba(251, 246, 239, 0.95)",
-    alignItems: "center",
-    justifyContent: "flex-end",
-    overflow: "hidden",
-    shadowColor: colors.ink,
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-  },
 });

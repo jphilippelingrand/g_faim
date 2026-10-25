@@ -1,20 +1,10 @@
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text } from "react-native";
-import Animated, {
-  Easing,
-  interpolate,
-  useAnimatedStyle,
-  useSharedValue,
-  withSequence,
-  withSpring,
-  withTiming,
-  type SharedValue,
-} from "react-native-reanimated";
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from "react-native-reanimated";
 import { t } from "../i18n";
 
-const SIZE = 84;
-const GAP = 16;
+export const DICE_SIZE = 84;
 // Le changement de face se fait quand l'emoji est minuscule et tourne vite : invisible.
 const OUT_MS = 300; // tourne en accélérant et rétrécit
 const IN_MS = 350; // la nouvelle face jaillit avec un petit rebond
@@ -23,17 +13,14 @@ type Props = {
   on: boolean;
   /** Bascule : 🎲 → tirage au sort, ⭐ → retour au classement par note. */
   onToggle: () => void;
-  /** Haut du panneau (px depuis le haut de l'écran), fourni par la bottom sheet : le bouton le suit. */
-  sheetTop: SharedValue<number>;
-  screenHeight: number;
 };
 
 /**
- * Le bouton du mode surprise, posé sur la carte au-dessus du panneau. Deux faces : 🎲 (toucher = restos
+ * Le bouton du mode surprise (placé sur la carte par MapControls). Deux faces : 🎲 (toucher = restos
  * tirés au sort) et ⭐ (toucher = retour au classement par note). Au toucher, la face tourne en accélérant
  * et rétrécit, change quand elle est minuscule, puis la nouvelle jaillit avec un rebond.
  */
-export function DiceButton({ on, onToggle, sheetTop, screenHeight }: Props) {
+export function DiceButton({ on, onToggle }: Props) {
   // La face affichée change au milieu de l'animation, quand elle est presque invisible.
   const [face, setFace] = useState(on ? "⭐" : "🎲");
   const swap = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -43,11 +30,6 @@ export function DiceButton({ on, onToggle, sheetTop, screenHeight }: Props) {
   const scale = useSharedValue(1);
   const direction = useSharedValue(1);
 
-  const follow = useAnimatedStyle(() => ({
-    top: sheetTop.value - SIZE - GAP,
-    // Panneau ouvert en grand : la carte est cachée, le bouton s'efface.
-    opacity: interpolate(sheetTop.value, [screenHeight * 0.2, screenHeight * 0.35], [0, 1], "clamp"),
-  }));
   const anim = useAnimatedStyle(() => ({
     transform: [{ rotate: `${direction.value * spin.value * 720}deg` }, { scale: scale.value }],
   }));
@@ -79,25 +61,22 @@ export function DiceButton({ on, onToggle, sheetTop, screenHeight }: Props) {
   }
 
   return (
-    <Animated.View style={[styles.wrap, follow]} pointerEvents="box-none">
-      <Pressable
-        onPress={press}
-        accessibilityRole="button"
-        accessibilityLabel={on ? t("closeSurprise") : t("surpriseMode")}
-        accessibilityHint={on ? undefined : t("surpriseTip")}
-      >
-        <Animated.View style={[styles.face, anim]}>
-          <Text style={styles.emoji}>{face}</Text>
-        </Animated.View>
-      </Pressable>
-    </Animated.View>
+    <Pressable
+      onPress={press}
+      accessibilityRole="button"
+      accessibilityLabel={on ? t("closeSurprise") : t("surpriseMode")}
+      accessibilityHint={on ? undefined : t("surpriseTip")}
+    >
+      <Animated.View style={[styles.face, anim]}>
+        <Text style={styles.emoji}>{face}</Text>
+      </Animated.View>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { position: "absolute", right: GAP, width: SIZE, height: SIZE },
   // Juste l'emoji, sans fond : une ombre le garde lisible sur la carte.
-  face: { width: SIZE, height: SIZE, alignItems: "center", justifyContent: "center" },
+  face: { width: DICE_SIZE, height: DICE_SIZE, alignItems: "center", justifyContent: "center" },
   emoji: {
     fontSize: 64,
     textShadowColor: "rgba(43, 33, 28, 0.35)",
