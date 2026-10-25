@@ -1,12 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { t } from "../i18n";
+import type { Mode } from "./ModePicker";
 
 /** starving = ça gargouille non-stop (recherche) ; hungry = gros gargouillis réguliers ; happy = elle a trouvé, elle bave. */
 export type Mood = "starving" | "hungry" | "happy";
 
 const GRR = "GRROOOUUBBLL";
 
-export function Lady({ mood, surprise = false }: { mood: Mood; surprise?: boolean }) {
+export function Lady({ mood, mode = "top" }: { mood: Mood; mode?: Mode }) {
+  const surprise = mode === "surprise";
+  const fast = mode === "fast";
+
   // Un clic sur la dame la fait gargouiller à fond pendant un instant.
   const [poked, setPoked] = useState(false);
   useEffect(() => {
@@ -17,27 +21,31 @@ export function Lady({ mood, surprise = false }: { mood: Mood; surprise?: boolea
 
   const effective = poked ? "starving" : mood;
 
-  // Une pirouette quand on active le mode surprise.
+  // Une pirouette à chaque changement de mode (pas à l'ouverture de la page).
   const [twirl, setTwirl] = useState(false);
+  const firstMode = useRef(true);
   useEffect(() => {
-    if (!surprise) return;
+    if (firstMode.current) {
+      firstMode.current = false;
+      return;
+    }
     setTwirl(true);
     const t = setTimeout(() => setTwirl(false), 800);
     return () => clearTimeout(t);
-  }, [surprise]);
+  }, [mode]);
 
   return (
     <button
       type="button"
-      className={`lady${surprise ? " surprise" : ""}${twirl ? " twirl" : ""}`}
+      className={`lady${surprise ? " surprise" : ""}${fast ? " fast" : ""}${twirl ? " twirl" : ""}`}
       data-mood={effective}
       onClick={() => setPoked(true)}
       aria-label={t("ladyLabel")}
     >
       <span className="grr" aria-hidden="true">
-        {/* Mode surprise : elle mange « au pif », les yeux bandés. */}
-        {[...(surprise ? t("ladyPif") : GRR)].map((ch, i) => (
-          <span key={i} className={ch === "\u00a0" ? "space" : undefined} style={{ animationDelay: `${i * (surprise ? 90 : 35)}ms` }}>
+        {/* Mode surprise : elle mange « au pif », les yeux bandés. Mode rapide : elle file. */}
+        {[...(surprise ? t("ladyPif") : fast ? t("ladyFast") : GRR)].map((ch, i) => (
+          <span key={i} className={ch === "\u00a0" ? "space" : undefined} style={{ animationDelay: `${i * (surprise ? 90 : fast ? 40 : 35)}ms` }}>
             {ch}
           </span>
         ))}
@@ -53,9 +61,17 @@ export function Lady({ mood, surprise = false }: { mood: Mood; surprise?: boolea
 
       <svg viewBox="0 0 240 270" width="220" height="248" aria-hidden="true">
         <g className="figure">
+          {/* Mode rapide : elle court vers nous, un nuage de poussière à chaque pas. */}
+          {fast && (
+            <g className="dust" fill="var(--muted)">
+              <circle cx="80" cy="256" r="7" />
+              <circle cx="160" cy="256" r="7" />
+            </g>
+          )}
+
           {/* pieds */}
-          <ellipse cx="100" cy="258" rx="16" ry="7" fill="var(--ink)" />
-          <ellipse cx="140" cy="258" rx="16" ry="7" fill="var(--ink)" />
+          <ellipse className="foot foot-left" cx="100" cy="258" rx="16" ry="7" fill="var(--ink)" />
+          <ellipse className="foot foot-right" cx="140" cy="258" rx="16" ry="7" fill="var(--ink)" />
 
           {/* robe */}
           <path d="M92 84 Q120 76 148 84 L172 252 L68 252 Z" fill="var(--dress)" />
@@ -81,10 +97,14 @@ export function Lady({ mood, surprise = false }: { mood: Mood; surprise?: boolea
           </g>
 
           {/* bras, mains posées sur le ventre */}
-          <path d="M94 92 Q66 120 78 150" fill="none" stroke="var(--skin)" strokeWidth="10" strokeLinecap="round" />
-          <path d="M146 92 Q174 120 162 150" fill="none" stroke="var(--skin)" strokeWidth="10" strokeLinecap="round" />
-          <circle cx="80" cy="152" r="8" fill="var(--skin)" />
-          <circle cx="160" cy="152" r="8" fill="var(--skin)" />
+          <g className="arm arm-left">
+            <path d="M94 92 Q66 120 78 150" fill="none" stroke="var(--skin)" strokeWidth="10" strokeLinecap="round" />
+            <circle cx="80" cy="152" r="8" fill="var(--skin)" />
+          </g>
+          <g className="arm arm-right">
+            <path d="M146 92 Q174 120 162 150" fill="none" stroke="var(--skin)" strokeWidth="10" strokeLinecap="round" />
+            <circle cx="160" cy="152" r="8" fill="var(--skin)" />
+          </g>
 
           {/* tête */}
           <circle cx="120" cy="22" r="14" fill="var(--hair)" />

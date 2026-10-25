@@ -70,77 +70,51 @@ header { text-align: center; position: relative; }
 }
 .minibar-home img { border-radius: 50%; }
 
-/* ============ Mode surprise ============ */
+/* ============ Choix du mode : les meilleurs, sur le pouce, au hasard ============ */
 
-.shuffle { position: relative; z-index: 2; }
-/* Dans l'en-tête, en haut à gauche ; la bulle s'ouvre donc vers la droite. */
-header .shuffle { position: absolute; top: 0; left: 0; }
-header .shuffle-tip { left: 0; right: auto; }
-header .shuffle-tip::before { left: 16px; right: auto; }
-.shuffle-button {
-  position: relative;
+.modes {
   display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border-radius: 50%;
-  border: 1px solid var(--line);
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px;
+  margin: 0 0 14px;
+  border-radius: 20px;
   background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: 0 2px 6px rgb(43 33 28 / .06);
+}
+/* Emoji au-dessus du texte : trois choix tiennent côte à côte même sur un petit téléphone. */
+.modes button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  padding: 7px 4px 6px;
+  border: 0;
+  border-radius: 16px;
+  background: none;
   color: var(--muted);
+  font: 600 .82rem "Inter", system-ui, sans-serif;
+  white-space: nowrap;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  -webkit-touch-callout: none;
-  user-select: none;
-  transition: color .15s, border-color .15s;
+  transition: background .15s, color .15s;
 }
-.shuffle-button.on { color: var(--accent); border-color: var(--accent); }
-/* Le petit point sous l'icône, comme dans Spotify */
-.shuffle-button.on::after {
-  content: "";
-  position: absolute;
-  bottom: 5px;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--accent);
-}
+.modes button > span:first-child { font-size: 1.3rem; line-height: 1.2; }
+.modes button[aria-checked="true"] { background: var(--accent); color: #fff; }
 @media (hover: hover) {
-  .shuffle-button:hover { border-color: var(--accent); color: var(--ink); }
-  .shuffle-button.on:hover { color: var(--accent); }
+  .modes button:hover:not([aria-checked="true"]) { color: var(--ink); }
 }
-.shuffle-tip {
-  position: absolute;
-  top: 52px;
-  right: 0;
-  width: 220px;
-  padding: 10px 12px;
-  border-radius: 12px;
-  background: var(--ink);
-  color: var(--bg);
-  font-size: .85rem;
-  line-height: 1.4;
-  text-align: left;
-  box-shadow: 0 8px 24px rgb(43 33 28 / .2);
-  opacity: 0;
-  transform: translateY(-4px);
-  pointer-events: none;
-  transition: opacity .15s, transform .15s;
-}
-.shuffle-tip::before {
-  content: "";
-  position: absolute;
-  top: -6px;
-  right: 16px;
-  border: 6px solid transparent;
-  border-top: 0;
-  border-bottom-color: var(--ink);
-}
-.shuffle-tip.visible { opacity: 1; transform: none; }
+/* Dans la barre du haut : les emojis seuls. */
+.modes.compact { margin: 0; gap: 2px; padding: 3px; border-radius: 999px; box-shadow: none; }
+.modes.compact button { width: 38px; height: 32px; padding: 0; border-radius: 999px; }
+.modes.compact button > span:first-child { font-size: 1.05rem; }
 
 
 
-.tagline { margin: 4px 0 24px; color: var(--muted); }
+.tagline { margin: 4px 0 16px; color: var(--muted); }
 
 /* ============ La petite dame ============ */
 
@@ -235,7 +209,7 @@ header .shuffle-tip::before { left: 16px; right: auto; }
   30% { opacity: .8; transform: scale(1.12); }
 }
 
-/* Mode surprise : pirouette à l'activation, petits « ? » qui flottent autour de la tête */
+/* Pirouette à chaque changement de mode ; en mode surprise, petits « ? » qui flottent autour de la tête */
 .lady.twirl svg { animation: twirl .8s cubic-bezier(.5, 0, .3, 1.3); }
 @keyframes twirl {
   from { transform: perspective(600px) rotateY(0); }
@@ -265,6 +239,41 @@ header .shuffle-tip::before { left: 16px; right: auto; }
   0%, 100% { transform: translateY(0) rotate(0); }
   30% { transform: translateY(-6px) rotate(-4deg); }
   60% { transform: translateY(1px) rotate(3deg); }
+}
+
+/* Mode rapide : elle court vers nous (pas alternés, bras qui balancent, rebond, poussière). */
+.lady.fast .grr { color: #f2b134; }
+.lady.fast .grr span { opacity: 1; animation: vite .5s ease-in-out infinite alternate; }
+@keyframes vite {
+  from { transform: skewX(-12deg) translateX(0); }
+  to { transform: skewX(-18deg) translateX(3px); }
+}
+.lady.fast .waves { display: none; }
+.lady.fast .figure { animation: bob .22s ease-in-out infinite alternate; }
+@keyframes bob {
+  from { transform: translateY(0); }
+  to { transform: translateY(-6px); }
+}
+.lady.fast .foot { animation: step .44s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.lady.fast .foot-right { animation-delay: -.22s; }
+@keyframes step {
+  0%, 100% { transform: none; }
+  50% { transform: translateY(-9px) scale(1.25); }
+}
+/* La même rotation écarte un bras pendant que l'autre revient sur le ventre : ils alternent. */
+.lady.fast .arm { animation: pump .44s ease-in-out infinite; }
+.lady.fast .arm-left { transform-origin: 94px 92px; }
+.lady.fast .arm-right { transform-origin: 146px 92px; }
+@keyframes pump {
+  0%, 100% { transform: rotate(-16deg); }
+  50% { transform: rotate(16deg); }
+}
+.lady .dust circle { opacity: 0; animation: dust .44s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+.lady .dust circle:first-child { --dx: -14px; }
+.lady .dust circle:last-child { --dx: 14px; animation-delay: -.22s; }
+@keyframes dust {
+  0% { opacity: .45; transform: translate(0, 0) scale(.6); }
+  100% { opacity: 0; transform: translate(var(--dx), -6px) scale(1.6); }
 }
 
 /* GRROOOUUBBLL façon BD */
@@ -308,54 +317,45 @@ header .shuffle-tip::before { left: 16px; right: auto; }
 
 /* ============ Catégories : gros emoji rond + nom ============ */
 
+/* Une seule ligne, qui défile au doigt si elle déborde (centrée quand elle tient). */
 .categories {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  margin: 0 0 18px;
+  display: flex;
+  gap: 6px;
+  margin: 0 -16px 18px;
+  padding: 0 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.categories::-webkit-scrollbar { display: none; }
+.categories > :first-child { margin-left: auto; }
+.categories > :last-child { margin-right: auto; }
 .categories button {
   display: flex;
-  flex-direction: column;
+  flex: none;
   align-items: center;
-  gap: 6px;
-  padding: 0;
-  border: 0;
-  background: none;
+  gap: 5px;
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
   color: var(--ink);
-  font: 500 .8rem "Inter", system-ui, sans-serif;
+  font: 500 .82rem "Inter", system-ui, sans-serif;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  transition: border-color .15s, color .15s;
 }
-.categories .emoji {
-  display: grid;
-  place-items: center;
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  background: var(--card);
-  border: 1px solid var(--line);
-  box-shadow: 0 2px 6px rgb(43 33 28 / .06);
-  font-size: 30px;
-  line-height: 1;
-  transition: transform .2s cubic-bezier(.3, 1.6, .5, 1), background .15s, border-color .15s;
-}
-.categories .label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.categories button:active .emoji { transform: scale(.92); }
-.categories button.active .emoji {
-  background: var(--accent);
-  border-color: var(--accent);
-  transform: scale(1.08) rotate(-8deg);
-  animation: boing .45s cubic-bezier(.3, 1.6, .5, 1);
-}
-.categories button.active .label { color: var(--accent); font-weight: 700; }
+.categories .emoji { font-size: 1rem; line-height: 1; }
+.categories .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.categories button:active { transform: scale(.96); }
+.categories button.active { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.categories button.active .emoji { display: inline-block; animation: boing .45s cubic-bezier(.3, 1.6, .5, 1) both; }
 @keyframes boing {
   0% { transform: scale(.85) rotate(0); }
-  60% { transform: scale(1.18) rotate(-12deg); }
-  100% { transform: scale(1.08) rotate(-8deg); }
+  60% { transform: scale(1.25) rotate(-12deg); }
+  100% { transform: none; }
 }
 @media (hover: hover) {
-  .categories button:hover:not(.active) .emoji { transform: translateY(-2px) rotate(-4deg); border-color: var(--accent); }
+  .categories button:hover:not(.active) { border-color: var(--accent); }
 }
 
 /* ============ Carte ============ */

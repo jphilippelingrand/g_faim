@@ -30,6 +30,13 @@ const MAX_START_RADIUS = 6400;
 // Limite de searchNearby.
 export const MAX_RADIUS = 50_000;
 
+// Mode rapide : ce qui se mange sur le pouce, d'après les types Google.
+const FAST_TYPES = ["fast_food_restaurant", "hamburger_restaurant", "sandwich_shop", "meal_takeaway"];
+// En dessous, on n'en veut pas même tout près (écarte surtout les chaînes mal notées).
+const FAST_MIN_RATING = 3.8;
+// Étoiles perdues par km : à 500 m, il faut 0,4★ de plus que le voisin d'à côté pour passer devant.
+const FAST_STARS_PER_KM = 0.8;
+
 const PRICE: Record<string, string> = {
   INEXPENSIVE: "€",
   MODERATE: "€€",
@@ -96,7 +103,7 @@ function isOpenNow(place: google.maps.places.Place, now = new Date()): boolean |
 const FIELDS = [
   "id", "displayName", "rating", "userRatingCount", "location",
   "googleMapsURI", "priceLevel", "primaryTypeDisplayName", "photos",
-  "businessStatus", "currentOpeningHours", "regularOpeningHours", "utcOffsetMinutes",
+  "businessStatus", "currentOpeningHours", "regularOpeningHours", "utcOffsetMinutes", "types",
 ];
 
 /** Le carré qui contient le cercle (searchByText n'accepte que des rectangles). */
@@ -111,8 +118,9 @@ function circleBounds({ center, radius }: Area): google.maps.LatLngBoundsLiteral
  * - searchNearby : les 20 plus populaires, mais ouverts ou non (la nuit, souvent presque tous fermés) ;
  * - searchByText filtré par Google sur « ouvert maintenant » : 20 restos ouverts, même à 1 h du matin.
  * Aucune ne trie par note : le classement se fait dans rankTop.
+ * En mode rapide, les mêmes recherches portent sur les types « sur le pouce » au lieu de « restaurant ».
  */
-export async function searchRestaurants(area: Area, category?: Category | null): Promise<Restaurant[]> {
+export async function searchRestaurants(area: Area, category?: Category | null, fast = false): Promise<Restaurant[]> {
   const { Place, SearchNearbyRankPreference } = await importLibrary<google.maps.PlacesLibrary>("places");
   const radius = Math.min(area.radius, MAX_RADIUS);
 
@@ -127,14 +135,15 @@ export async function searchRestaurants(area: Area, category?: Category | null):
           Place.searchNearby({
             fields: FIELDS,
             locationRestriction: { center: area.center, radius },
-            includedPrimaryTypes: ["restaurant"],
+            includedPrimaryTypes: fast ? FAST_TYPES : ["restaurant"],
             maxResultCount: 20,
             rankPreference: SearchNearbyRankPreference.POPULARITY,
           }),
           Place.searchByText({
             fields: FIELDS,
-            textQuery: "restaurant",
-            includedType: "restaurant",
+            // includedType n'accepte qu'un type : on prend le plus courant, les autres viennent de searchNearby.
+            textQuery: fast ? "fast food" : "restaurant",
+            includedType: fast ? "fast_food_restaurant" : "restaurant",
             useStrictTypeFiltering: true,
             isOpenNow: true,
             locationRestriction: bounds,
@@ -152,6 +161,8 @@ export async function searchRestaurants(area: Area, category?: Category | null):
     // Fermés définitivement / temporairement : on écarte. Fermés à cette heure-ci : gardés pour les
     // catégories (elles décrivent le quartier), écartés du classement par rankTop.
     .filter((p) => (p.businessStatus ?? "OPERATIONAL") === "OPERATIONAL")
+    // Une cuisine en mode rapide : la recherche par mot-clé ramène aussi des restos à table.
+    .filter((p) => !fast || !category || p.types?.some((type) => FAST_TYPES.includes(type)))
     .map((p) => ({
       id: p.id,
       name: p.displayName ?? t("noName"),
@@ -170,11 +181,13 @@ export async function searchRestaurants(area: Area, category?: Category | null):
 export async function searchUntilTop(
   center: LatLng,
   category?: Category | null,
+  fast = false,
 ): Promise<{ list: Restaurant[]; area: Area }> {
   for (let radius = START_RADIUS; ; radius *= 2) {
     const area = { center, radius };
-    const list = await searchRestaurants(area, category);
-    if (rankTop(list).length >= TOP_N || radius >= MAX_START_RADIUS) return { list, area };
+    const list = await searchRestaurants(area, category, fast);
+    const ranked = fast ? rankFast(list, center) : rankTop(list);
+    if (ranked.length >= TOP_N || radius >= MAX_START_RADIUS) return { list, area };
   }
 }
 
@@ -185,6 +198,25 @@ export function rankTop(list: Restaurant[]): Restaurant[] {
   return list
     .filter((r) => r.open !== false && hasEnoughReviews(r))
     .sort((a, b) => b.rating - a.rating || b.reviews - a.reviews)
+    .slice(0, TOP_N);
+}
+
+/**
+ * Mode rapide : la note moins une pénalité de distance (quand on veut manger vite, la porte d'à côté
+ * compte), une seule adresse par enseigne, et rien sous FAST_MIN_RATING.
+ */
+export function rankFast(list: Restaurant[], origin: LatLng): Restaurant[] {
+  const score = (r: Restaurant) => r.rating - (distanceMeters(origin, r.location) / 1000) * FAST_STARS_PER_KM;
+  const seen = new Set<string>();
+  return list
+    .filter((r) => r.open !== false && hasEnoughReviews(r) && r.rating >= FAST_MIN_RATING)
+    .sort((a, b) => score(b) - score(a))
+    .filter((r) => {
+      const brand = r.name.toLowerCase();
+      if (seen.has(brand)) return false;
+      seen.add(brand);
+      return true;
+    })
     .slice(0, TOP_N);
 }
 

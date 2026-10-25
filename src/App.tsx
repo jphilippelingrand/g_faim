@@ -3,7 +3,7 @@ import { Lady, type Mood } from "./components/Lady";
 import { RestaurantCard } from "./components/RestaurantCard";
 import { RestaurantMap } from "./components/RestaurantMap";
 import { MiniBar } from "./components/MiniBar";
-import { ShuffleToggle } from "./components/ShuffleToggle";
+import { ModePicker, type Mode } from "./components/ModePicker";
 import { hasApiKey } from "./lib/google";
 import { MAX_SHOWN, neighborhoodCategories, type Category } from "./lib/osm";
 import { LANGS, lang, setLang, t } from "./i18n";
@@ -13,6 +13,7 @@ import {
   geocode,
   getBrowserPosition,
   pickRandom,
+  rankFast,
   rankTop,
   searchRestaurants,
   searchUntilTop,
@@ -35,8 +36,11 @@ export default function App() {
   const [area, setArea] = useState<Area | null>(null);
   const [fitKey, setFitKey] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  // Mode surprise : tirage au sort au lieu du top par note ; la graine change à chaque « Autre tirage ».
-  const [surprise, setSurprise] = useState(false);
+  // Top par note, rapide (fast-foods et vente à emporter, la distance compte) ou surprise (tirage au
+  // sort ; la graine change à chaque « Autre tirage »).
+  const [mode, setMode] = useState<Mode>("top");
+  const surprise = mode === "surprise";
+  const fast = mode === "fast";
   const [seed, setSeed] = useState(() => Date.now());
   // Quand la grande dame sort de l'écran, une barre compacte prend le relais en haut.
   const heroRef = useRef<HTMLElement>(null);
@@ -53,9 +57,11 @@ export default function App() {
   // Zone déjà fouillée (ou en cours) : lue depuis le handler de la carte, d'où la ref.
   const coveredArea = useRef<Area | null>(null);
   const categoryRef = useRef(category);
+  const fastRef = useRef(fast);
   useEffect(() => {
     categoryRef.current = category;
-  }, [category]);
+    fastRef.current = fast;
+  }, [category, fast]);
 
   // Catégories de la zone visible : recalculées à chaque déplacement de la carte (le fichier de la
   // zone est en cache, c'est instantané). Seule la dernière demande compte.
@@ -111,12 +117,13 @@ export default function App() {
     };
   }, []);
 
-  // Position (ou catégorie) connue : on élargit depuis 200 m jusqu'à trouver 5 restos, puis on cadre la carte dessus.
+  // Position (ou catégorie, ou mode rapide) connue : on élargit depuis 200 m jusqu'à trouver 5 restos,
+  // puis on cadre la carte dessus.
   useEffect(() => {
     if (!home) return;
     coveredArea.current = null;
-    run(() => searchUntilTop(home, category), category != null, true);
-  }, [home, category, run]);
+    run(() => searchUntilTop(home, category, fast), category != null, true);
+  }, [home, category, fast, run]);
 
   // On recherche sur la vue quand l'utilisateur dézoome / se déplace au-delà de la zone fouillée,
   // ou quand il zoome assez pour que la vue soit nettement plus petite que cette zone.
@@ -130,7 +137,8 @@ export default function App() {
       if (inside && !zoomedIn) return;
       coveredArea.current = view;
       const c = categoryRef.current;
-      run(async () => ({ list: await searchRestaurants(view, c), area: view }), c != null, false);
+      const f = fastRef.current;
+      run(async () => ({ list: await searchRestaurants(view, c, f), area: view }), c != null, false);
     },
     [run, refreshCategories],
   );
@@ -140,7 +148,10 @@ export default function App() {
     document.getElementById(`resto-${id}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, []);
 
-  const top = useMemo(() => (surprise ? pickRandom(places, seed) : rankTop(places)), [places, surprise, seed]);
+  const top = useMemo(
+    () => (surprise ? pickRandom(places, seed) : fast && home ? rankFast(places, home) : rankTop(places)),
+    [places, surprise, seed, fast, home],
+  );
 
   // 4 cuisines au plus ; la cuisine choisie reste affichée même si elle sort du top en bougeant la carte.
   const shownCategories = (() => {
@@ -170,19 +181,19 @@ export default function App() {
     }
   }
 
-  const toggleSurprise = (on: boolean) => {
-    setSurprise(on);
+  const changeMode = (next: Mode) => {
+    setMode(next);
     setSeed(Date.now());
   };
 
   return (
     <>
-      <MiniBar watch={heroRef} surprise={surprise} onSurprise={toggleSurprise} />
+      <MiniBar watch={heroRef} mode={mode} onMode={changeMode} />
       <main>
         <header ref={heroRef}>
-          <ShuffleToggle on={surprise} onChange={toggleSurprise} />
-          <Lady mood={mood} surprise={surprise} />
-          <p className="tagline">{surprise ? t("taglineSurprise") : t("tagline")}</p>
+          <Lady mood={mood} mode={mode} />
+          <p className="tagline">{surprise ? t("taglineSurprise") : fast ? t("taglineFast") : t("tagline")}</p>
+          <ModePicker mode={mode} onChange={changeMode} />
         </header>
 
         {shownCategories.length > 0 && (

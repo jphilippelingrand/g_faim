@@ -1,16 +1,16 @@
 import { useEffect, useState, type RefObject } from "react";
-import { ShuffleToggle } from "./ShuffleToggle";
+import { ModePicker, type Mode } from "./ModePicker";
 import { t } from "../i18n";
 
 /** Barre compacte fixée en haut, qui apparaît quand l'élément surveillé (la grande dame) sort de l'écran. */
 export function MiniBar({
   watch,
-  surprise,
-  onSurprise,
+  mode,
+  onMode,
 }: {
   watch: RefObject<HTMLElement | null>;
-  surprise: boolean;
-  onSurprise: (on: boolean) => void;
+  mode: Mode;
+  onMode: (mode: Mode) => void;
 }) {
   const [visible, setVisible] = useState(false);
 
@@ -36,7 +36,7 @@ export function MiniBar({
         <img src="/icon.svg" alt="" width={34} height={34} />
         <span>{t("appName")}</span>
       </button>
-      <ShuffleToggle on={surprise} onChange={onSurprise} />
+      <ModePicker mode={mode} onChange={onMode} compact />
     </div>
   );
 }
