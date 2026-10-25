@@ -176,6 +176,33 @@ h1 {
   100% { transform: scaleY(1.6); opacity: 0; }
 }
 
+/* ============ Catégories ============ */
+
+.categories {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 -16px 14px;
+  padding: 2px 16px;
+}
+.categories::-webkit-scrollbar { display: none; }
+.categories button {
+  flex: none;
+  font: 500 .9rem "Inter", system-ui, sans-serif;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.categories button.active { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+@media (hover: hover) {
+  .categories button:hover:not(.active) { border-color: var(--accent); }
+}
+
 /* ============ Carte ============ */
 
 .map {

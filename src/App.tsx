@@ -11,7 +11,9 @@ import {
   rankTop,
   searchRestaurants,
   searchUntilTop,
+  topCategories,
   type Area,
+  type Category,
   type LatLng,
   type Restaurant,
 } from "./lib/places";
@@ -24,6 +26,9 @@ const ZOOM_IN_RATIO = 0.6;
 export default function App() {
   const [home, setHome] = useState<LatLng | null>(null);
   const [places, setPlaces] = useState<Restaurant[]>([]);
+  // Catégories proposées : calculées sur les recherches « toutes cuisines », gardées pendant qu'on filtre.
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [category, setCategory] = useState<Category | null>(null);
   const [area, setArea] = useState<Area | null>(null);
   const [fitKey, setFitKey] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -39,8 +44,18 @@ export default function App() {
   const requestId = useRef(0);
   // Zone déjà fouillée (ou en cours) : lue depuis le handler de la carte, d'où la ref.
   const coveredArea = useRef<Area | null>(null);
+  // Tous les restos vus pendant la session (recherches « toutes cuisines ») : les catégories s'affinent en explorant.
+  const seen = useRef(new Map<string, Restaurant>());
+  const categoryRef = useRef(category);
+  useEffect(() => {
+    categoryRef.current = category;
+  }, [category]);
 
-  const run = useCallback(async (search: () => Promise<{ list: Restaurant[]; area: Area }>, refit: boolean) => {
+  const run = useCallback(async (
+    search: () => Promise<{ list: Restaurant[]; area: Area }>,
+    filtered: boolean,
+    refit: boolean,
+  ) => {
     const id = ++requestId.current;
     setPhase("searching");
     setError(null);
@@ -49,6 +64,10 @@ export default function App() {
       if (id !== requestId.current) return;
       coveredArea.current = area;
       setPlaces(list);
+      if (!filtered) {
+        list.forEach((r) => seen.current.set(r.id, r));
+        setCategories(topCategories([...seen.current.values()]));
+      }
       setArea(area);
       setSelectedId(null);
       if (refit) setFitKey((k) => k + 1);
@@ -78,12 +97,12 @@ export default function App() {
     };
   }, []);
 
-  // Position connue : on élargit depuis 200 m jusqu'à trouver 5 restos, puis on cadre la carte dessus.
+  // Position (ou catégorie) connue : on élargit depuis 200 m jusqu'à trouver 5 restos, puis on cadre la carte dessus.
   useEffect(() => {
     if (!home) return;
     coveredArea.current = null;
-    run(() => searchUntilTop(home), true);
-  }, [home, run]);
+    run(() => searchUntilTop(home, category), category != null, true);
+  }, [home, category, run]);
 
   // On recherche sur la vue quand l'utilisateur dézoome / se déplace au-delà de la zone fouillée,
   // ou quand il zoome assez pour que la vue soit nettement plus petite que cette zone.
@@ -95,7 +114,8 @@ export default function App() {
       const zoomedIn = view.radius < covered.radius * ZOOM_IN_RATIO;
       if (inside && !zoomedIn) return;
       coveredArea.current = view;
-      run(async () => ({ list: await searchRestaurants(view), area: view }), false);
+      const c = categoryRef.current;
+      run(async () => ({ list: await searchRestaurants(view, c), area: view }), c != null, false);
     },
     [run],
   );
@@ -115,7 +135,7 @@ export default function App() {
   else if (phase === "searching") status = "Je renifle les cuisines du coin…";
   else if (phase === "error") status = error ?? "";
   else if (!top.length) status = "Rien d'ouvert et bien noté par ici… dézoome la carte ?";
-  else status = `Top ${top.length} dans un rayon de ${formatDistance(area?.radius ?? 0)} · dézoome pour voir plus loin`;
+  else status = `Top ${top.length}${category ? ` ${category.label.toLowerCase()}` : ""} dans un rayon de ${formatDistance(area?.radius ?? 0)} · dézoome pour voir plus loin`;
 
   async function submitAddress(e: FormEvent) {
     e.preventDefault();
@@ -138,6 +158,26 @@ export default function App() {
           <h1>J'ai faim</h1>
           <p className="tagline">Les 5 meilleures tables, juste à côté.</p>
         </header>
+
+        {categories.length > 0 && (
+          <div className="categories" role="radiogroup" aria-label="Type de cuisine">
+            {[null, ...categories].map((c) => {
+              const active = (c?.type ?? null) === (category?.type ?? null);
+              return (
+                <button
+                  key={c?.type ?? "all"}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  className={active ? "active" : ""}
+                  onClick={() => setCategory(active ? null : c)}
+                >
+                  {c ? c.label : "Tout"}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {home && (
           <RestaurantMap
