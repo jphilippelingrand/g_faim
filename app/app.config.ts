@@ -9,8 +9,9 @@ const config: ExpoConfig = {
   name: "J'ai faim",
   slug: "g-faim",
   scheme: "gfaim",
-  // En release, vient du tag git (workflow EAS : « v1.0.1 » → 1.0.1) ; le numéro de build est géré par EAS.
-  version: process.env.APP_VERSION?.replace(/^v/, "") || "1.0.0",
+  // Vient du tag git avec le workflow EAS (« v1.0.2 » → 1.0.2) ; sinon (build lancé à la main), cette valeur.
+  // Le numéro de build est géré par EAS.
+  version: process.env.APP_VERSION?.replace(/^v/, "") || "1.0.1",
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "light",
