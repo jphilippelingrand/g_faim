@@ -16,6 +16,8 @@ export const lang: Lang =
 export const locale = { fr: "fr-FR", en: "en-US", es: "es-ES" }[lang];
 
 const fr = {
+  support: "Support",
+  menu: "Menu",
   cuisineType: "Type de cuisine",
   localSpecialty: "Spécialité du coin",
   appName: "J'ai faim",
@@ -43,13 +45,15 @@ const fr = {
   reroll: "Autre tirage",
   ladyLabel: "La petite dame a faim",
   ladyPif: "AU PIF !",
-  footer: "Données Google Maps · touche la dame 👆 ·",
+  footer: "Données Google Maps · cuisines © contributeurs OpenStreetMap",
   privacy: "Confidentialité",
 };
 
 type Dict = typeof fr;
 
 const en: Dict = {
+  support: "Support",
+  menu: "Menu",
   cuisineType: "Type of cuisine",
   localSpecialty: "Local specialty",
   appName: "I'm hungry",
@@ -77,11 +81,13 @@ const en: Dict = {
   reroll: "Pick again",
   ladyLabel: "The little lady is hungry",
   ladyPif: "EENY MEENY!",
-  footer: "Google Maps data · tap the lady 👆 ·",
+  footer: "Google Maps data · cuisines © OpenStreetMap contributors",
   privacy: "Privacy",
 };
 
 const es: Dict = {
+  support: "Soporte",
+  menu: "Menú",
   cuisineType: "Tipo de cocina",
   localSpecialty: "Especialidad local",
   appName: "Tengo hambre",
@@ -109,7 +115,7 @@ const es: Dict = {
   reroll: "Otra vez",
   ladyLabel: "La señora tiene hambre",
   ladyPif: "¡A LO LOCO!",
-  footer: "Datos de Google Maps · toca a la señora 👆 ·",
+  footer: "Datos de Google Maps · cocinas © colaboradores de OpenStreetMap",
   privacy: "Privacidad",
 };
 

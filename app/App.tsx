@@ -6,14 +6,14 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import BottomSheet, { BottomSheetScrollView, type BottomSheetScrollViewMethods } from "@gorhom/bottom-sheet";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Linking, Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
-import { Lady, type Mood } from "./src/components/Lady";
+import { type Mood } from "./src/components/Lady";
+import { LadyMenu } from "./src/components/LadyMenu";
 import { CategoryBar } from "./src/components/CategoryBar";
 import { RestaurantCard } from "./src/components/RestaurantCard";
 import { RestaurantMap } from "./src/components/RestaurantMap";
-import { ShuffleToggle } from "./src/components/ShuffleToggle";
 import {
   distanceMeters,
   formatDistance,
@@ -27,19 +27,16 @@ import {
   type Restaurant,
 } from "./src/lib/places";
 import { colors, fonts } from "./src/theme";
-import { lang, t } from "./src/i18n";
+import { t } from "./src/i18n";
 import { MAX_SHOWN, neighborhoodCategories, type Category } from "./src/lib/osm";
 
 SplashScreen.preventAutoHideAsync();
 
 type Phase = "locating" | "searching" | "done" | "error";
 
-const PRIVACY_URL = `https://www.groubl.com/${lang}/privacy`;
-
-// Mise en page : hauteur de la barre du haut (sous la zone de l'encoche), panneau replié, taille de la dame.
-const TOP_BAR = 60;
-const SHEET_MIN = 250;
-const LADY_WIDTH = 92;
+// Mise en page : hauteur de la barre du haut (sous l'encoche, la dame y tient) et du panneau replié (catégories).
+const TOP_BAR = 72;
+const SHEET_MIN = 190;
 
 // En dessous de cette fraction de la zone fouillée, un zoom avant relance la recherche.
 const ZOOM_IN_RATIO = 0.6;
@@ -241,10 +238,13 @@ function Main() {
       )}
 
       <View style={[styles.topBar, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
-        <View style={styles.titlePill}>
-          <Text style={styles.title}>{t("appName")}</Text>
-        </View>
-        <ShuffleToggle style={styles.shuffle} on={surprise} onChange={toggleSurprise} />
+        <LadyMenu
+          mood={mood}
+          surprise={surprise}
+          onSurprise={toggleSurprise}
+          onReroll={() => setSeed(Date.now())}
+          top={topBarHeight + 8}
+        />
       </View>
 
       <BottomSheet
@@ -257,18 +257,7 @@ function Main() {
         enableDynamicSizing={false}
       >
         <BottomSheetScrollView ref={scroll} contentContainerStyle={styles.sheetContent}>
-          <View style={styles.sheetHeader}>
-            <Lady mood={mood} surprise={surprise} width={LADY_WIDTH} />
-            <View style={styles.sheetHeaderText}>
-              <Text style={styles.tagline}>{surprise ? t("taglineSurprise") : t("tagline")}</Text>
-              {status !== "" && <Text style={[styles.status, phase === "error" && styles.statusError]}>{status}</Text>}
-              {surprise && phase === "done" && top.length > 0 && (
-                <Text style={styles.reroll} onPress={() => setSeed(Date.now())} accessibilityRole="button">
-                  ↻ {t("reroll")}
-                </Text>
-              )}
-            </View>
-          </View>
+          {status !== "" && <Text style={[styles.status, phase === "error" && styles.statusError]}>{status}</Text>}
 
           {shownCategories.length > 0 && (
             <CategoryBar categories={shownCategories} selected={category} onSelect={setCategory} />
@@ -309,12 +298,7 @@ function Main() {
             </View>
           )}
 
-          <Text style={styles.footer}>
-            {t("footer")}{" "}
-            <Text style={styles.footerLink} onPress={() => Linking.openURL(PRIVACY_URL)} accessibilityRole="link">
-              {t("privacy")}
-            </Text>
-          </Text>
+          <Text style={styles.footer}>{t("footer")}</Text>
         </BottomSheetScrollView>
       </BottomSheet>
     </View>
@@ -344,27 +328,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
   },
-  titlePill: {
-    backgroundColor: "rgba(251, 246, 239, 0.94)",
-    borderRadius: 999,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    shadowColor: colors.ink,
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  title: { fontFamily: fonts.title, fontSize: 22, color: colors.ink, letterSpacing: -0.4 },
-  shuffle: { position: "relative" },
   sheetBackground: { backgroundColor: colors.bg, borderRadius: 24 },
   sheetHandle: { backgroundColor: colors.line, width: 44 },
-  sheetContent: { paddingHorizontal: 16, paddingBottom: 48 },
-  sheetHeader: { flexDirection: "row", alignItems: "flex-end", gap: 12, marginTop: -18, marginBottom: 12 },
-  sheetHeaderText: { flex: 1, paddingBottom: 14, gap: 4 },
-  tagline: { fontFamily: fonts.title, fontSize: 18, color: colors.ink, lineHeight: 22 },
-  status: { fontFamily: fonts.body, fontSize: 14, color: colors.muted },
+  sheetContent: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 48 },
+  status: { fontFamily: fonts.body, fontSize: 14, color: colors.muted, textAlign: "center", marginBottom: 12 },
   statusError: { color: colors.accent },
-  reroll: { fontFamily: fonts.medium, fontSize: 14, color: colors.accent },
   address: { flexDirection: "row", gap: 8, marginBottom: 16 },
   input: {
     flex: 1,
@@ -383,5 +351,4 @@ const styles = StyleSheet.create({
   results: { gap: 14, paddingTop: 8, paddingLeft: 8 },
   stale: { opacity: 0.5 },
   footer: { fontFamily: fonts.body, fontSize: 12, color: colors.muted, textAlign: "center", marginTop: 24 },
-  footerLink: { textDecorationLine: "underline" },
 });

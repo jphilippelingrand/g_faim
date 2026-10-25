@@ -25,7 +25,20 @@ const VIEWBOX = "0 0 240 270";
  * Même dessin que la version web, découpé en calques superposés (corps, ondes, ventre, bras)
  * pour animer le ventre et les ondes indépendamment. Tous les calques partagent le même viewBox.
  */
-export function Lady({ mood, surprise = false, width = W }: { mood: Mood; surprise?: boolean; width?: number }) {
+export function Lady({
+  mood,
+  surprise = false,
+  width = W,
+  onPress,
+  accessibilityLabel,
+}: {
+  mood: Mood;
+  surprise?: boolean;
+  width?: number;
+  /** Action au toucher, en plus du sursaut (ex. ouvrir un menu). */
+  onPress?: () => void;
+  accessibilityLabel?: string;
+}) {
   const k = width / W;
   const ladyW = width;
   const ladyH = H * k;
@@ -114,13 +127,14 @@ export function Lady({ mood, surprise = false, width = W }: { mood: Mood; surpri
 
   function poke() {
     setPoked(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    Haptics.impactAsync(onPress ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Heavy);
+    onPress?.();
   }
 
   const happy = effective === "happy";
 
   return (
-    <Pressable onPress={poke} accessibilityLabel={t("ladyLabel")} style={[styles.wrap, { paddingTop: 34 * k }]}>
+    <Pressable onPress={poke} accessibilityLabel={accessibilityLabel ?? t("ladyLabel")} style={[styles.wrap, { paddingTop: 34 * k }]}>
       <View style={styles.grr} pointerEvents="none">
         {surprise ? (
           <Animated.Text style={[styles.letter, styles.pif, { fontSize: 26 * k }, { transform: [{ translateY: pif.bob }, { rotate: pif.tilt }] }]}>
