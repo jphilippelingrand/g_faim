@@ -1,17 +1,21 @@
-# Publier une nouvelle version iOS : git push origin main:release
-# → build de production chez EAS, puis envoi sur App Store Connect / TestFlight.
-# Prérequis : repo GitHub relié au projet EAS (base directory : app) et
-# certificats iOS déjà créés par un premier build lancé en local.
+# Publier une nouvelle version iOS : poser un tag de version sur main et le pousser.
+#   git tag v1.0.1 && git push origin v1.0.1
+# → build de production chez EAS (version 1.0.1, lue dans le tag), puis envoi sur App Store Connect / TestFlight.
+# Prérequis : repo GitHub relié au projet EAS (base directory : app) et un premier build + submit
+# lancés en local (certificats et clé App Store Connect stockés chez EAS).
 name: Release iOS
 
 on:
   push:
-    branches: ['release']
+    tags: ['v*']
 
 jobs:
   build_ios:
     name: Build iOS (production)
     type: build
+    env:
+      # Lu par app.config.ts : « v1.0.1 » → version 1.0.1.
+      APP_VERSION: ${{ github.ref_name }}
     params:
       platform: ios
       profile: production
