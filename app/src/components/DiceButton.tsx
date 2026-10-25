@@ -15,8 +15,9 @@ import { t } from "../i18n";
 
 const SIZE = 84;
 const GAP = 16;
-const ROLL_MS = 650;
-const FLIP_MS = 140;
+// Le changement de face se fait quand l'emoji est minuscule et tourne vite : invisible.
+const OUT_MS = 300; // tourne en accélérant et rétrécit
+const IN_MS = 350; // la nouvelle face jaillit avec un petit rebond
 
 type Props = {
   on: boolean;
@@ -28,19 +29,19 @@ type Props = {
 };
 
 /**
- * Le bouton du mode surprise, posé sur la carte au-dessus du panneau. Deux faces :
- * 🎲 (toucher = le dé roule puis devient ⭐, restos tirés au sort) et ⭐ (toucher = il se retourne en 🎲,
- * retour au classement par note).
+ * Le bouton du mode surprise, posé sur la carte au-dessus du panneau. Deux faces : 🎲 (toucher = restos
+ * tirés au sort) et ⭐ (toucher = retour au classement par note). Au toucher, la face tourne en accélérant
+ * et rétrécit, change quand elle est minuscule, puis la nouvelle jaillit avec un rebond.
  */
 export function DiceButton({ on, onToggle, sheetTop, screenHeight }: Props) {
-  // La face affichée change en fin d'animation, pas au toucher : on voit le dé rouler avant de devenir ⭐.
+  // La face affichée change au milieu de l'animation, quand elle est presque invisible.
   const [face, setFace] = useState(on ? "⭐" : "🎲");
   const swap = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(swap.current), []);
 
   const spin = useSharedValue(0);
-  const flip = useSharedValue(1);
-  const bounce = useSharedValue(1);
+  const scale = useSharedValue(1);
+  const direction = useSharedValue(1);
 
   const follow = useAnimatedStyle(() => ({
     top: sheetTop.value - SIZE - GAP,
@@ -48,24 +49,32 @@ export function DiceButton({ on, onToggle, sheetTop, screenHeight }: Props) {
     opacity: interpolate(sheetTop.value, [screenHeight * 0.2, screenHeight * 0.35], [0, 1], "clamp"),
   }));
   const anim = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${spin.value * 720}deg` }, { scaleX: flip.value }, { scale: bounce.value }],
+    transform: [{ rotate: `${direction.value * spin.value * 720}deg` }, { scale: scale.value }],
   }));
 
   function press() {
     clearTimeout(swap.current);
-    if (!on) {
-      // 🎲 : le dé roule, puis devient ⭐.
+    const next = on ? "🎲" : "⭐";
+    // 🎲 → ⭐ tourne dans un sens, ⭐ → 🎲 dans l'autre.
+    direction.set(on ? -1 : 1);
+    spin.set(0);
+    spin.set(
+      withSequence(
+        withTiming(0.75, { duration: OUT_MS, easing: Easing.in(Easing.quad) }),
+        withTiming(1, { duration: IN_MS, easing: Easing.out(Easing.cubic) }),
+      ),
+    );
+    scale.set(
+      withSequence(
+        withTiming(0.1, { duration: OUT_MS, easing: Easing.in(Easing.quad) }),
+        withSpring(1, { damping: 7, stiffness: 220 }),
+      ),
+    );
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    swap.current = setTimeout(() => {
+      setFace(next);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-      spin.set(0);
-      spin.set(withTiming(1, { duration: ROLL_MS, easing: Easing.out(Easing.cubic) }));
-      bounce.set(withSequence(withTiming(0.8, { duration: 90 }), withSpring(1, { damping: 6, stiffness: 220 })));
-      swap.current = setTimeout(() => setFace("⭐"), ROLL_MS - 120);
-    } else {
-      // ⭐ : se retourne comme une carte, et redevient 🎲.
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      flip.set(withSequence(withTiming(0, { duration: FLIP_MS }), withTiming(1, { duration: FLIP_MS })));
-      swap.current = setTimeout(() => setFace("🎲"), FLIP_MS);
-    }
+    }, OUT_MS);
     onToggle();
   }
 
