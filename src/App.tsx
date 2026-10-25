@@ -5,7 +5,7 @@ import { RestaurantMap } from "./components/RestaurantMap";
 import { MiniBar } from "./components/MiniBar";
 import { ShuffleToggle } from "./components/ShuffleToggle";
 import { hasApiKey } from "./lib/google";
-import { neighborhoodCategories, type Category } from "./lib/osm";
+import { MAX_SHOWN, neighborhoodCategories, type Category } from "./lib/osm";
 import { LANGS, lang, setLang, t } from "./i18n";
 import {
   distanceMeters,
@@ -135,6 +135,12 @@ export default function App() {
 
   const top = useMemo(() => (surprise ? pickRandom(places, seed) : rankTop(places)), [places, surprise, seed]);
 
+  // 4 cuisines au plus ; la cuisine choisie reste affichée même si elle sort du top en bougeant la carte.
+  const shownCategories = (() => {
+    const top4 = categories.slice(0, MAX_SHOWN);
+    return category && !top4.some((c) => c.key === category.key) ? [...top4.slice(0, MAX_SHOWN - 1), category] : top4;
+  })();
+
   const busy = phase === "locating" || phase === "searching";
   const mood: Mood = busy ? "starving" : phase === "done" && top.length ? "happy" : "hungry";
 
@@ -173,21 +179,23 @@ export default function App() {
           <p className="tagline">{surprise ? t("taglineSurprise") : t("tagline")}</p>
         </header>
 
-        {categories.length > 0 && (
-          <div className="categories" role="radiogroup" aria-label={t("cuisineType")}>
-            {[null, ...categories].map((c) => {
-              const active = (c?.key ?? null) === (category?.key ?? null);
+        {shownCategories.length > 0 && (
+          <div className="categories" role="toolbar" aria-label={t("cuisineType")}>
+            {shownCategories.map((c) => {
+              const active = c.key === category?.key;
               return (
                 <button
-                  key={c?.key ?? "all"}
+                  key={c.key}
                   type="button"
-                  role="radio"
-                  aria-checked={active}
-                  className={[active && "active", c?.distinctive && "distinctive"].filter(Boolean).join(" ")}
-                  title={c?.distinctive ? t("localSpecialty") : undefined}
+                  aria-pressed={active}
+                  className={active ? "active" : ""}
+                  title={c.distinctive ? t("localSpecialty") : undefined}
                   onClick={() => setCategory(active ? null : c)}
                 >
-                  {c ? c.label : t("allCuisines")}
+                  <span className="emoji" aria-hidden="true">
+                    {c.emoji}
+                  </span>
+                  <span className="label">{c.label}</span>
                 </button>
               );
             })}

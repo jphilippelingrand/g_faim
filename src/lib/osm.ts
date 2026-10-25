@@ -14,98 +14,101 @@ export type Category = {
   label: string;
   /** Ce qu'on tape dans la recherche Google pour trouver cette cuisine. */
   query: string;
+  emoji: string;
   /** Nettement plus présente ici qu'en moyenne dans le monde. */
   distinctive: boolean;
 };
 
 // Libellés et requêtes par langue. Ça ne décide pas des catégories (elles viennent des données),
 // ça traduit juste les mots-clés OSM courants ; les autres sont affichés tels quels, mis en forme.
-// Format : [libellé fr, libellé en, libellé es] ; la requête Google est « restaurant <libellé> »
+// Format : [emoji, libellé fr, libellé en, libellé es] ; la requête Google est « restaurant <libellé> »
 // pour les nationalités (R), sinon le libellé lui-même.
 const R = true;
-const LABELS: Record<string, [fr: string, en: string, es: string, nationality?: boolean]> = {
-  pizza: ["Pizza", "Pizza", "Pizza"],
-  burger: ["Burgers", "Burgers", "Hamburguesas"],
-  sushi: ["Sushis", "Sushi", "Sushi"],
-  japanese: ["Japonais", "Japanese", "Japonés", R],
-  chinese: ["Chinois", "Chinese", "Chino", R],
-  italian: ["Italien", "Italian", "Italiano", R],
-  french: ["Français", "French", "Francés", R],
-  mexican: ["Mexicain", "Mexican", "Mexicano", R],
-  indian: ["Indien", "Indian", "Indio", R],
-  thai: ["Thaï", "Thai", "Tailandés", R],
-  vietnamese: ["Vietnamien", "Vietnamese", "Vietnamita", R],
-  korean: ["Coréen", "Korean", "Coreano", R],
-  asian: ["Asiatique", "Asian", "Asiático", R],
-  lebanese: ["Libanais", "Lebanese", "Libanés", R],
-  greek: ["Grec", "Greek", "Griego", R],
-  turkish: ["Turc", "Turkish", "Turco", R],
-  spanish: ["Espagnol", "Spanish", "Español", R],
-  portuguese: ["Portugais", "Portuguese", "Portugués", R],
-  moroccan: ["Marocain", "Moroccan", "Marroquí", R],
-  african: ["Africain", "African", "Africano", R],
-  ethiopian: ["Éthiopien", "Ethiopian", "Etíope", R],
-  caribbean: ["Caribéen", "Caribbean", "Caribeño", R],
-  haitian: ["Haïtien", "Haitian", "Haitiano", R],
-  peruvian: ["Péruvien", "Peruvian", "Peruano", R],
-  brazilian: ["Brésilien", "Brazilian", "Brasileño", R],
-  belgian: ["Belge", "Belgian", "Belga", R],
-  german: ["Allemand", "German", "Alemán", R],
-  polish: ["Polonais", "Polish", "Polaco", R],
-  pakistani: ["Pakistanais", "Pakistani", "Pakistaní", R],
-  nepalese: ["Népalais", "Nepalese", "Nepalí", R],
-  taiwanese: ["Taïwanais", "Taiwanese", "Taiwanés", R],
-  sichuan: ["Sichuan", "Sichuan", "Sichuan", R],
-  basque: ["Basque", "Basque", "Vasco", R],
-  middle_eastern: ["Moyen-Orient", "Middle Eastern", "Oriente Medio", R],
-  vegetarian: ["Végétarien", "Vegetarian", "Vegetariano", R],
-  vegan: ["Vegan", "Vegan", "Vegano", R],
-  kebab: ["Kebab", "Kebab", "Kebab"],
-  sandwich: ["Sandwichs", "Sandwiches", "Bocadillos"],
-  chicken: ["Poulet", "Chicken", "Pollo"],
-  breakfast: ["Petit-déjeuner", "Breakfast", "Desayuno"],
-  brunch: ["Brunch", "Brunch", "Brunch"],
-  crepe: ["Crêpes", "Crêpes", "Crepes"],
-  galette: ["Galettes", "Galettes", "Galettes"],
-  pancake: ["Pancakes", "Pancakes", "Tortitas"],
-  seafood: ["Fruits de mer", "Seafood", "Marisco"],
-  fish: ["Poisson", "Fish", "Pescado"],
-  steak_house: ["Grillades", "Steakhouse", "Asador"],
-  regional: ["Cuisine du coin", "Local cuisine", "Cocina local"],
-  tapas: ["Tapas", "Tapas", "Tapas"],
-  couscous: ["Couscous", "Couscous", "Cuscús"],
-  falafel: ["Falafels", "Falafel", "Falafel"],
-  ramen: ["Ramen", "Ramen", "Ramen"],
-  noodle: ["Nouilles", "Noodles", "Fideos"],
-  dumplings: ["Raviolis", "Dumplings", "Dumplings"],
-  bubble_tea: ["Bubble tea", "Bubble tea", "Bubble tea"],
-  salad: ["Salades", "Salads", "Ensaladas"],
-  bagel: ["Bagels", "Bagels", "Bagels"],
-  hot_dog: ["Hot-dogs", "Hot dogs", "Perritos"],
-  fries: ["Frites", "Fries", "Patatas fritas"],
-  poutine: ["Poutine", "Poutine", "Poutine"],
-  bbq: ["Barbecue", "BBQ", "Barbacoa"],
-  brasserie: ["Brasserie", "Brasserie", "Brasserie"],
-  bistro: ["Bistrot", "Bistro", "Bistró"],
-  fine_dining: ["Gastronomique", "Fine dining", "Alta cocina"],
-  savoyard: ["Savoyard", "Savoyard", "Saboyano", R],
-  deli: ["Deli", "Deli", "Charcutería"],
-  smoked_meat: ["Smoked meat", "Smoked meat", "Smoked meat"],
+const LABELS: Record<string, [emoji: string, fr: string, en: string, es: string, nationality?: boolean]> = {
+  pizza: ["🍕", "Pizza", "Pizza", "Pizza"],
+  burger: ["🍔", "Burgers", "Burgers", "Hamburguesas"],
+  sushi: ["🍣", "Sushis", "Sushi", "Sushi"],
+  japanese: ["🍱", "Japonais", "Japanese", "Japonés", R],
+  chinese: ["🥡", "Chinois", "Chinese", "Chino", R],
+  italian: ["🍝", "Italien", "Italian", "Italiano", R],
+  french: ["🥖", "Français", "French", "Francés", R],
+  mexican: ["🌮", "Mexicain", "Mexican", "Mexicano", R],
+  indian: ["🍛", "Indien", "Indian", "Indio", R],
+  thai: ["🌶️", "Thaï", "Thai", "Tailandés", R],
+  vietnamese: ["🍜", "Vietnamien", "Vietnamese", "Vietnamita", R],
+  korean: ["🍲", "Coréen", "Korean", "Coreano", R],
+  asian: ["🥢", "Asiatique", "Asian", "Asiático", R],
+  lebanese: ["🧆", "Libanais", "Lebanese", "Libanés", R],
+  greek: ["🥙", "Grec", "Greek", "Griego", R],
+  turkish: ["🥙", "Turc", "Turkish", "Turco", R],
+  spanish: ["🥘", "Espagnol", "Spanish", "Español", R],
+  portuguese: ["🐟", "Portugais", "Portuguese", "Portugués", R],
+  moroccan: ["🍲", "Marocain", "Moroccan", "Marroquí", R],
+  african: ["🍲", "Africain", "African", "Africano", R],
+  ethiopian: ["🍲", "Éthiopien", "Ethiopian", "Etíope", R],
+  caribbean: ["🌴", "Caribéen", "Caribbean", "Caribeño", R],
+  haitian: ["🌴", "Haïtien", "Haitian", "Haitiano", R],
+  peruvian: ["🌶️", "Péruvien", "Peruvian", "Peruano", R],
+  brazilian: ["🍖", "Brésilien", "Brazilian", "Brasileño", R],
+  belgian: ["🍟", "Belge", "Belgian", "Belga", R],
+  german: ["🥨", "Allemand", "German", "Alemán", R],
+  polish: ["🥟", "Polonais", "Polish", "Polaco", R],
+  pakistani: ["🍛", "Pakistanais", "Pakistani", "Pakistaní", R],
+  nepalese: ["🥟", "Népalais", "Nepalese", "Nepalí", R],
+  taiwanese: ["🧋", "Taïwanais", "Taiwanese", "Taiwanés", R],
+  sichuan: ["🌶️", "Sichuan", "Sichuan", "Sichuan", R],
+  basque: ["🍷", "Basque", "Basque", "Vasco", R],
+  middle_eastern: ["🧆", "Moyen-Orient", "Middle Eastern", "Oriente Medio", R],
+  vegetarian: ["🥗", "Végétarien", "Vegetarian", "Vegetariano", R],
+  vegan: ["🌱", "Vegan", "Vegan", "Vegano", R],
+  kebab: ["🥙", "Kebab", "Kebab", "Kebab"],
+  sandwich: ["🥪", "Sandwichs", "Sandwiches", "Bocadillos"],
+  chicken: ["🍗", "Poulet", "Chicken", "Pollo"],
+  breakfast: ["🍳", "Petit-déj", "Breakfast", "Desayuno"],
+  brunch: ["🥞", "Brunch", "Brunch", "Brunch"],
+  crepe: ["🥞", "Crêpes", "Crêpes", "Crepes"],
+  galette: ["🥞", "Galettes", "Galettes", "Galettes"],
+  pancake: ["🥞", "Pancakes", "Pancakes", "Tortitas"],
+  seafood: ["🦞", "Fruits de mer", "Seafood", "Marisco"],
+  fish: ["🐟", "Poisson", "Fish", "Pescado"],
+  steak_house: ["🥩", "Grillades", "Steakhouse", "Asador"],
+  regional: ["📍", "Cuisine du coin", "Local cuisine", "Cocina local"],
+  tapas: ["🫒", "Tapas", "Tapas", "Tapas"],
+  couscous: ["🍲", "Couscous", "Couscous", "Cuscús"],
+  falafel: ["🧆", "Falafels", "Falafel", "Falafel"],
+  ramen: ["🍜", "Ramen", "Ramen", "Ramen"],
+  noodle: ["🍜", "Nouilles", "Noodles", "Fideos"],
+  dumplings: ["🥟", "Raviolis", "Dumplings", "Dumplings"],
+  bubble_tea: ["🧋", "Bubble tea", "Bubble tea", "Bubble tea"],
+  salad: ["🥗", "Salades", "Salads", "Ensaladas"],
+  bagel: ["🥯", "Bagels", "Bagels", "Bagels"],
+  hot_dog: ["🌭", "Hot-dogs", "Hot dogs", "Perritos"],
+  fries: ["🍟", "Frites", "Fries", "Patatas fritas"],
+  poutine: ["🍟", "Poutine", "Poutine", "Poutine"],
+  bbq: ["🍖", "Barbecue", "BBQ", "Barbacoa"],
+  brasserie: ["🍺", "Brasserie", "Brasserie", "Brasserie"],
+  bistro: ["🍷", "Bistrot", "Bistro", "Bistró"],
+  fine_dining: ["🍽️", "Gastronomique", "Fine dining", "Alta cocina"],
+  savoyard: ["🧀", "Savoyard", "Savoyard", "Saboyano", R],
+  deli: ["🥪", "Deli", "Deli", "Charcutería"],
+  smoked_meat: ["🥩", "Smoked meat", "Smoked meat", "Smoked meat"],
+  shawarma: ["🥙", "Shawarma", "Shawarma", "Shawarma"],
+  barbecue: ["🍖", "Barbecue", "BBQ", "Barbacoa"],
 };
 
 const RESTAURANT = { fr: "restaurant", en: "restaurant", es: "restaurante" };
 
-function labelFor(key: string): { label: string; query: string } {
+function labelFor(key: string): { emoji: string; label: string; query: string } {
   const known = LABELS[key];
   if (!known) {
     const label = key.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
-    return { label, query: label };
+    return { emoji: "🍽️", label, query: label };
   }
-  const [fr, en, es, nationality] = known;
+  const [emoji, fr, en, es, nationality] = known;
   const label = { fr, en, es }[lang];
   // « restaurant japonais » / « Japanese restaurant » / « restaurante japonés »
   const query = !nationality ? label : lang === "en" ? `${label} ${RESTAURANT.en}` : `${RESTAURANT[lang]} ${label.toLowerCase()}`;
-  return { label, query };
+  return { emoji, label, query };
 }
 
 const tiles = new Map<string, Promise<CuisineNode | null>>();
@@ -124,8 +127,8 @@ function getTile(key: string): Promise<CuisineNode | null> {
   return tile;
 }
 
-// Au-delà, la rangée de catégories devient trop longue à parcourir.
-const MAX_SHOWN = 10;
+// Une rangée de boutons, sans défilement : 4 cuisines au plus.
+export const MAX_SHOWN = 4;
 
 /**
  * Catégories de la zone visible (pays, région ou quartier selon le zoom, ou la zone la plus fine
