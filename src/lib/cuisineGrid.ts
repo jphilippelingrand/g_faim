@@ -36,13 +36,16 @@ export function levelForRadius(radiusMeters: number): number {
   return 2;
 }
 
-/** Descend dans l'arbre jusqu'au niveau voulu, ou s'arrête à la zone la plus fine disponible. */
-export function findNode(tile: CuisineNode, lat: number, lng: number, level: number): CuisineNode {
-  let node = tile;
+/**
+ * Les zones qui contiennent le point, de la plus grande (le fichier) à la plus fine disponible
+ * jusqu'au niveau voulu.
+ */
+export function findPath(tile: CuisineNode, lat: number, lng: number, level: number): CuisineNode[] {
+  const path = [tile];
   for (let l = 1; l <= level; l++) {
-    const child = node.sub_regions?.[cellKey(lat, lng, l)];
+    const child = path[path.length - 1].sub_regions?.[cellKey(lat, lng, l)];
     if (!child) break;
-    node = child;
+    path.push(child);
   }
-  return node;
+  return path;
 }

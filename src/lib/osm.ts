@@ -1,5 +1,5 @@
 import { lang } from "../i18n";
-import { cellKey, findNode, levelForRadius, type CuisineNode } from "./cuisineGrid";
+import { cellKey, findPath, levelForRadius, type CategoryEntry, type CuisineNode } from "./cuisineGrid";
 import type { LatLng } from "./places";
 
 /**
@@ -124,13 +124,42 @@ function getTile(key: string): Promise<CuisineNode | null> {
   return tile;
 }
 
+// Au-delà, la rangée de catégories devient trop longue à parcourir.
+const MAX_SHOWN = 10;
+
 /**
- * Catégories de la zone visible : celles du pays/de la région/du quartier selon le zoom,
- * ou de la zone la plus fine disponible. D'abord les spécialités du coin, puis les plus courantes.
+ * Catégories de la zone visible (pays, région ou quartier selon le zoom, ou la zone la plus fine
+ * disponible). D'abord les spécialités, de cette zone et des zones qui la contiennent (la poutine
+ * du Québec reste visible au Plateau) : celles qui ressortent au plus de niveaux en premier, la plus
+ * régionale d'abord à égalité. Puis les cuisines les plus courantes de la zone.
  */
 export async function neighborhoodCategories(center: LatLng, radius: number): Promise<Category[]> {
   const tile = await getTile(cellKey(center.lat, center.lng, 0));
   if (!tile) return [];
-  const node = findNode(tile, center.lat, center.lng, levelForRadius(radius));
-  return node.categories.map(([key, distinctive]) => ({ key, ...labelFor(key), distinctive: distinctive === 1 }));
+  const path = findPath(tile, center.lat, center.lng, levelForRadius(radius));
+  const zone = path[path.length - 1];
+
+  const specialties = new Map<string, { levels: number; broadest: number }>();
+  path.forEach((node, depth) => {
+    for (const [key, d] of node.categories) {
+      if (d !== 1) continue;
+      const s = specialties.get(key);
+      if (s) s.levels++;
+      else specialties.set(key, { levels: 1, broadest: depth });
+    }
+  });
+  const ordered: CategoryEntry[] = [
+    ...[...specialties]
+      .sort(([, a], [, b]) => b.levels - a.levels || a.broadest - b.broadest)
+      .map(([key]): CategoryEntry => [key, 1]),
+    ...zone.categories.filter(([, d]) => d !== 1),
+  ];
+  const seen = new Set<string>();
+  const result: Category[] = [];
+  for (const [key, distinctive] of ordered) {
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push({ key, ...labelFor(key), distinctive: distinctive === 1 });
+  }
+  return result.slice(0, MAX_SHOWN);
 }

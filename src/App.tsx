@@ -187,7 +187,7 @@ export default function App() {
                   title={c?.distinctive ? t("localSpecialty") : undefined}
                   onClick={() => setCategory(active ? null : c)}
                 >
-                  {c ? (c.distinctive ? `✦ ${c.label}` : c.label) : t("allCuisines")}
+                  {c ? c.label : t("allCuisines")}
                 </button>
               );
             })}
