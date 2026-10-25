@@ -69,6 +69,15 @@ for (const post of due) {
     if (status_code === "ERROR" || i === 20) throw new Error(`${post.id} : Instagram n'a pas pu préparer l'image (${status_code}).`);
     await new Promise((r) => setTimeout(r, 3000));
   }
-  const { id } = await ig(`${account.user_id}/media_publish`, { method: "POST", params: { creation_id: container.id } });
+  // « Media ID is not available » (code 9007) arrive parfois juste après FINISHED : on réessaie un peu plus tard.
+  let id;
+  for (let i = 0; !id; i++) {
+    try {
+      ({ id } = await ig(`${account.user_id}/media_publish`, { method: "POST", params: { creation_id: container.id } }));
+    } catch (err) {
+      if (!String(err.message).includes("code 9007") || i === 5) throw err;
+      await new Promise((r) => setTimeout(r, 10_000));
+    }
+  }
   console.log(`Publié : ${post.id} → ${id}`);
 }
