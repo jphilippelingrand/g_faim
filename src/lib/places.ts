@@ -1,5 +1,6 @@
 import { importLibrary } from "./google";
 import type { Category } from "./osm";
+import { locale, t } from "../i18n";
 
 export type LatLng = { lat: number; lng: number };
 
@@ -39,12 +40,12 @@ const PRICE: Record<string, string> = {
 export function getBrowserPosition(): Promise<LatLng> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
-      reject(new Error("Ton navigateur ne sait pas où tu es."));
+      reject(new Error(t("noGeolocation")));
       return;
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => reject(new Error("Je n'ai pas eu accès à ta position.")),
+      () => reject(new Error(t("geolocationDenied"))),
       { enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 },
     );
   });
@@ -53,7 +54,7 @@ export function getBrowserPosition(): Promise<LatLng> {
 export async function geocode(address: string): Promise<LatLng> {
   const { Geocoder } = await importLibrary<google.maps.GeocodingLibrary>("geocoding");
   const { results } = await new Geocoder().geocode({ address });
-  if (!results.length) throw new Error("Adresse introuvable.");
+  if (!results.length) throw new Error(t("addressNotFound"));
   const loc = results[0].geometry.location;
   return { lat: loc.lat(), lng: loc.lng() };
 }
@@ -153,7 +154,7 @@ export async function searchRestaurants(area: Area, category?: Category | null):
     .filter((p) => (p.businessStatus ?? "OPERATIONAL") === "OPERATIONAL")
     .map((p) => ({
       id: p.id,
-      name: p.displayName ?? "Sans nom",
+      name: p.displayName ?? t("noName"),
       rating: p.rating!,
       reviews: p.userRatingCount ?? 0,
       type: p.primaryTypeDisplayName ?? "",
@@ -189,7 +190,7 @@ export function rankTop(list: Restaurant[]): Restaurant[] {
 
 export function formatDistance(m: number): string {
   return m >= 1000
-    ? `${(m / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} km`
+    ? `${(m / 1000).toLocaleString(locale, { maximumFractionDigits: 1 })} km`
     : `${Math.round(m)} m`;
 }
 

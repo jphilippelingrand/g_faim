@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { t } from "../i18n";
 
-const TIP = "Mode surprise : 5 restos ouverts tirés au sort, bien notés ou pas. Pour sortir des sentiers battus.";
 const LONG_PRESS_MS = 450;
 
 /**
@@ -22,7 +22,7 @@ export function ShuffleToggle({ on, onChange }: { on: boolean; onChange: (on: bo
         type="button"
         className={`shuffle-button${on ? " on" : ""}`}
         aria-pressed={on}
-        aria-label="Mode surprise"
+        aria-label={t("surpriseMode")}
         aria-describedby={tipId}
         onPointerEnter={(e) => e.pointerType === "mouse" && setTip(true)}
         onPointerLeave={(e) => e.pointerType === "mouse" && setTip(false)}
@@ -57,7 +57,7 @@ export function ShuffleToggle({ on, onChange }: { on: boolean; onChange: (on: bo
         </svg>
       </button>
       <div id={tipId} role="tooltip" className={`shuffle-tip${tip ? " visible" : ""}`}>
-        {TIP}
+        {t("surpriseTip")}
       </div>
     </div>
   );

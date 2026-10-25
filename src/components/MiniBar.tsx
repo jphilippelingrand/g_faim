@@ -1,5 +1,6 @@
 import { useEffect, useState, type RefObject } from "react";
 import { ShuffleToggle } from "./ShuffleToggle";
+import { t } from "../i18n";
 
 /** Barre compacte fixée en haut, qui apparaît quand l'élément surveillé (la grande dame) sort de l'écran. */
 export function MiniBar({
@@ -30,7 +31,7 @@ export function MiniBar({
         type="button"
         className="minibar-home"
         onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        aria-label="Remonter en haut"
+        aria-label={t("backToTop")}
       >
         <img src="/icon.svg" alt="" width={34} height={34} />
         <span>J'ai faim</span>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { MAP_ID, importLibrary } from "../lib/google";
 import { MAX_RADIUS, distanceMeters, type Area, type LatLng, type Restaurant } from "../lib/places";
+import { t } from "../i18n";
 
 const TOP_Z = 100;
 
@@ -77,7 +78,7 @@ export function RestaurantMap({ home, results, area, fitKey, selectedId, onSelec
     if (!map) return;
     const el = document.createElement("div");
     el.className = "home-pin";
-    const marker = new google.maps.marker.AdvancedMarkerElement({ map, position: home, content: el, title: "Toi" });
+    const marker = new google.maps.marker.AdvancedMarkerElement({ map, position: home, content: el, title: t("you") });
     return () => {
       marker.map = null;
     };

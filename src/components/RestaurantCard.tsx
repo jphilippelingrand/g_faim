@@ -1,4 +1,5 @@
 import { formatDistance, type LatLng, type Restaurant } from "../lib/places";
+import { t } from "../i18n";
 
 type Props = {
   r: Restaurant;
@@ -47,7 +48,7 @@ export function RestaurantCard({ r, index, home, distance, selected, onSelect }:
               <span className="rating">
                 <span className="star">★</span> {r.rating.toFixed(1)}
               </span>{" "}
-              · {r.reviews} avis
+              · {r.reviews} {t("reviews")}
             </div>
             <div className="meta meta-line">{details}</div>
           </div>
@@ -57,8 +58,8 @@ export function RestaurantCard({ r, index, home, distance, selected, onSelect }:
           href={directionsUrl(home, r, distance)}
           target="_blank"
           rel="noopener noreferrer"
-          title="Itinéraire"
-          aria-label={`Itinéraire vers ${r.name}`}
+          title={t("directions")}
+          aria-label={t("directionsTo", { name: r.name })}
         >
           <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
             <path d="M21.7 11.3l-9-9a1 1 0 0 0-1.4 0l-9 9a1 1 0 0 0 0 1.4l9 9a1 1 0 0 0 1.4 0l9-9a1 1 0 0 0 0-1.4zM14 14.5V12h-4v3H8v-4a1 1 0 0 1 1-1h5V7.5l3.5 3.5-3.5 3.5z" fill="currentColor" />

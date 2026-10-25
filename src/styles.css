@@ -518,6 +518,17 @@ input:focus { border-color: var(--accent); }
 
 footer { text-align: center; font-size: .75rem; color: var(--muted); padding: 16px; }
 footer a { color: inherit; }
+.langs { display: flex; justify-content: center; gap: 4px; margin-top: 10px; }
+.langs button {
+  font: 500 .75rem "Inter", system-ui, sans-serif;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.langs button[aria-current="true"] { border-color: var(--line); background: var(--card); color: var(--ink); }
 
 @media (max-width: 420px) {
   h1 { font-size: 2.1rem; }

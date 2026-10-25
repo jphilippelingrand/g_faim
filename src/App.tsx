@@ -6,6 +6,7 @@ import { MiniBar } from "./components/MiniBar";
 import { ShuffleToggle } from "./components/ShuffleToggle";
 import { hasApiKey } from "./lib/google";
 import { neighborhoodCategories, type Category } from "./lib/osm";
+import { LANGS, lang, setLang, t } from "./i18n";
 import {
   distanceMeters,
   formatDistance,
@@ -41,7 +42,7 @@ export default function App() {
   const heroRef = useRef<HTMLElement>(null);
   const [phase, setPhase] = useState<Phase>(hasApiKey ? "locating" : "error");
   const [error, setError] = useState<string | null>(
-    hasApiKey ? null : "Ajoute ta clé dans .env (VITE_GOOGLE_MAPS_API_KEY), puis relance npm run dev.",
+    hasApiKey ? null : t("missingKey"),
   );
   // Si la géoloc est refusée, on propose de taper une adresse à la place.
   const [askAddress, setAskAddress] = useState(false);
@@ -83,7 +84,7 @@ export default function App() {
       if (id !== requestId.current) return;
       console.error(err);
       setPhase("error");
-      setError((err as Error).message || "Oups, quelque chose a coincé.");
+      setError((err as Error).message || t("oops"));
     }
   }, []);
 
@@ -96,7 +97,7 @@ export default function App() {
       .catch((err: Error) => {
         if (cancelled) return;
         setPhase("error");
-        setError(`${err.message} Dis-moi où tu es :`);
+        setError(`${err.message} ${t("askAddress")}`);
         setAskAddress(true);
       });
     return () => {
@@ -139,9 +140,9 @@ export default function App() {
 
   // Ligne de texte seulement quand il y a quelque chose à dire ; sinon, le rayon est une étiquette sur la carte.
   let status = "";
-  if (phase === "locating") status = "Je te localise…";
+  if (phase === "locating") status = t("locating");
   else if (phase === "error") status = error ?? "";
-  else if (phase === "done" && !top.length) status = "Rien d'ouvert par ici… dézoome la carte ?";
+  else if (phase === "done" && !top.length) status = t("nothingOpen");
 
   async function submitAddress(e: FormEvent) {
     e.preventDefault();
@@ -169,11 +170,11 @@ export default function App() {
           <ShuffleToggle on={surprise} onChange={toggleSurprise} />
           <Lady mood={mood} surprise={surprise} />
           <h1>J'ai faim</h1>
-          <p className="tagline">{surprise ? "5 tables au hasard, juste à côté." : "Les 5 meilleures tables, juste à côté."}</p>
+          <p className="tagline">{surprise ? t("taglineSurprise") : t("tagline")}</p>
         </header>
 
         {categories.length > 0 && (
-          <div className="categories" role="radiogroup" aria-label="Type de cuisine">
+          <div className="categories" role="radiogroup" aria-label={t("cuisineType")}>
             {[null, ...categories].map((c) => {
               const active = (c?.key ?? null) === (category?.key ?? null);
               return (
@@ -183,10 +184,10 @@ export default function App() {
                   role="radio"
                   aria-checked={active}
                   className={[active && "active", c?.distinctive && "distinctive"].filter(Boolean).join(" ")}
-                  title={c?.distinctive ? "Spécialité du coin" : undefined}
+                  title={c?.distinctive ? t("localSpecialty") : undefined}
                   onClick={() => setCategory(active ? null : c)}
                 >
-                  {c ? (c.distinctive ? `✦ ${c.label}` : c.label) : "Tout"}
+                  {c ? (c.distinctive ? `✦ ${c.label}` : c.label) : t("allCuisines")}
                 </button>
               );
             })}
@@ -204,13 +205,13 @@ export default function App() {
             onViewportChange={onViewportChange}
           >
             {busy ? (
-              <span className="pill">Je renifle…</span>
+              <span className="pill">{t("sniffing")}</span>
             ) : (
               area && <span className="pill">{formatDistance(area.radius)}</span>
             )}
             {surprise && phase === "done" && top.length > 0 && (
               <button type="button" className="pill pill-button" onClick={() => setSeed(Date.now())}>
-                ↻ Autre tirage
+                {t("reroll")}
               </button>
             )}
           </RestaurantMap>
@@ -226,12 +227,12 @@ export default function App() {
           <form className="address" onSubmit={submitAddress}>
             <input
               type="text"
-              placeholder="12 rue des Martyrs, Paris"
+              placeholder={t("addressPlaceholder")}
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               autoFocus
             />
-            <button type="submit">Go</button>
+            <button type="submit">{t("go")}</button>
           </form>
         )}
 
@@ -253,11 +254,18 @@ export default function App() {
       </main>
 
       <footer>
-        Données Google Maps · cuisines ©{" "}
+        {t("footerData")}{" "}
         <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">
           OpenStreetMap
         </a>{" "}
-        · clique sur la dame 👆 · <a href="/privacy">Confidentialité</a>
+        · {t("footerPoke")} · <a href="/privacy">{t("privacy")}</a>
+        <nav className="langs" aria-label={t("language")}>
+          {LANGS.map((l) => (
+            <button key={l} type="button" aria-current={l === lang} onClick={() => l !== lang && setLang(l)}>
+              {l.toUpperCase()}
+            </button>
+          ))}
+        </nav>
       </footer>
     </>
   );

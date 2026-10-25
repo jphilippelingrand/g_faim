@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
+import { t } from "../i18n";
 
 /** starving = ça gargouille non-stop (recherche) ; hungry = gros gargouillis réguliers ; happy = elle a trouvé, elle bave. */
 export type Mood = "starving" | "hungry" | "happy";
 
 const GRR = "GRROOOUUBBLL";
-// Mode surprise : elle mange « au pif », les yeux bandés.
-const PIF = "AU\u00a0PIF\u00a0!";
 
 export function Lady({ mood, surprise = false }: { mood: Mood; surprise?: boolean }) {
   // Un clic sur la dame la fait gargouiller à fond pendant un instant.
@@ -33,10 +32,11 @@ export function Lady({ mood, surprise = false }: { mood: Mood; surprise?: boolea
       className={`lady${surprise ? " surprise" : ""}${twirl ? " twirl" : ""}`}
       data-mood={effective}
       onClick={() => setPoked(true)}
-      aria-label="La petite dame a faim"
+      aria-label={t("ladyLabel")}
     >
       <span className="grr" aria-hidden="true">
-        {[...(surprise ? PIF : GRR)].map((ch, i) => (
+        {/* Mode surprise : elle mange « au pif », les yeux bandés. */}
+        {[...(surprise ? t("ladyPif") : GRR)].map((ch, i) => (
           <span key={i} className={ch === "\u00a0" ? "space" : undefined} style={{ animationDelay: `${i * (surprise ? 90 : 35)}ms` }}>
             {ch}
           </span>

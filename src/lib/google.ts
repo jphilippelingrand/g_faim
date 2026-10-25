@@ -1,3 +1,5 @@
+import { lang, t } from "../i18n";
+
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 
 export const hasApiKey = Boolean(API_KEY && !API_KEY.startsWith("COLLE"));
@@ -18,7 +20,7 @@ function loadGoogleMaps(): Promise<void> {
     const params = new URLSearchParams({
       key: API_KEY!,
       v: "weekly",
-      language: "fr",
+      language: lang,
       loading: "async",
       callback,
     });
@@ -27,7 +29,7 @@ function loadGoogleMaps(): Promise<void> {
     script.async = true;
     script.onerror = () => {
       loading = null;
-      reject(new Error("Google Maps n'a pas pu se charger."));
+      reject(new Error(t("mapsFailed")));
     };
     document.head.append(script);
   });

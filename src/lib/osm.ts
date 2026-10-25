@@ -1,3 +1,4 @@
+import { lang } from "../i18n";
 import { cellKey, findNode, levelForRadius, type CuisineNode } from "./cuisineGrid";
 import type { LatLng } from "./places";
 
@@ -17,43 +18,94 @@ export type Category = {
   distinctive: boolean;
 };
 
-// Libellés et requêtes en français. Ça ne décide pas des catégories (elles viennent des données),
+// Libellés et requêtes par langue. Ça ne décide pas des catégories (elles viennent des données),
 // ça traduit juste les mots-clés OSM courants ; les autres sont affichés tels quels, mis en forme.
-const LABELS: Record<string, string | [label: string, query: string]> = {
-  pizza: "Pizza", burger: "Burgers", sushi: "Sushis", japanese: ["Japonais", "restaurant japonais"],
-  chinese: ["Chinois", "restaurant chinois"], italian: ["Italien", "restaurant italien"],
-  french: ["Français", "restaurant français"], mexican: ["Mexicain", "restaurant mexicain"],
-  indian: ["Indien", "restaurant indien"], thai: ["Thaï", "restaurant thaï"],
-  vietnamese: ["Vietnamien", "restaurant vietnamien"], korean: ["Coréen", "restaurant coréen"],
-  asian: ["Asiatique", "restaurant asiatique"], lebanese: ["Libanais", "restaurant libanais"],
-  greek: ["Grec", "restaurant grec"], turkish: ["Turc", "restaurant turc"], kebab: "Kebab",
-  sandwich: "Sandwichs", chicken: ["Poulet", "poulet frit"], breakfast: ["Petit-déjeuner", "petit-déjeuner"],
-  brunch: "Brunch", crepe: "Crêpes", pancake: "Pancakes", seafood: ["Fruits de mer", "fruits de mer"],
-  fish: ["Poisson", "restaurant de poisson"], steak_house: ["Grillades", "steakhouse"],
-  regional: ["Cuisine du coin", "cuisine traditionnelle régionale"], tapas: "Tapas",
-  spanish: ["Espagnol", "restaurant espagnol"], portuguese: ["Portugais", "restaurant portugais"],
-  moroccan: ["Marocain", "restaurant marocain"], couscous: "Couscous", african: ["Africain", "restaurant africain"],
-  ethiopian: ["Éthiopien", "restaurant éthiopien"], middle_eastern: ["Moyen-Orient", "restaurant libanais"],
-  falafel: "Falafels", vegetarian: ["Végétarien", "restaurant végétarien"], vegan: ["Vegan", "restaurant vegan"],
-  ramen: "Ramen", noodle: ["Nouilles", "nouilles"], dumplings: ["Raviolis", "raviolis dumplings"],
-  bubble_tea: "Bubble tea", salad: "Salades", bagel: "Bagels", hot_dog: "Hot-dogs", fries: "Frites",
-  poutine: "Poutine", bbq: ["Barbecue", "barbecue"], caribbean: ["Caribéen", "restaurant caribéen"],
-  haitian: ["Haïtien", "restaurant haïtien"], peruvian: ["Péruvien", "restaurant péruvien"],
-  brazilian: ["Brésilien", "restaurant brésilien"], belgian: ["Belge", "restaurant belge"],
-  german: ["Allemand", "restaurant allemand"], polish: ["Polonais", "restaurant polonais"],
-  pakistani: ["Pakistanais", "restaurant pakistanais"], nepalese: ["Népalais", "restaurant népalais"],
-  taiwanese: ["Taïwanais", "restaurant taïwanais"], sichuan: ["Sichuan", "restaurant sichuanais"],
-  brasserie: "Brasserie", bistro: "Bistrot", fine_dining: ["Gastronomique", "restaurant gastronomique"],
-  basque: ["Basque", "restaurant basque"], savoyard: ["Savoyard", "fondue raclette"],
-  galette: "Galettes", deli: ["Deli", "deli viande fumée"], smoked_meat: ["Smoked meat", "smoked meat"],
+// Format : [libellé fr, libellé en, libellé es] ; la requête Google est « restaurant <libellé> »
+// pour les nationalités (R), sinon le libellé lui-même.
+const R = true;
+const LABELS: Record<string, [fr: string, en: string, es: string, nationality?: boolean]> = {
+  pizza: ["Pizza", "Pizza", "Pizza"],
+  burger: ["Burgers", "Burgers", "Hamburguesas"],
+  sushi: ["Sushis", "Sushi", "Sushi"],
+  japanese: ["Japonais", "Japanese", "Japonés", R],
+  chinese: ["Chinois", "Chinese", "Chino", R],
+  italian: ["Italien", "Italian", "Italiano", R],
+  french: ["Français", "French", "Francés", R],
+  mexican: ["Mexicain", "Mexican", "Mexicano", R],
+  indian: ["Indien", "Indian", "Indio", R],
+  thai: ["Thaï", "Thai", "Tailandés", R],
+  vietnamese: ["Vietnamien", "Vietnamese", "Vietnamita", R],
+  korean: ["Coréen", "Korean", "Coreano", R],
+  asian: ["Asiatique", "Asian", "Asiático", R],
+  lebanese: ["Libanais", "Lebanese", "Libanés", R],
+  greek: ["Grec", "Greek", "Griego", R],
+  turkish: ["Turc", "Turkish", "Turco", R],
+  spanish: ["Espagnol", "Spanish", "Español", R],
+  portuguese: ["Portugais", "Portuguese", "Portugués", R],
+  moroccan: ["Marocain", "Moroccan", "Marroquí", R],
+  african: ["Africain", "African", "Africano", R],
+  ethiopian: ["Éthiopien", "Ethiopian", "Etíope", R],
+  caribbean: ["Caribéen", "Caribbean", "Caribeño", R],
+  haitian: ["Haïtien", "Haitian", "Haitiano", R],
+  peruvian: ["Péruvien", "Peruvian", "Peruano", R],
+  brazilian: ["Brésilien", "Brazilian", "Brasileño", R],
+  belgian: ["Belge", "Belgian", "Belga", R],
+  german: ["Allemand", "German", "Alemán", R],
+  polish: ["Polonais", "Polish", "Polaco", R],
+  pakistani: ["Pakistanais", "Pakistani", "Pakistaní", R],
+  nepalese: ["Népalais", "Nepalese", "Nepalí", R],
+  taiwanese: ["Taïwanais", "Taiwanese", "Taiwanés", R],
+  sichuan: ["Sichuan", "Sichuan", "Sichuan", R],
+  basque: ["Basque", "Basque", "Vasco", R],
+  middle_eastern: ["Moyen-Orient", "Middle Eastern", "Oriente Medio", R],
+  vegetarian: ["Végétarien", "Vegetarian", "Vegetariano", R],
+  vegan: ["Vegan", "Vegan", "Vegano", R],
+  kebab: ["Kebab", "Kebab", "Kebab"],
+  sandwich: ["Sandwichs", "Sandwiches", "Bocadillos"],
+  chicken: ["Poulet", "Chicken", "Pollo"],
+  breakfast: ["Petit-déjeuner", "Breakfast", "Desayuno"],
+  brunch: ["Brunch", "Brunch", "Brunch"],
+  crepe: ["Crêpes", "Crêpes", "Crepes"],
+  galette: ["Galettes", "Galettes", "Galettes"],
+  pancake: ["Pancakes", "Pancakes", "Tortitas"],
+  seafood: ["Fruits de mer", "Seafood", "Marisco"],
+  fish: ["Poisson", "Fish", "Pescado"],
+  steak_house: ["Grillades", "Steakhouse", "Asador"],
+  regional: ["Cuisine du coin", "Local cuisine", "Cocina local"],
+  tapas: ["Tapas", "Tapas", "Tapas"],
+  couscous: ["Couscous", "Couscous", "Cuscús"],
+  falafel: ["Falafels", "Falafel", "Falafel"],
+  ramen: ["Ramen", "Ramen", "Ramen"],
+  noodle: ["Nouilles", "Noodles", "Fideos"],
+  dumplings: ["Raviolis", "Dumplings", "Dumplings"],
+  bubble_tea: ["Bubble tea", "Bubble tea", "Bubble tea"],
+  salad: ["Salades", "Salads", "Ensaladas"],
+  bagel: ["Bagels", "Bagels", "Bagels"],
+  hot_dog: ["Hot-dogs", "Hot dogs", "Perritos"],
+  fries: ["Frites", "Fries", "Patatas fritas"],
+  poutine: ["Poutine", "Poutine", "Poutine"],
+  bbq: ["Barbecue", "BBQ", "Barbacoa"],
+  brasserie: ["Brasserie", "Brasserie", "Brasserie"],
+  bistro: ["Bistrot", "Bistro", "Bistró"],
+  fine_dining: ["Gastronomique", "Fine dining", "Alta cocina"],
+  savoyard: ["Savoyard", "Savoyard", "Saboyano", R],
+  deli: ["Deli", "Deli", "Charcutería"],
+  smoked_meat: ["Smoked meat", "Smoked meat", "Smoked meat"],
 };
+
+const RESTAURANT = { fr: "restaurant", en: "restaurant", es: "restaurante" };
 
 function labelFor(key: string): { label: string; query: string } {
   const known = LABELS[key];
-  if (Array.isArray(known)) return { label: known[0], query: known[1] };
-  if (known) return { label: known, query: known };
-  const label = key.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
-  return { label, query: label };
+  if (!known) {
+    const label = key.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+    return { label, query: label };
+  }
+  const [fr, en, es, nationality] = known;
+  const label = { fr, en, es }[lang];
+  // « restaurant japonais » / « Japanese restaurant » / « restaurante japonés »
+  const query = !nationality ? label : lang === "en" ? `${label} ${RESTAURANT.en}` : `${RESTAURANT[lang]} ${label.toLowerCase()}`;
+  return { label, query };
 }
 
 const tiles = new Map<string, Promise<CuisineNode | null>>();
