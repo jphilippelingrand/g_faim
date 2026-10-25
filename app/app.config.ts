@@ -18,6 +18,8 @@ const config: ExpoConfig = {
     supportsTablet: false,
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
+      // Nécessaire pour que les traductions de languages/*.json (permission, nom) soient utilisées.
+      CFBundleAllowMixedLocalizations: true,
     },
   },
   android: {
@@ -27,7 +29,14 @@ const config: ExpoConfig = {
       foregroundImage: "./assets/android-icon-foreground.png",
     },
   },
+  locales: {
+    fr: "./languages/fr.json",
+    en: "./languages/en.json",
+    es: "./languages/es.json",
+  },
   plugins: [
+    // Permet de choisir la langue de l'app dans Réglages iOS.
+    ["expo-localization", { supportedLocales: ["fr", "en", "es"] }],
     [
       "expo-location",
       {

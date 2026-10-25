@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { colors, fonts } from "../theme";
+import { t } from "../i18n";
 
-const TIP = "Mode surprise : 5 restos ouverts tirés au sort, bien notés ou pas. Pour sortir des sentiers battus.";
 
 /** Interrupteur du mode surprise ; un appui long affiche une bulle d'explication. */
 export function ShuffleToggle({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
@@ -32,8 +32,8 @@ export function ShuffleToggle({ on, onChange }: { on: boolean; onChange: (on: bo
         hitSlop={6}
         accessibilityRole="switch"
         accessibilityState={{ checked: on }}
-        accessibilityLabel="Mode surprise"
-        accessibilityHint={TIP}
+        accessibilityLabel={t("surpriseMode")}
+        accessibilityHint={t("surpriseTip")}
       >
         <Svg viewBox="0 0 24 24" width={22} height={22}>
           <Path
@@ -46,7 +46,7 @@ export function ShuffleToggle({ on, onChange }: { on: boolean; onChange: (on: bo
       {tip && (
         <View style={styles.tip} pointerEvents="none">
           <View style={styles.tipArrow} />
-          <Text style={styles.tipText}>{TIP}</Text>
+          <Text style={styles.tipText}>{t("surpriseTip")}</Text>
         </View>
       )}
     </View>

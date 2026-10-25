@@ -24,6 +24,7 @@ import {
   type Restaurant,
 } from "./src/lib/places";
 import { colors, fonts } from "./src/theme";
+import { t } from "./src/i18n";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -36,7 +37,7 @@ const ZOOM_IN_RATIO = 0.6;
 
 async function getPosition(): Promise<LatLng> {
   const { status } = await Location.requestForegroundPermissionsAsync();
-  if (status !== "granted") throw new Error("Je n'ai pas eu accès à ta position.");
+  if (status !== "granted") throw new Error(t("geolocationDenied"));
   const { coords } = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
   return { latitude: coords.latitude, longitude: coords.longitude };
 }
@@ -57,7 +58,7 @@ export default function App() {
   const [seed, setSeed] = useState(() => Date.now());
   const [phase, setPhase] = useState<Phase>(hasApiKey ? "locating" : "error");
   const [error, setError] = useState<string | null>(
-    hasApiKey ? null : "Clé Google manquante (EXPO_PUBLIC_GOOGLE_MAPS_API_KEY).",
+    hasApiKey ? null : t("missingKey"),
   );
   // Si la géoloc est refusée, on propose de taper une adresse à la place.
   const [askAddress, setAskAddress] = useState(false);
@@ -90,7 +91,7 @@ export default function App() {
       if (id !== requestId.current) return;
       console.error(err);
       setPhase("error");
-      setError((err as Error).message || "Oups, quelque chose a coincé.");
+      setError((err as Error).message || t("oops"));
     }
   }, []);
 
@@ -103,7 +104,7 @@ export default function App() {
       .catch((err: Error) => {
         if (cancelled) return;
         setPhase("error");
-        setError(`${err.message} Dis-moi où tu es :`);
+        setError(`${err.message} ${t("askAddress")}`);
         setAskAddress(true);
       });
     return () => {
@@ -146,12 +147,12 @@ export default function App() {
   const mood: Mood = busy ? "starving" : phase === "done" && top.length ? "happy" : "hungry";
 
   let status = "";
-  if (phase === "locating") status = "Je te localise…";
-  else if (phase === "searching") status = "Je renifle les cuisines du coin…";
+  if (phase === "locating") status = t("locating");
+  else if (phase === "searching") status = t("searching");
   else if (phase === "error") status = error ?? "";
-  else if (!top.length) status = "Rien d'ouvert et bien noté par ici… dézoome la carte ?";
-  else if (surprise) status = `${top.length} restos au hasard dans un rayon de ${formatDistance(area?.radius ?? 0)}`;
-  else status = `Top ${top.length} dans un rayon de ${formatDistance(area?.radius ?? 0)} · dézoome pour voir plus loin`;
+  else if (!top.length) status = t("nothingOpen");
+  else if (surprise) status = t("randomWithin", { n: top.length, radius: formatDistance(area?.radius ?? 0) });
+  else status = t("topWithin", { n: top.length, radius: formatDistance(area?.radius ?? 0) });
 
   async function submitAddress() {
     if (!address.trim()) return;
@@ -159,7 +160,7 @@ export default function App() {
       setPhase("locating");
       // Géocodage du système (Apple sur iOS) : pas besoin de clé Google.
       const [hit] = await Location.geocodeAsync(address.trim());
-      if (!hit) throw new Error("Adresse introuvable.");
+      if (!hit) throw new Error(t("addressNotFound"));
       setHome({ latitude: hit.latitude, longitude: hit.longitude });
       setAskAddress(false);
     } catch (err) {
@@ -186,7 +187,7 @@ export default function App() {
             <Lady mood={mood} surprise={surprise} />
             <Text style={styles.title}>J'ai faim</Text>
             <Text style={styles.tagline}>
-              {surprise ? "5 tables au hasard, juste à côté." : "Les 5 meilleures tables, juste à côté."}
+              {surprise ? t("taglineSurprise") : t("tagline")}
             </Text>
           </View>
 
@@ -208,7 +209,7 @@ export default function App() {
               <>
                 {" · "}
                 <Text style={styles.reroll} onPress={() => setSeed(Date.now())} accessibilityRole="button">
-                  Autre tirage
+                  {t("reroll")}
                 </Text>
               </>
             )}
@@ -218,7 +219,7 @@ export default function App() {
             <View style={styles.address}>
               <TextInput
                 style={styles.input}
-                placeholder="12 rue des Martyrs, Paris"
+                placeholder={t("addressPlaceholder")}
                 placeholderTextColor={colors.muted}
                 value={address}
                 onChangeText={setAddress}
@@ -227,7 +228,7 @@ export default function App() {
                 autoFocus
               />
               <Pressable style={styles.goButton} onPress={submitAddress}>
-                <Text style={styles.goButtonText}>Go</Text>
+                <Text style={styles.goButtonText}>{t("go")}</Text>
               </Pressable>
             </View>
           )}
@@ -250,9 +251,9 @@ export default function App() {
           )}
 
           <Text style={styles.footer}>
-            Données Google Maps · touche la dame 👆 ·{" "}
+            {t("footer")}{" "}
             <Text style={styles.footerLink} onPress={() => Linking.openURL(PRIVACY_URL)} accessibilityRole="link">
-              Confidentialité
+              {t("privacy")}
             </Text>
           </Text>
         </ScrollView>

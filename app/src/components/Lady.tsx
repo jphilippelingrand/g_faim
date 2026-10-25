@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Animated, Easing, Pressable, StyleSheet, View } from "react-native";
 import Svg, { Circle, Ellipse, G, Path } from "react-native-svg";
 import { colors, fonts } from "../theme";
+import { t } from "../i18n";
 
 /** starving = ça gargouille non-stop (recherche) ; hungry = gros gargouillis réguliers ; happy = elle a trouvé, elle bave. */
 export type Mood = "starving" | "hungry" | "happy";
@@ -10,7 +11,6 @@ export type Mood = "starving" | "hungry" | "happy";
 const DURATION: Record<Mood, number> = { starving: 900, hungry: 2600, happy: 3400 };
 const GRR = "GRROOOUUBBLL";
 // Mode surprise : elle mange « au pif », les yeux bandés.
-const PIF = "AU PIF !";
 const PIF_LOOP = 1400;
 
 // Où flottent les « ? » autour de la tête en mode surprise.
@@ -36,11 +36,11 @@ export function Lady({ mood, surprise = false }: { mood: Mood; surprise?: boolea
   const effective: Mood = poked ? "starving" : mood;
 
   // Une seule horloge 0 → 1 par cycle ; toutes les animations en sont des interpolations.
-  const [t] = useState(() => new Animated.Value(0));
+  const [clock] = useState(() => new Animated.Value(0));
   useEffect(() => {
-    t.setValue(0);
+    clock.setValue(0);
     const loop = Animated.loop(
-      Animated.timing(t, {
+      Animated.timing(clock, {
         toValue: 1,
         duration: DURATION[effective],
         easing: Easing.linear,
@@ -49,7 +49,7 @@ export function Lady({ mood, surprise = false }: { mood: Mood; surprise?: boolea
     );
     loop.start();
     return () => loop.stop();
-  }, [effective, t]);
+  }, [effective, clock]);
 
   // Mode surprise : une horloge à part pour la vague de « AU PIF ! » et les « ? » qui flottent.
   const [w] = useState(() => new Animated.Value(0));
@@ -87,7 +87,7 @@ export function Lady({ mood, surprise = false }: { mood: Mood; surprise?: boolea
 
   const anim = useMemo(() => {
     const at = <T extends number | string>(input: number[], output: T[]) =>
-      t.interpolate<T>({ inputRange: input, outputRange: output, extrapolate: "clamp" });
+      clock.interpolate<T>({ inputRange: input, outputRange: output, extrapolate: "clamp" });
     return {
       shakeX: at([0, 0.04, 0.08, 0.12, 0.16, 0.22, 0.28, 0.4, 1], [0, -2, 2, -2, 2, -1, 1, 0, 0]),
       shakeRot: at([0, 0.04, 0.08, 0.12, 0.16, 0.4, 1], ["0deg", "-1deg", "1deg", "-0.6deg", "0.6deg", "0deg", "0deg"]),
@@ -106,7 +106,7 @@ export function Lady({ mood, surprise = false }: { mood: Mood; surprise?: boolea
         };
       },
     };
-  }, [t, effective]);
+  }, [clock, effective]);
 
   function poke() {
     setPoked(true);
@@ -116,11 +116,11 @@ export function Lady({ mood, surprise = false }: { mood: Mood; surprise?: boolea
   const happy = effective === "happy";
 
   return (
-    <Pressable onPress={poke} accessibilityLabel="La petite dame a faim" style={styles.wrap}>
+    <Pressable onPress={poke} accessibilityLabel={t("ladyLabel")} style={styles.wrap}>
       <View style={styles.grr} pointerEvents="none">
         {surprise ? (
           <Animated.Text style={[styles.letter, styles.pif, { transform: [{ translateY: pif.bob }, { rotate: pif.tilt }] }]}>
-            {PIF}
+            {t("ladyPif")}
           </Animated.Text>
         ) : (
           [...GRR].map((ch, i) => {

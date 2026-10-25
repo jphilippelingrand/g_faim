@@ -1,5 +1,6 @@
 import Constants from "expo-constants";
 import { Platform } from "react-native";
+import { lang, locale, t } from "../i18n";
 
 export type LatLng = { latitude: number; longitude: number };
 
@@ -85,10 +86,10 @@ async function placesApi(endpoint: "searchNearby" | "searchText", body: object):
       "X-Goog-FieldMask": FIELD_MASK,
       ...googleHeaders,
     },
-    body: JSON.stringify({ ...body, languageCode: "fr" }),
+    body: JSON.stringify({ ...body, languageCode: lang }),
   });
   const json = await res.json();
-  if (!res.ok) throw new Error(json?.error?.message ?? `Google a répondu ${res.status}.`);
+  if (!res.ok) throw new Error(json?.error?.message ?? t("googleError", { status: res.status }));
   return json.places ?? [];
 }
 
@@ -138,7 +139,7 @@ export async function searchRestaurants(area: Area): Promise<Restaurant[]> {
     .filter((p) => (p.businessStatus ?? "OPERATIONAL") === "OPERATIONAL" && p.currentOpeningHours?.openNow !== false)
     .map((p) => ({
       id: p.id,
-      name: p.displayName?.text ?? "Sans nom",
+      name: p.displayName?.text ?? t("noName"),
       rating: p.rating!,
       reviews: p.userRatingCount ?? 0,
       type: p.primaryTypeDisplayName?.text ?? "",
@@ -168,7 +169,7 @@ export function rankTop(list: Restaurant[]): Restaurant[] {
 
 export function formatDistance(m: number): string {
   return m >= 1000
-    ? `${(m / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} km`
+    ? `${(m / 1000).toLocaleString(locale, { maximumFractionDigits: 1 })} km`
     : `${Math.round(m)} m`;
 }
 

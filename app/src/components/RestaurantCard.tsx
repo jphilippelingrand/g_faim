@@ -2,6 +2,7 @@ import { Image, Linking, Pressable, StyleSheet, Text, View } from "react-native"
 import Svg, { Path } from "react-native-svg";
 import { directionsUrl, formatDistance, googleHeaders, type LatLng, type Restaurant } from "../lib/places";
 import { colors, fonts } from "../theme";
+import { t } from "../i18n";
 
 type Props = {
   r: Restaurant;
@@ -28,7 +29,7 @@ export function RestaurantCard({ r, index, home, distance, selected, onSelect }:
           Linking.openURL(r.url);
         }}
         accessibilityRole="link"
-        accessibilityHint="Ouvre la fiche Google Maps"
+        accessibilityHint={t("openInMaps")}
       >
         {r.photo ? (
           <Image style={styles.thumb} source={{ uri: r.photo, headers: googleHeaders }} />
@@ -42,7 +43,7 @@ export function RestaurantCard({ r, index, home, distance, selected, onSelect }:
             {r.name}
           </Text>
           <Text style={styles.meta}>
-            <Text style={styles.star}>★</Text> <Text style={styles.rating}>{r.rating.toFixed(1)}</Text> · {r.reviews} avis
+            <Text style={styles.star}>★</Text> <Text style={styles.rating}>{r.rating.toFixed(1)}</Text> · {r.reviews} {t("reviews")}
           </Text>
           <Text style={styles.meta} numberOfLines={1}>
             {details}
@@ -54,7 +55,7 @@ export function RestaurantCard({ r, index, home, distance, selected, onSelect }:
         style={({ pressed }) => [styles.go, pressed && styles.goPressed]}
         onPress={() => Linking.openURL(directionsUrl(home, r, distance))}
         accessibilityRole="link"
-        accessibilityLabel={`Itinéraire vers ${r.name}`}
+        accessibilityLabel={t("directionsTo", { name: r.name })}
         hitSlop={8}
       >
         {({ pressed }) => (
