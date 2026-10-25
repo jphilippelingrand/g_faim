@@ -4,24 +4,21 @@ import Animated, { interpolate, useAnimatedStyle, type SharedValue } from "react
 import Svg, { Path } from "react-native-svg";
 import { t } from "../i18n";
 import { colors } from "../theme";
-import { DICE_SIZE, DiceButton } from "./DiceButton";
 
 const GAP = 16;
 const RECENTER = 48;
 
 type Props = {
-  surprise: boolean;
-  onToggleSurprise: () => void;
   onRecenter: () => void;
   /** Haut du panneau (px depuis le haut de l'écran), fourni par la bottom sheet : les boutons le suivent. */
   sheetTop: SharedValue<number>;
   screenHeight: number;
 };
 
-/** Les boutons posés sur la carte, à droite, juste au-dessus du panneau : recentrer ➤, puis le dé. */
-export function MapControls({ surprise, onToggleSurprise, onRecenter, sheetTop, screenHeight }: Props) {
+/** Le bouton posé sur la carte, à droite, juste au-dessus du panneau : recentrer ➤. */
+export function MapControls({ onRecenter, sheetTop, screenHeight }: Props) {
   const follow = useAnimatedStyle(() => ({
-    top: sheetTop.value - RECENTER - 8 - DICE_SIZE - GAP,
+    top: sheetTop.value - RECENTER - GAP,
     // Panneau ouvert en grand : la carte est cachée, les boutons s'effacent.
     opacity: interpolate(sheetTop.value, [screenHeight * 0.2, screenHeight * 0.35], [0, 1], "clamp"),
   }));
@@ -43,13 +40,12 @@ export function MapControls({ surprise, onToggleSurprise, onRecenter, sheetTop, 
           <Path d="M20.5 3.5 3 11.2l7.4 2.4 2.4 7.4z" fill={colors.accent} />
         </Svg>
       </Pressable>
-      <DiceButton on={surprise} onToggle={onToggleSurprise} />
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  column: { position: "absolute", right: GAP - (DICE_SIZE - RECENTER) / 2, alignItems: "center", gap: 8 },
+  column: { position: "absolute", right: GAP },
   recenter: {
     width: RECENTER,
     height: RECENTER,

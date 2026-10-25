@@ -11,6 +11,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { useSharedValue } from "react-native-reanimated";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { MapControls } from "./src/components/MapControls";
+import { ShuffleToggle } from "./src/components/ShuffleToggle";
 import { SearchingLady } from "./src/components/SearchingLady";
 import { CategoryBar } from "./src/components/CategoryBar";
 import { RestaurantCard } from "./src/components/RestaurantCard";
@@ -258,13 +259,18 @@ function Main() {
           {t("appName")}
         </Text>
       </View>
+      {/* Mode surprise : à gauche du bandeau, comme sur le site. Hors du bandeau pour que sa bulle déborde dessous. */}
+      <ShuffleToggle
+        side="left"
+        style={{ top: insets.top + (TOP_BAR - 44) / 2, left: 16 }}
+        on={surprise}
+        onChange={(on) => {
+          setSurprise(on);
+          setSeed(Date.now());
+        }}
+      />
 
       <MapControls
-        surprise={surprise}
-        onToggleSurprise={() => {
-          if (!surprise) setSeed(Date.now());
-          setSurprise(!surprise);
-        }}
         onRecenter={recenter}
         sheetTop={sheetTop}
         screenHeight={screenH}
