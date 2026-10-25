@@ -6,8 +6,9 @@
  *   node --env-file=.env social/publish.mjs --dry-run  (montre ce qui partirait maintenant)
  *
  * Lancé toutes les 15 minutes par .github/workflows/instagram.yml. Sans état à garder : un post est
- * considéré publié si une publication récente du compte a la même légende. Les images doivent être
- * en ligne (public/social/, déployées par Vercel) avant l'heure du post.
+ * considéré publié si une publication récente du compte a la même légende. Une story n'a pas de
+ * légende : elle n'est publiée qu'à la main (hors CI), et marquée "published" dans la file ensuite.
+ * Les images doivent être en ligne (public/social/, déployées par Vercel) avant l'heure du post.
  */
 import { readFileSync } from "node:fs";
 import { ig, me, sameCaption, SITE } from "./instagram.mjs";
@@ -27,7 +28,7 @@ const now = Date.now();
 
 const account = await me();
 const { data: recent = [] } = await ig(`${account.user_id}/media`, { params: { fields: "caption,timestamp", limit: "50" } });
-const published = (post) => recent.some((m) => sameCaption(m.caption, post.caption));
+const published = (post) => Boolean(post.published) || recent.some((m) => sameCaption(m.caption, post.caption));
 
 if (mode === "--list") {
   for (const post of queue) {
@@ -39,7 +40,7 @@ if (mode === "--list") {
 
 const due = queue.filter((post) => {
   const at = Date.parse(post.at);
-  return at <= now && now - at <= MAX_LATE_HOURS * 3_600_000 && !published(post);
+  return at <= now && now - at <= MAX_LATE_HOURS * 3_600_000 && !published(post) && !(post.story && process.env.CI);
 });
 if (!due.length) {
   console.log(`@${account.username} : rien à publier.`);
@@ -60,7 +61,7 @@ for (const post of due) {
 
   const container = await ig(`${account.user_id}/media`, {
     method: "POST",
-    params: { image_url: imageUrl, caption: post.caption, ...(post.story ? { media_type: "STORIES" } : {}) },
+    params: post.story ? { image_url: imageUrl, media_type: "STORIES" } : { image_url: imageUrl, caption: post.caption },
   });
   // Meta prépare l'image avant qu'on puisse publier : on attend qu'elle soit prête (une minute au plus).
   for (let i = 0; ; i++) {
