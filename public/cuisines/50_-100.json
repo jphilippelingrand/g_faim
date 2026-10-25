@@ -1,1 +1,1 @@
-{"count":111,"categories":[["burger",1],["sandwich",1],["fries",1],["pizza"],["chinese"],["chicken"],["american"],["breakfast"]],"sub_regions":{"50.0_-97.0":{"count":34,"categories":[["hot_dog",1],["burger",1],["pizza",1],["sandwich"]]}}}
+{"count":111,"categories":[["hot_dog",1],["pizza"],["burger"],["sandwich"],["chinese"],["chicken"],["american"],["breakfast"]],"sub_regions":{"50.0_-97.0":{"count":34,"categories":[["pizza"],["burger"],["sandwich"],["hot_dog"]]}}}

@@ -96,6 +96,62 @@ const LABELS: Record<string, [emoji: string, fr: string, en: string, es: string,
   barbecue: ["🍖", "Barbecue", "BBQ", "Barbacoa"],
   tibetan: ["🥟", "Tibétain", "Tibetan", "Tibetano", R],
   canadian: ["🍁", "Canadien", "Canadian", "Canadiense", R],
+  mediterranean: ["🫒", "Méditerranéen", "Mediterranean", "Mediterráneo", R],
+  pita: ["🥙", "Pita", "Pita", "Pita"],
+  american: ["🍔", "Américain", "American", "Americano", R],
+  tacos: ["🌮", "Tacos", "Tacos", "Tacos"],
+  french_tacos: ["🌯", "French tacos", "French tacos", "French tacos"],
+  tex_mex: ["🌮", "Tex-Mex", "Tex-Mex", "Tex-Mex"],
+  pasta: ["🍝", "Pâtes", "Pasta", "Pasta"],
+  fish_and_chips: ["🐟", "Fish & chips", "Fish & chips", "Fish & chips"],
+  friture: ["🍟", "Friterie", "Chip shop", "Freiduría"],
+  grill: ["🔥", "Grillades", "Grill", "Parrilla"],
+  bar_and_grill: ["🍖", "Bar & grill", "Bar & grill", "Bar & grill"],
+  diner: ["🍳", "Diner", "Diner", "Diner"],
+  panini: ["🥪", "Panini", "Panini", "Panini"],
+  filipino: ["🍚", "Philippin", "Filipino", "Filipino", R],
+  donair: ["🥙", "Donair", "Donair", "Donair"],
+  poke: ["🥗", "Poké", "Poke", "Poke"],
+  bowl: ["🥗", "Bowls", "Bowls", "Bowls"],
+  wings: ["🍗", "Ailes de poulet", "Wings", "Alitas"],
+  jamaican: ["🌴", "Jamaïcain", "Jamaican", "Jamaicano", R],
+  oriental: ["🧆", "Oriental", "Middle Eastern", "Oriental", R],
+  tunisian: ["🍲", "Tunisien", "Tunisian", "Tunecino", R],
+  arab: ["🧆", "Arabe", "Arab", "Árabe", R],
+  syrian: ["🧆", "Syrien", "Syrian", "Sirio", R],
+  persian: ["🍢", "Persan", "Persian", "Persa", R],
+  armenian: ["🍢", "Arménien", "Armenian", "Armenio", R],
+  serbian: ["🍖", "Serbe", "Serbian", "Serbio", R],
+  ukrainian: ["🥟", "Ukrainien", "Ukrainian", "Ucraniano", R],
+  soup: ["🍜", "Soupes", "Soup", "Sopas"],
+  waffle: ["🧇", "Gaufres", "Waffles", "Gofres"],
+  corsican: ["🧀", "Corse", "Corsican", "Corso", R],
+  alsatian: ["🥨", "Alsacien", "Alsatian", "Alsaciano", R],
+  tarte_flambee: ["🥧", "Tarte flambée", "Tarte flambée", "Tarte flambée"],
+  latin_american: ["🌶️", "Latino", "Latin American", "Latinoamericano", R],
+  senegalese: ["🍲", "Sénégalais", "Senegalese", "Senegalés", R],
+  eritrean: ["🍲", "Érythréen", "Eritrean", "Eritreo", R],
+  creole: ["🌶️", "Créole", "Creole", "Criollo", R],
+  reunionese: ["🌴", "Réunionnais", "Réunionese", "Reunionés", R],
+  cajun: ["🌶️", "Cajun", "Cajun", "Cajún"],
+  hotpot: ["🍲", "Fondue chinoise", "Hot pot", "Hot pot"],
+  dim_sum: ["🥟", "Dim sum", "Dim sum", "Dim sum"],
+  cantonese: ["🥡", "Cantonais", "Cantonese", "Cantonés", R],
+  hakka: ["🥡", "Hakka", "Hakka", "Hakka", R],
+  malaysian: ["🍛", "Malaisien", "Malaysian", "Malasio", R],
+  singaporean: ["🍜", "Singapourien", "Singaporean", "Singapurense", R],
+  cambodian: ["🍜", "Cambodgien", "Cambodian", "Camboyano", R],
+  bangladeshi: ["🍛", "Bangladais", "Bangladeshi", "Bangladesí", R],
+  pho: ["🍜", "Phở", "Phở", "Phở"],
+  naan: ["🫓", "Naan", "Naan", "Naan"],
+  maple: ["🍁", "Érable", "Maple", "Arce"],
+  quebec: ["🍁", "Québécois", "Québécois", "Quebequense", R],
+  crousty: ["🍗", "Crousty", "Crousty", "Crousty"],
+  rotisserie: ["🍗", "Rôtisserie", "Rotisserie", "Pollos asados"],
+  pie: ["🥧", "Tourtes", "Pies", "Pasteles"],
+  oyster: ["🦪", "Huîtres", "Oysters", "Ostras"],
+  panisses: ["🍟", "Panisses", "Panisses", "Panisses"],
+  "croque-monsieur": ["🥪", "Croque-monsieur", "Croque-monsieur", "Croque-monsieur"],
 };
 
 const RESTAURANT = { fr: "restaurant", en: "restaurant", es: "restaurante" };
@@ -134,21 +190,18 @@ export const MAX_SHOWN = 4;
 
 /**
  * Catégories de la zone visible (pays, région ou quartier selon le zoom, ou la zone la plus fine
- * disponible) : d'abord ses spécialités, puis celles de sa région directe (la poutine de Montréal
- * reste visible au Plateau), puis ses cuisines les plus courantes. On n'hérite jamais du carré de 10° :
- * il couvre plusieurs provinces, ses spécialités remonteraient partout (la poutine à Toronto).
+ * disponible). Le plus local prime : d'abord les spécialités de la zone, puis celles des zones qui la
+ * contiennent (la ville, puis la grande région), qui ne font que compléter ; enfin ses cuisines les
+ * plus courantes.
  */
 export async function neighborhoodCategories(center: LatLng, radius: number): Promise<Category[]> {
   const tile = await getTile(cellKey(center.lat, center.lng, 0));
   if (!tile) return [];
   const path = findPath(tile, center.lat, center.lng, levelForRadius(radius));
   const zone = path[path.length - 1];
-  const region = path.length > 2 ? path[path.length - 2] : null;
 
-  const specialties = (node: CuisineNode | null) => node?.categories.filter(([, d]) => d === 1) ?? [];
   const ordered: CategoryEntry[] = [
-    ...specialties(zone),
-    ...specialties(region),
+    ...[...path].reverse().flatMap((node) => node.categories.filter(([, d]) => d === 1)),
     ...zone.categories.filter(([, d]) => d !== 1),
   ];
   const seen = new Set<string>();

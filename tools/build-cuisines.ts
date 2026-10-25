@@ -34,15 +34,34 @@ const TAGINFO_URL =
 const MAX_CATEGORIES = 8;
 const MAX_DISTINCTIVE = 3;
 // Plus de N fois plus présente qu'en moyenne mondiale → spécialité du coin.
-const DISTINCTIVE_LIFT = 2.5;
+// Une spécialité est au moins N fois plus présente ici que dans le reste du pays (la poutine au Québec,
+// les crêpes à Rennes ; « français » ne ressort pas en France). On les classe ensuite par rareté dans
+// le monde : c'est ce qui fait l'identité d'un lieu (la poutine passe avant le petit-déjeuner).
+const DISTINCTIVE_LIFT = 2;
 const MIN_COUNT = 3;
+// Pour être une spécialité, il faut un minimum de restos : 4 sushis dans un petit quartier ne font pas une identité.
+const MIN_DISTINCTIVE_COUNT = 5;
 // Trop vagues ou pas de la restauration.
-const IGNORED = new Set(["yes", "coffee_shop", "ice_cream", "cake", "donut", "tea", "juice", "international", "local"]);
+const IGNORED = new Set([
+  "yes", "coffee_shop", "ice_cream", "cake", "donut", "tea", "juice", "international", "local", "fast_food", "snack",
+  "traditional", "european", "lunch", "buffet", "healthy", "organic", "universitaire", "western", "meat", "eggs",
+  "dessert", "bakery", "pastry", "popcorn", "milkshake", "teahouse", "trucker", "roadhouse", "fusion", "pub", "irish_pub",
+]);
+// Variantes d'écriture d'une même cuisine, ramenées à une seule valeur.
+const ALIASES: Record<string, string> = {
+  friterie: "friture", fried_food: "friture", frites: "fries", corse: "corsican", flammekueche: "tarte_flambee",
+  hot_pot: "hotpot", noodles: "noodle", savoyarde: "savoyard", nepal: "nepalese", italian_pizza: "pizza",
+  fried_chicken: "chicken", gastronomique: "fine_dining", bistronomique: "bistro", savory_pancakes: "galette",
+  "canadian-chinese": "chinese", "tex-mex": "tex_mex",
+};
 
 type Counts = Map<string, number>;
-type Tree = { count: number; cuisines: Counts; children: Map<string, Tree>; forced?: boolean };
+type Tree = { count: number; cuisines: Counts; children: Map<string, Tree>; countries: Counts; forced?: boolean };
 
-const newTree = (): Tree => ({ count: 0, cuisines: new Map(), children: new Map() });
+const newTree = (): Tree => ({ count: 0, cuisines: new Map(), children: new Map(), countries: new Map() });
+
+/** Nombre de restos par cuisine dans chaque pays : la moyenne à laquelle on compare chaque zone. */
+const countryTotals = new Map<string, Counts>();
 
 function inRefinedArea(lat: number, lng: number): boolean {
   return CONFIG.refine.some(({ bbox: [s, w, n, e] }) => lat >= s && lat <= n && lng >= w && lng <= e);
@@ -78,6 +97,8 @@ function extractRestaurants(country: string): string {
 
 async function addCountry(tiles: Map<string, Tree>, country: string): Promise<number> {
   const file = extractRestaurants(country);
+  const totals: Counts = new Map();
+  countryTotals.set(country, totals);
   let n = 0;
   for await (const line of createInterface({ input: createReadStream(file) })) {
     if (!line.trim()) continue;
@@ -87,7 +108,8 @@ async function addCountry(tiles: Map<string, Tree>, country: string): Promise<nu
     const cuisines = String(props.cuisine ?? "")
       .split(";")
       .map((c) => c.trim().toLowerCase())
-      .filter((c) => c && !IGNORED.has(c));
+      .map((c) => ALIASES[c] ?? c)
+      .filter((c, i, all) => c && !IGNORED.has(c) && all.indexOf(c) === i);
     if (!cuisines.length) continue;
     const point = representativePoint(feature.geometry);
     if (!point) continue;
@@ -101,16 +123,30 @@ async function addCountry(tiles: Map<string, Tree>, country: string): Promise<nu
       let node = level.get(key);
       if (!node) level.set(key, (node = newTree()));
       node.count++;
+      node.countries.set(country, (node.countries.get(country) ?? 0) + 1);
       if (forced) node.forced = true;
       for (const c of cuisines) node.cuisines.set(c, (node.cuisines.get(c) ?? 0) + 1);
       level = node.children;
     }
+    for (const c of cuisines) totals.set(c, (totals.get(c) ?? 0) + 1);
     n++;
   }
   return n;
 }
 
 type Baseline = { counts: Map<string, number>; total: number; floor: number };
+
+function countryBaseline(counts: Counts): Baseline {
+  // Une cuisine présente dans la zone l'est forcément dans le pays : le plancher ne sert qu'en garde-fou.
+  return { counts, total: [...counts.values()].reduce((a, b) => a + b, 0), floor: 1 };
+}
+
+/** Le pays majoritaire de la zone (une zone frontalière peut mêler deux extraits). */
+function baselineFor(tree: Tree, fallback: Baseline): Baseline {
+  const [country] = [...tree.countries].sort((a, b) => b[1] - a[1])[0] ?? [];
+  const counts = country ? countryTotals.get(country) : undefined;
+  return counts ? countryBaseline(counts) : fallback;
+}
 
 async function worldBaseline(): Promise<Baseline> {
   const cache = `${OSM_DIR}/taginfo-cuisine.json`;
@@ -124,15 +160,23 @@ async function worldBaseline(): Promise<Baseline> {
   };
 }
 
-/** D'abord les spécialités du coin (sur-représentées par rapport au monde), puis les plus courantes. */
-function categoriesFor(cuisines: Counts, world: Baseline): CategoryEntry[] {
+const share = (b: Baseline, key: string) => (b.counts.get(key) ?? b.floor) / b.total;
+
+/** D'abord les spécialités du coin, puis les cuisines les plus courantes de la zone. */
+function categoriesFor(cuisines: Counts, country: Baseline, world: Baseline): CategoryEntry[] {
   const total = [...cuisines.values()].reduce((a, b) => a + b, 0);
   const scored = [...cuisines.entries()]
     .filter(([, count]) => count >= MIN_COUNT)
-    .map(([key, count]) => ({ key, count, lift: count / total / ((world.counts.get(key) ?? world.floor) / world.total) }));
+    .map(([key, count]) => ({
+      key,
+      count,
+      vsCountry: count / total / share(country, key),
+      vsWorld: count / total / share(world, key),
+    }));
+  const rarity = (c: (typeof scored)[number]) => Math.sqrt(c.count) * Math.log(c.vsWorld);
   const distinctive = scored
-    .filter((c) => c.lift >= DISTINCTIVE_LIFT)
-    .sort((a, b) => b.count * Math.log(b.lift) - a.count * Math.log(a.lift))
+    .filter((c) => c.count >= MIN_DISTINCTIVE_COUNT && c.vsCountry >= DISTINCTIVE_LIFT && c.vsWorld > 1)
+    .sort((a, b) => rarity(b) - rarity(a))
     .slice(0, MAX_DISTINCTIVE);
   const common = scored
     .filter((c) => !distinctive.includes(c))
@@ -142,7 +186,10 @@ function categoriesFor(cuisines: Counts, world: Baseline): CategoryEntry[] {
 }
 
 function toNode(tree: Tree, world: Baseline, level = 0): CuisineNode {
-  const node: CuisineNode = { count: tree.count, categories: categoriesFor(tree.cuisines, world) };
+  const node: CuisineNode = {
+    count: tree.count,
+    categories: categoriesFor(tree.cuisines, baselineFor(tree, world), world),
+  };
   // Les régions (niveau 1) ne sont découpées en quartiers que si elles sont denses ou forcées.
   const split = level === 0 || (level === 1 && (tree.count >= CONFIG.refineMinRestaurants || tree.forced));
   const subs = split ? [...tree.children].filter(([, child]) => child.count >= CONFIG.minRestaurants) : [];
