@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } 
 import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { Lady, type Mood } from "./src/components/Lady";
+import { CategoryBar } from "./src/components/CategoryBar";
 import { RestaurantCard } from "./src/components/RestaurantCard";
 import { RestaurantMap } from "./src/components/RestaurantMap";
 import { ShuffleToggle } from "./src/components/ShuffleToggle";
@@ -25,6 +26,7 @@ import {
 } from "./src/lib/places";
 import { colors, fonts } from "./src/theme";
 import { lang, t } from "./src/i18n";
+import { MAX_SHOWN, neighborhoodCategories, type Category } from "./src/lib/osm";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -56,6 +58,9 @@ export default function App() {
   // Mode surprise : tirage au sort au lieu du top par note ; la graine change à chaque « Autre tirage ».
   const [surprise, setSurprise] = useState(false);
   const [seed, setSeed] = useState(() => Date.now());
+  // Cuisines de la zone visible (fichiers pré-calculés sur groubl.com) et cuisine choisie.
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [category, setCategory] = useState<Category | null>(null);
   const [phase, setPhase] = useState<Phase>(hasApiKey ? "locating" : "error");
   const [error, setError] = useState<string | null>(
     hasApiKey ? null : t("missingKey"),
@@ -68,6 +73,20 @@ export default function App() {
   const requestId = useRef(0);
   // Zone déjà fouillée (ou en cours) : lue depuis le handler de la carte, d'où la ref.
   const coveredArea = useRef<Area | null>(null);
+  const categoryRef = useRef(category);
+  useEffect(() => {
+    categoryRef.current = category;
+  }, [category]);
+
+  // Catégories de la zone visible, recalculées à chaque déplacement de la carte. Seule la dernière demande compte.
+  const categoriesRequest = useRef(0);
+  const refreshCategories = useCallback((view: Area) => {
+    const id = ++categoriesRequest.current;
+    neighborhoodCategories(view.center, view.radius)
+      .then((cats) => id === categoriesRequest.current && setCategories(cats))
+      // Les catégories sont un plus : si le fichier ne se charge pas, on garde les précédentes.
+      .catch((err) => console.warn("Catégories indisponibles", err));
+  }, []);
 
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
   const listY = useRef(0);
@@ -81,6 +100,7 @@ export default function App() {
       const { list, area } = await search();
       if (id !== requestId.current) return;
       coveredArea.current = area;
+      if (!categoryRef.current) refreshCategories(area);
       setPlaces(list);
       setArea(area);
       setSelectedId(null);
@@ -93,7 +113,7 @@ export default function App() {
       setPhase("error");
       setError((err as Error).message || t("oops"));
     }
-  }, []);
+  }, [refreshCategories]);
 
   // Dès l'ouverture : on récupère la position.
   useEffect(() => {
@@ -112,12 +132,12 @@ export default function App() {
     };
   }, []);
 
-  // Position connue : on élargit depuis 200 m jusqu'à trouver 5 restos, puis on cadre la carte dessus.
+  // Position (ou cuisine) connue : on élargit depuis 200 m jusqu'à trouver 5 restos, puis on cadre la carte dessus.
   useEffect(() => {
     if (!home) return;
     coveredArea.current = null;
-    run(() => searchUntilTop(home), true);
-  }, [home, run]);
+    run(() => searchUntilTop(home, category), true);
+  }, [home, category, run]);
 
   // On recherche sur la vue quand l'utilisateur dézoome / se déplace au-delà de la zone fouillée,
   // ou quand il zoome assez pour que la vue soit nettement plus petite que cette zone.
@@ -125,13 +145,15 @@ export default function App() {
     (view: Area) => {
       const covered = coveredArea.current;
       if (!covered) return;
+      refreshCategories(view);
       const inside = distanceMeters(view.center, covered.center) + view.radius <= covered.radius * 1.05;
       const zoomedIn = view.radius < covered.radius * ZOOM_IN_RATIO;
       if (inside && !zoomedIn) return;
       coveredArea.current = view;
-      run(async () => ({ list: await searchRestaurants(view), area: view }), false);
+      const c = categoryRef.current;
+      run(async () => ({ list: await searchRestaurants(view, c), area: view }), false);
     },
-    [run],
+    [run, refreshCategories],
   );
 
   const onSelectFromMap = useCallback((id: string) => {
@@ -142,6 +164,11 @@ export default function App() {
   }, []);
 
   const top = useMemo(() => (surprise ? pickRandom(places, seed) : rankTop(places)), [places, surprise, seed]);
+
+  // 4 cuisines au plus ; la cuisine choisie reste affichée même si elle sort du top en bougeant la carte.
+  const top4 = categories.slice(0, MAX_SHOWN);
+  const shownCategories =
+    category && !top4.some((c) => c.key === category.key) ? [...top4.slice(0, MAX_SHOWN - 1), category] : top4;
 
   const busy = phase === "locating" || phase === "searching";
   const mood: Mood = busy ? "starving" : phase === "done" && top.length ? "happy" : "hungry";
@@ -190,6 +217,10 @@ export default function App() {
               {surprise ? t("taglineSurprise") : t("tagline")}
             </Text>
           </View>
+
+          {shownCategories.length > 0 && (
+            <CategoryBar categories={shownCategories} selected={category} onSelect={setCategory} />
+          )}
 
           {home && (
             <RestaurantMap

@@ -16,6 +16,8 @@ export const lang: Lang =
 export const locale = { fr: "fr-FR", en: "en-US", es: "es-ES" }[lang];
 
 const fr = {
+  cuisineType: "Type de cuisine",
+  localSpecialty: "Spécialité du coin",
   appName: "J'ai faim",
   tagline: "Les 5 meilleures tables, juste à côté.",
   taglineSurprise: "5 tables au hasard, juste à côté.",
@@ -48,6 +50,8 @@ const fr = {
 type Dict = typeof fr;
 
 const en: Dict = {
+  cuisineType: "Type of cuisine",
+  localSpecialty: "Local specialty",
   appName: "I'm hungry",
   tagline: "The 5 best tables, right around the corner.",
   taglineSurprise: "5 random tables, right around the corner.",
@@ -78,6 +82,8 @@ const en: Dict = {
 };
 
 const es: Dict = {
+  cuisineType: "Tipo de cocina",
+  localSpecialty: "Especialidad local",
   appName: "Tengo hambre",
   tagline: "Las 5 mejores mesas, a la vuelta de la esquina.",
   taglineSurprise: "5 mesas al azar, a la vuelta de la esquina.",

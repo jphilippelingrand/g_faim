@@ -1,6 +1,7 @@
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 import { lang, locale, t } from "../i18n";
+import type { Category } from "./osm";
 
 export type LatLng = { latitude: number; longitude: number };
 
@@ -109,25 +110,33 @@ function circleRectangle({ center, radius }: Area) {
  * - searchText filtré par Google sur « ouvert maintenant » : 20 restos ouverts, même à 1 h du matin.
  * Aucune ne trie par note : le classement se fait dans rankTop.
  */
-export async function searchRestaurants(area: Area): Promise<Restaurant[]> {
+export async function searchRestaurants(area: Area, category?: Category | null): Promise<Restaurant[]> {
   const radius = Math.min(area.radius, MAX_RADIUS);
+  const rectangle = circleRectangle({ center: area.center, radius });
 
-  const responses = await Promise.allSettled([
-    placesApi("searchNearby", {
-      includedPrimaryTypes: ["restaurant"],
-      maxResultCount: 20,
-      rankPreference: "POPULARITY",
-      locationRestriction: { circle: { center: area.center, radius } },
-    }),
-    placesApi("searchText", {
-      textQuery: "restaurant",
-      includedType: "restaurant",
-      strictTypeFiltering: true,
-      openNow: true,
-      pageSize: 20,
-      locationRestriction: { rectangle: circleRectangle({ center: area.center, radius }) },
-    }),
-  ]);
+  const responses = await Promise.allSettled(
+    category
+      ? // Une cuisine (venue d'OSM) : recherche Google par mot-clé, comme on le taperait dans Maps.
+        [true, false].map((openNow) =>
+          placesApi("searchText", { textQuery: category.query, openNow, pageSize: 20, locationRestriction: { rectangle } }),
+        )
+      : [
+          placesApi("searchNearby", {
+            includedPrimaryTypes: ["restaurant"],
+            maxResultCount: 20,
+            rankPreference: "POPULARITY",
+            locationRestriction: { circle: { center: area.center, radius } },
+          }),
+          placesApi("searchText", {
+            textQuery: "restaurant",
+            includedType: "restaurant",
+            strictTypeFiltering: true,
+            openNow: true,
+            pageSize: 20,
+            locationRestriction: { rectangle },
+          }),
+        ],
+  );
   const ok = responses.filter((r) => r.status === "fulfilled").map((r) => r.value);
   if (!ok.length) throw (responses[0] as PromiseRejectedResult).reason;
   const places = [...new Map(ok.flat().map((p) => [p.id, p])).values()];
@@ -151,10 +160,13 @@ export async function searchRestaurants(area: Area): Promise<Restaurant[]> {
 }
 
 /** Double le rayon à partir de 200 m jusqu'à avoir TOP_N restos classables (ou atteindre MAX_START_RADIUS). */
-export async function searchUntilTop(center: LatLng): Promise<{ list: Restaurant[]; area: Area }> {
+export async function searchUntilTop(
+  center: LatLng,
+  category?: Category | null,
+): Promise<{ list: Restaurant[]; area: Area }> {
   for (let radius = START_RADIUS; ; radius *= 2) {
     const area = { center, radius };
-    const list = await searchRestaurants(area);
+    const list = await searchRestaurants(area, category);
     if (rankTop(list).length >= TOP_N || radius >= MAX_START_RADIUS) return { list, area };
   }
 }
