@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { Lady, type Mood } from "./components/Lady";
 import { RestaurantCard } from "./components/RestaurantCard";
 import { RestaurantMap } from "./components/RestaurantMap";
+import { ShuffleToggle } from "./components/ShuffleToggle";
 import { hasApiKey } from "./lib/google";
 import { neighborhoodCategories, type Category } from "./lib/osm";
 import {
@@ -9,6 +10,7 @@ import {
   formatDistance,
   geocode,
   getBrowserPosition,
+  pickRandom,
   rankTop,
   searchRestaurants,
   searchUntilTop,
@@ -31,6 +33,9 @@ export default function App() {
   const [area, setArea] = useState<Area | null>(null);
   const [fitKey, setFitKey] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Mode surprise : tirage au sort au lieu du top par note ; la graine change à chaque « Autre tirage ».
+  const [surprise, setSurprise] = useState(false);
+  const [seed, setSeed] = useState(() => Date.now());
   const [phase, setPhase] = useState<Phase>(hasApiKey ? "locating" : "error");
   const [error, setError] = useState<string | null>(
     hasApiKey ? null : "Ajoute ta clé dans .env (VITE_GOOGLE_MAPS_API_KEY), puis relance npm run dev.",
@@ -124,7 +129,7 @@ export default function App() {
     document.getElementById(`resto-${id}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, []);
 
-  const top = useMemo(() => rankTop(places), [places]);
+  const top = useMemo(() => (surprise ? pickRandom(places, seed) : rankTop(places)), [places, surprise, seed]);
 
   const busy = phase === "locating" || phase === "searching";
   const mood: Mood = busy ? "starving" : phase === "done" && top.length ? "happy" : "hungry";
@@ -134,6 +139,7 @@ export default function App() {
   else if (phase === "searching") status = "Je renifle les cuisines du coin…";
   else if (phase === "error") status = error ?? "";
   else if (!top.length) status = "Rien d'ouvert et bien noté par ici… dézoome la carte ?";
+  else if (surprise) status = `${top.length} restos${category ? ` ${category.label.toLowerCase()}` : ""} au hasard dans un rayon de ${formatDistance(area?.radius ?? 0)}`;
   else status = `Top ${top.length}${category ? ` ${category.label.toLowerCase()}` : ""} dans un rayon de ${formatDistance(area?.radius ?? 0)} · dézoome pour voir plus loin`;
 
   async function submitAddress(e: FormEvent) {
@@ -153,9 +159,16 @@ export default function App() {
     <>
       <main>
         <header>
+          <ShuffleToggle
+            on={surprise}
+            onChange={(on) => {
+              setSurprise(on);
+              setSeed(Date.now());
+            }}
+          />
           <Lady mood={mood} />
           <h1>J'ai faim</h1>
-          <p className="tagline">Les 5 meilleures tables, juste à côté.</p>
+          <p className="tagline">{surprise ? "5 tables au hasard, juste à côté." : "Les 5 meilleures tables, juste à côté."}</p>
         </header>
 
         {categories.length > 0 && (
@@ -193,6 +206,14 @@ export default function App() {
 
         <p className={`status${phase === "error" ? " error" : ""}`} role="status">
           {status}
+          {surprise && phase === "done" && top.length > 0 && (
+            <>
+              {" · "}
+              <button type="button" className="reroll" onClick={() => setSeed(Date.now())}>
+                Autre tirage
+              </button>
+            </>
+          )}
         </p>
 
         {askAddress && (

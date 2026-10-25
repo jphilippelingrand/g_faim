@@ -193,3 +193,30 @@ export function formatDistance(m: number): string {
     : `${Math.round(m)} m`;
 }
 
+
+/** Générateur pseudo-aléatoire à graine (mulberry32) : même graine → même tirage. */
+function seededRandom(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Mode surprise : TOP_N restos ouverts tirés au sort, bien notés ou pas, même avec peu d'avis.
+ * La graine fige le tirage tant qu'on ne demande pas « Autre tirage ».
+ */
+export function pickRandom(list: Restaurant[], seed: number): Restaurant[] {
+  const random = seededRandom(seed);
+  const pool = list.filter((r) => r.open !== false);
+  // Mélange de Fisher-Yates.
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, TOP_N);
+}

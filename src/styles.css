@@ -32,7 +32,81 @@ main {
   flex: 1;
 }
 
-header { text-align: center; }
+header { text-align: center; position: relative; }
+
+/* ============ Mode surprise ============ */
+
+.shuffle { position: absolute; top: 0; right: 0; z-index: 2; }
+.shuffle-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--muted);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+  transition: color .15s, border-color .15s;
+}
+.shuffle-button.on { color: var(--accent); border-color: var(--accent); }
+/* Le petit point sous l'icône, comme dans Spotify */
+.shuffle-button.on::after {
+  content: "";
+  position: absolute;
+  bottom: 5px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+@media (hover: hover) {
+  .shuffle-button:hover { border-color: var(--accent); color: var(--ink); }
+  .shuffle-button.on:hover { color: var(--accent); }
+}
+.shuffle-tip {
+  position: absolute;
+  top: 52px;
+  right: 0;
+  width: 220px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: .85rem;
+  line-height: 1.4;
+  text-align: left;
+  box-shadow: 0 8px 24px rgb(43 33 28 / .2);
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity .15s, transform .15s;
+}
+.shuffle-tip::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  right: 16px;
+  border: 6px solid transparent;
+  border-top: 0;
+  border-bottom-color: var(--ink);
+}
+.shuffle-tip.visible { opacity: 1; transform: none; }
+
+.reroll {
+  font: inherit;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
 
 h1 {
   font-family: "Fraunces", Georgia, serif;

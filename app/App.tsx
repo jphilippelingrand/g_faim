@@ -10,10 +10,12 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { Lady, type Mood } from "./src/components/Lady";
 import { RestaurantCard } from "./src/components/RestaurantCard";
 import { RestaurantMap } from "./src/components/RestaurantMap";
+import { ShuffleToggle } from "./src/components/ShuffleToggle";
 import {
   distanceMeters,
   formatDistance,
   hasApiKey,
+  pickRandom,
   rankTop,
   searchRestaurants,
   searchUntilTop,
@@ -50,6 +52,9 @@ export default function App() {
   const [area, setArea] = useState<Area | null>(null);
   const [fitKey, setFitKey] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Mode surprise : tirage au sort au lieu du top par note ; la graine change à chaque « Autre tirage ».
+  const [surprise, setSurprise] = useState(false);
+  const [seed, setSeed] = useState(() => Date.now());
   const [phase, setPhase] = useState<Phase>(hasApiKey ? "locating" : "error");
   const [error, setError] = useState<string | null>(
     hasApiKey ? null : "Clé Google manquante (EXPO_PUBLIC_GOOGLE_MAPS_API_KEY).",
@@ -135,7 +140,7 @@ export default function App() {
     if (y != null) scroll.current?.scrollTo({ y: listY.current + y - 120, animated: true });
   }, []);
 
-  const top = useMemo(() => rankTop(places), [places]);
+  const top = useMemo(() => (surprise ? pickRandom(places, seed) : rankTop(places)), [places, surprise, seed]);
 
   const busy = phase === "locating" || phase === "searching";
   const mood: Mood = busy ? "starving" : phase === "done" && top.length ? "happy" : "hungry";
@@ -145,6 +150,7 @@ export default function App() {
   else if (phase === "searching") status = "Je renifle les cuisines du coin…";
   else if (phase === "error") status = error ?? "";
   else if (!top.length) status = "Rien d'ouvert et bien noté par ici… dézoome la carte ?";
+  else if (surprise) status = `${top.length} restos au hasard dans un rayon de ${formatDistance(area?.radius ?? 0)}`;
   else status = `Top ${top.length} dans un rayon de ${formatDistance(area?.radius ?? 0)} · dézoome pour voir plus loin`;
 
   async function submitAddress() {
@@ -170,9 +176,18 @@ export default function App() {
       <SafeAreaView style={styles.safe} edges={["top"]}>
         <ScrollView ref={scroll} contentContainerStyle={styles.content}>
           <View style={styles.header}>
+            <ShuffleToggle
+              on={surprise}
+              onChange={(on) => {
+                setSurprise(on);
+                setSeed(Date.now());
+              }}
+            />
             <Lady mood={mood} />
             <Text style={styles.title}>J'ai faim</Text>
-            <Text style={styles.tagline}>Les 5 meilleures tables, juste à côté.</Text>
+            <Text style={styles.tagline}>
+              {surprise ? "5 tables au hasard, juste à côté." : "Les 5 meilleures tables, juste à côté."}
+            </Text>
           </View>
 
           {home && (
@@ -187,7 +202,17 @@ export default function App() {
             />
           )}
 
-          <Text style={[styles.status, phase === "error" && styles.statusError]}>{status}</Text>
+          <Text style={[styles.status, phase === "error" && styles.statusError]}>
+            {status}
+            {surprise && phase === "done" && top.length > 0 && (
+              <>
+                {" · "}
+                <Text style={styles.reroll} onPress={() => setSeed(Date.now())} accessibilityRole="button">
+                  Autre tirage
+                </Text>
+              </>
+            )}
+          </Text>
 
           {askAddress && (
             <View style={styles.address}>
@@ -239,11 +264,12 @@ export default function App() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   content: { paddingHorizontal: 16, paddingBottom: 32 },
-  header: { alignItems: "center" },
+  header: { alignItems: "center", position: "relative" },
   title: { fontFamily: fonts.title, fontSize: 40, color: colors.ink, letterSpacing: -0.8, marginTop: 4 },
   tagline: { fontFamily: fonts.body, fontSize: 15, color: colors.muted, marginTop: 4, marginBottom: 20 },
   status: { fontFamily: fonts.body, fontSize: 14, color: colors.muted, textAlign: "center", marginTop: 16, marginBottom: 14 },
   statusError: { color: colors.accent },
+  reroll: { color: colors.accent, textDecorationLine: "underline" },
   address: { flexDirection: "row", gap: 8, marginBottom: 16 },
   input: {
     flex: 1,
