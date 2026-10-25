@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { Lady, type Mood } from "./components/Lady";
 import { RestaurantCard } from "./components/RestaurantCard";
 import { RestaurantMap } from "./components/RestaurantMap";
+import { MiniBar } from "./components/MiniBar";
 import { ShuffleToggle } from "./components/ShuffleToggle";
 import { hasApiKey } from "./lib/google";
 import { neighborhoodCategories, type Category } from "./lib/osm";
@@ -36,6 +37,8 @@ export default function App() {
   // Mode surprise : tirage au sort au lieu du top par note ; la graine change à chaque « Autre tirage ».
   const [surprise, setSurprise] = useState(false);
   const [seed, setSeed] = useState(() => Date.now());
+  // Quand la grande dame sort de l'écran, une barre compacte prend le relais en haut.
+  const heroRef = useRef<HTMLElement>(null);
   const [phase, setPhase] = useState<Phase>(hasApiKey ? "locating" : "error");
   const [error, setError] = useState<string | null>(
     hasApiKey ? null : "Ajoute ta clé dans .env (VITE_GOOGLE_MAPS_API_KEY), puis relance npm run dev.",
@@ -134,13 +137,11 @@ export default function App() {
   const busy = phase === "locating" || phase === "searching";
   const mood: Mood = busy ? "starving" : phase === "done" && top.length ? "happy" : "hungry";
 
+  // Ligne de texte seulement quand il y a quelque chose à dire ; sinon, le rayon est une étiquette sur la carte.
   let status = "";
   if (phase === "locating") status = "Je te localise…";
-  else if (phase === "searching") status = "Je renifle les cuisines du coin…";
   else if (phase === "error") status = error ?? "";
-  else if (!top.length) status = "Rien d'ouvert et bien noté par ici… dézoome la carte ?";
-  else if (surprise) status = `${top.length} restos${category ? ` ${category.label.toLowerCase()}` : ""} au hasard dans un rayon de ${formatDistance(area?.radius ?? 0)}`;
-  else status = `Top ${top.length}${category ? ` ${category.label.toLowerCase()}` : ""} dans un rayon de ${formatDistance(area?.radius ?? 0)} · dézoome pour voir plus loin`;
+  else if (phase === "done" && !top.length) status = "Rien d'ouvert par ici… dézoome la carte ?";
 
   async function submitAddress(e: FormEvent) {
     e.preventDefault();
@@ -155,17 +156,17 @@ export default function App() {
     }
   }
 
+  const toggleSurprise = (on: boolean) => {
+    setSurprise(on);
+    setSeed(Date.now());
+  };
+
   return (
     <>
+      <MiniBar watch={heroRef} surprise={surprise} onSurprise={toggleSurprise} />
       <main>
-        <header>
-          <ShuffleToggle
-            on={surprise}
-            onChange={(on) => {
-              setSurprise(on);
-              setSeed(Date.now());
-            }}
-          />
+        <header ref={heroRef}>
+          <ShuffleToggle on={surprise} onChange={toggleSurprise} />
           <Lady mood={mood} />
           <h1>J'ai faim</h1>
           <p className="tagline">{surprise ? "5 tables au hasard, juste à côté." : "Les 5 meilleures tables, juste à côté."}</p>
@@ -201,20 +202,25 @@ export default function App() {
             selectedId={selectedId}
             onSelect={onSelectFromMap}
             onViewportChange={onViewportChange}
-          />
+          >
+            {busy ? (
+              <span className="pill">Je renifle…</span>
+            ) : (
+              area && <span className="pill">{formatDistance(area.radius)}</span>
+            )}
+            {surprise && phase === "done" && top.length > 0 && (
+              <button type="button" className="pill pill-button" onClick={() => setSeed(Date.now())}>
+                ↻ Autre tirage
+              </button>
+            )}
+          </RestaurantMap>
         )}
 
-        <p className={`status${phase === "error" ? " error" : ""}`} role="status">
-          {status}
-          {surprise && phase === "done" && top.length > 0 && (
-            <>
-              {" · "}
-              <button type="button" className="reroll" onClick={() => setSeed(Date.now())}>
-                Autre tirage
-              </button>
-            </>
-          )}
-        </p>
+        {status && (
+          <p className={`status${phase === "error" ? " error" : ""}`} role="status">
+            {status}
+          </p>
+        )}
 
         {askAddress && (
           <form className="address" onSubmit={submitAddress}>

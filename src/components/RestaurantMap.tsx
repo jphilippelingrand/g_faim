@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { MAP_ID, importLibrary } from "../lib/google";
 import { MAX_RADIUS, distanceMeters, type Area, type LatLng, type Restaurant } from "../lib/places";
 
@@ -13,6 +13,8 @@ type Props = {
   selectedId: string | null;
   onSelect: (id: string) => void;
   onViewportChange: (view: Area) => void;
+  /** Étiquettes posées en haut à gauche de la carte (le bas gauche est réservé au logo Google). */
+  children?: ReactNode;
 };
 
 /** Plus grand cercle centré sur la carte qui tient dans la vue. */
@@ -29,7 +31,7 @@ function viewportCircle(map: google.maps.Map): Area | null {
   return { center, radius: Math.min(Math.round(radius), MAX_RADIUS) };
 }
 
-export function RestaurantMap({ home, results, area, fitKey, selectedId, onSelect, onViewportChange }: Props) {
+export function RestaurantMap({ home, results, area, fitKey, selectedId, onSelect, onViewportChange, children }: Props) {
   const divRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const pins = useRef(new Map<string, HTMLElement>());
@@ -145,5 +147,10 @@ export function RestaurantMap({ home, results, area, fitKey, selectedId, onSelec
     map.fitBounds(bounds, 48);
   }, [map, fitKey]);
 
-  return <div ref={divRef} className="map" />;
+  return (
+    <div className="map-wrap">
+      <div ref={divRef} className="map" />
+      {children && <div className="map-overlay">{children}</div>}
+    </div>
+  );
 }

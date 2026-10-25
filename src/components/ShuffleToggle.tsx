@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 const TIP = "Mode surprise : 5 restos ouverts tirés au sort, bien notés ou pas. Pour sortir des sentiers battus.";
 const LONG_PRESS_MS = 450;
@@ -9,6 +9,8 @@ const LONG_PRESS_MS = 450;
  */
 export function ShuffleToggle({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
   const [tip, setTip] = useState(false);
+  // Le bouton existe deux fois (en-tête et barre compacte) : identifiant de bulle unique.
+  const tipId = useId();
   const pressTimer = useRef<number | undefined>(undefined);
   const longPressed = useRef(false);
 
@@ -21,7 +23,7 @@ export function ShuffleToggle({ on, onChange }: { on: boolean; onChange: (on: bo
         className={`shuffle-button${on ? " on" : ""}`}
         aria-pressed={on}
         aria-label="Mode surprise"
-        aria-describedby="shuffle-tip"
+        aria-describedby={tipId}
         onPointerEnter={(e) => e.pointerType === "mouse" && setTip(true)}
         onPointerLeave={(e) => e.pointerType === "mouse" && setTip(false)}
         onPointerDown={(e) => {
@@ -54,7 +56,7 @@ export function ShuffleToggle({ on, onChange }: { on: boolean; onChange: (on: bo
           />
         </svg>
       </button>
-      <div id="shuffle-tip" role="tooltip" className={`shuffle-tip${tip ? " visible" : ""}`}>
+      <div id={tipId} role="tooltip" className={`shuffle-tip${tip ? " visible" : ""}`}>
         {TIP}
       </div>
     </div>

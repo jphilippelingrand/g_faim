@@ -41,7 +41,7 @@ export function RestaurantCard({ r, index, home, distance, selected, onSelect }:
           ) : (
             <div className="thumb">🍽️</div>
           )}
-          <div>
+          <div className="card-body">
             <h2>{r.name}</h2>
             <div className="meta">
               <span className="rating">
@@ -49,7 +49,7 @@ export function RestaurantCard({ r, index, home, distance, selected, onSelect }:
               </span>{" "}
               · {r.reviews} avis
             </div>
-            <div className="meta">{details}</div>
+            <div className="meta meta-line">{details}</div>
           </div>
         </a>
         <a
