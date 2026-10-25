@@ -171,6 +171,15 @@ function Main() {
     [run, refreshCategories],
   );
 
+  // Toucher la dame : reprend la position GPS (on a pu bouger) et relance la recherche depuis le plus petit
+  // rayon, carte recentrée sur soi, comme à l'ouverture. Sans position (refusée), on repart de la dernière connue.
+  const recenter = useCallback(() => {
+    if (!home) return;
+    getPosition()
+      .then((pos) => setHome(pos))
+      .catch(() => setHome((h) => (h ? { ...h } : h)));
+  }, [home]);
+
   const onSelectFromMap = useCallback((id: string) => {
     setSelectedId(id);
     Haptics.selectionAsync();
@@ -238,7 +247,7 @@ function Main() {
 
       <View style={[styles.topBar, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
         <View style={styles.ladyBadge}>
-          <Lady mood={mood} surprise={surprise} width={58} />
+          <Lady mood={mood} surprise={surprise} width={58} onPress={recenter} accessibilityLabel={t("recenter")} />
         </View>
       </View>
 

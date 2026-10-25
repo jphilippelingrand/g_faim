@@ -13,7 +13,7 @@ import Animated, {
 import { t } from "../i18n";
 import { colors, fonts } from "../theme";
 
-const SIZE = 64;
+const SIZE = 84;
 const GAP = 16;
 
 type Props = {
@@ -57,8 +57,8 @@ export function DiceButton({ on, onRoll, onClose, sheetTop, screenHeight }: Prop
         accessibilityLabel={on ? t("reroll") : t("surpriseMode")}
         accessibilityHint={t("surpriseTip")}
       >
-        <Animated.View style={[styles.dice, on && styles.diceOn, roll]}>
-          <Text style={styles.emoji}>🎲</Text>
+        <Animated.View style={[styles.dice, roll]}>
+          <Text style={[styles.emoji, on && styles.emojiOn]}>🎲</Text>
         </Animated.View>
       </Pressable>
       {on && (
@@ -83,24 +83,19 @@ export function DiceButton({ on, onRoll, onClose, sheetTop, screenHeight }: Prop
 
 const styles = StyleSheet.create({
   wrap: { position: "absolute", right: GAP, width: SIZE, height: SIZE },
-  dice: {
-    width: SIZE,
-    height: SIZE,
-    borderRadius: 20,
-    backgroundColor: colors.card,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: colors.ink,
-    shadowOpacity: 0.22,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
+  // Juste le dé, sans fond : une ombre le garde lisible sur la carte, une lueur orange quand il est actif.
+  dice: { width: SIZE, height: SIZE, alignItems: "center", justifyContent: "center" },
+  emoji: {
+    fontSize: 64,
+    textShadowColor: "rgba(43, 33, 28, 0.35)",
+    textShadowRadius: 8,
+    textShadowOffset: { width: 0, height: 3 },
   },
-  diceOn: { backgroundColor: colors.accent },
-  emoji: { fontSize: 36 },
+  emojiOn: { textShadowColor: colors.accent, textShadowRadius: 18, textShadowOffset: { width: 0, height: 0 } },
   close: {
     position: "absolute",
-    top: -8,
-    left: -8,
+    top: 0,
+    left: 0,
     width: 26,
     height: 26,
     borderRadius: 13,

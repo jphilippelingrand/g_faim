@@ -16,6 +16,7 @@ export const lang: Lang =
 export const locale = { fr: "fr-FR", en: "en-US", es: "es-ES" }[lang];
 
 const fr = {
+  recenter: "Recentrer sur moi",
   closeSurprise: "Revenir au classement par note",
   support: "Support",
   menu: "Menu",
@@ -53,6 +54,7 @@ const fr = {
 type Dict = typeof fr;
 
 const en: Dict = {
+  recenter: "Center on me",
   closeSurprise: "Back to the top rated",
   support: "Support",
   menu: "Menu",
@@ -88,6 +90,7 @@ const en: Dict = {
 };
 
 const es: Dict = {
+  recenter: "Centrar en mí",
   closeSurprise: "Volver a los mejor valorados",
   support: "Soporte",
   menu: "Menú",
