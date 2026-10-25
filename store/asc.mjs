@@ -3,7 +3,7 @@
  * version, build, textes (FR/EN/ES), captures d'écran.
  *
  *   ASC_KEY_PATH=~/.appstoreconnect/AuthKey_XXXX.p8 ASC_KEY_ID=XXXX ASC_ISSUER_ID=… \
- *     node asc.mjs [--apply] [--build 12]
+ *     node asc.mjs [--apply] [--build 12] [--skip-screenshots]
  *
  * Sans --apply : n'écrit rien, affiche ce qui serait fait. Textes lus dans ../app/store.config.json,
  * images dans out/<langue>/<taille>/0N.png (voir generate.mjs). Rien n'est soumis à la vérification d'Apple.
@@ -13,6 +13,8 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 
 const APPLY = process.argv.includes("--apply");
+// Pour n'envoyer que la version, le build et les textes (ex. tant que les captures sont provisoires).
+const SKIP_SCREENSHOTS = process.argv.includes("--skip-screenshots");
 const BUILD = process.argv.includes("--build") ? process.argv[process.argv.indexOf("--build") + 1] : null;
 const BUNDLE_ID = "com.jphilippelingrand.gfaim";
 // Numéro de version par défaut de l'app (app.config.ts : APP_VERSION || "x.y.z").
@@ -172,8 +174,8 @@ async function uploadScreenshot(setId, file) {
   });
 }
 
-console.log("\nCaptures");
-for (const [locale, dir] of Object.entries(LOCALE_DIRS)) {
+console.log(`\nCaptures${SKIP_SCREENSHOTS ? " : ignorées (--skip-screenshots)" : ""}`);
+for (const [locale, dir] of SKIP_SCREENSHOTS ? [] : Object.entries(LOCALE_DIRS)) {
   for (const [folder, displayType] of Object.entries(DISPLAY_TYPES)) {
     const path = new URL(`./out/${dir}/${folder}/`, import.meta.url).pathname;
     if (!existsSync(path)) continue;

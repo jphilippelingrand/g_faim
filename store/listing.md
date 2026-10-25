@@ -28,7 +28,7 @@ Ton ventre gargouille ? Groubl trouve en un instant les 5 restaurants les mieux 
 • Dès l'ouverture, ta position et la carte, sans rien taper
 • Uniquement des restos ouverts maintenant, classés par note Google
 • Les spécialités du coin : poutine au Québec, crêpes en Bretagne, basque à Bayonne…
-• Le mode surprise 🔀 : 5 restos tirés au sort, bien notés ou pas, pour sortir des sentiers battus
+• Le mode surprise : 5 restos tirés au sort, bien notés ou pas, pour sortir des sentiers battus
 • Dézoome la carte pour chercher plus loin
 • Un bouton pour lancer l'itinéraire
 
@@ -55,7 +55,7 @@ Tummy rumbling? Groubl instantly finds the 5 best-rated restaurants that are ope
 • Opens straight to your location and the map, nothing to type
 • Only places open right now, ranked by Google rating
 • Local specialties: poutine in Québec, crêpes in Brittany, Basque food in Bayonne…
-• Surprise mode 🔀: 5 restaurants picked at random, highly rated or not, to get off the beaten track
+• Surprise mode: 5 restaurants picked at random, highly rated or not, to get off the beaten track
 • Zoom out the map to search further
 • One tap for directions
 
@@ -84,7 +84,7 @@ No account, no ads, no tracking.
 • Se abre directamente en tu ubicación y el mapa, sin escribir nada
 • Solo sitios abiertos ahora, ordenados por la nota de Google
 • Especialidades locales: poutine en Quebec, crepes en Bretaña, cocina vasca en Bayona…
-• El modo sorpresa 🔀: 5 restaurantes al azar, bien valorados o no, para salirse de lo de siempre
+• El modo sorpresa: 5 restaurantes al azar, bien valorados o no, para salirse de lo de siempre
 • Aleja el mapa para buscar más lejos
 • Un toque para ver cómo llegar
 
