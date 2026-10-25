@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build && node tools/localize-html.mjs",
+    "build": "tsc --noEmit && vite build && node tools/localize-html.mjs && node tools/legal-pages.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

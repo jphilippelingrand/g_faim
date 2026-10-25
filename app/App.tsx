@@ -24,13 +24,13 @@ import {
   type Restaurant,
 } from "./src/lib/places";
 import { colors, fonts } from "./src/theme";
-import { t } from "./src/i18n";
+import { lang, t } from "./src/i18n";
 
 SplashScreen.preventAutoHideAsync();
 
 type Phase = "locating" | "searching" | "done" | "error";
 
-const PRIVACY_URL = "https://www.groubl.com/privacy";
+const PRIVACY_URL = `https://www.groubl.com/${lang}/privacy`;
 
 // En dessous de cette fraction de la zone fouillée, un zoom avant relance la recherche.
 const ZOOM_IN_RATIO = 0.6;

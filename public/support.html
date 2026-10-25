@@ -1,6 +1,18 @@
 <!doctype html>
 <html lang="fr">
 <head>
+  <script>
+    (function () {
+      var langs = ["fr", "en", "es"], lang;
+      try { lang = localStorage.getItem("jai-faim:lang"); } catch (e) {}
+      if (langs.indexOf(lang) < 0) {
+        lang = (navigator.languages || [navigator.language || ""])
+          .map(function (l) { return l.slice(0, 2).toLowerCase(); })
+          .filter(function (l) { return langs.indexOf(l) >= 0; })[0] || "fr";
+      }
+      location.replace("/" + lang + "/support");
+    })();
+  </script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Support · J'ai faim</title>

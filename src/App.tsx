@@ -273,7 +273,7 @@ export default function App() {
         <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">
           OpenStreetMap
         </a>{" "}
-        · {t("footerPoke")} · <a href="/privacy">{t("privacy")}</a>
+        · {t("footerPoke")} · <a href={`/${lang}/privacy`}>{t("privacy")}</a>
         <nav className="langs" aria-label={t("language")}>
           {LANGS.map((l) => (
             <button key={l} type="button" aria-current={l === lang} onClick={() => l !== lang && setLang(l)}>
