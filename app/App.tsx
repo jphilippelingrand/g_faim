@@ -132,6 +132,37 @@ function Main() {
     }
   }, [refreshCategories]);
 
+  // Liens profonds gfaim://?cuisine=poutine&surprise=1&sheet=2 : ouvrent l'app dans un état donné
+  // (cuisine choisie dès qu'elle est proposée, mode surprise, hauteur du panneau 0/1/2). Servent aussi
+  // à automatiser les captures App Store sur le simulateur, qui ne sait pas toucher l'écran.
+  const pendingCuisine = useRef<string | null>(null);
+  useEffect(() => {
+    const apply = (url: string | null | undefined) => {
+      if (!url) return;
+      const params = Object.fromEntries(
+        (url.split("?")[1] ?? "").split("&").filter(Boolean).map((kv) => kv.split("=").map(decodeURIComponent)),
+      );
+      if (params.surprise !== undefined) {
+        setSurprise(params.surprise === "1");
+        setSeed(Date.now());
+      }
+      if (params.cuisine !== undefined) pendingCuisine.current = params.cuisine || null;
+      if (params.cuisine === "") setCategory(null);
+      if (params.sheet !== undefined) sheet.current?.snapToIndex(Number(params.sheet));
+    };
+    Linking.getInitialURL().then(apply);
+    const sub = Linking.addEventListener("url", ({ url }) => apply(url));
+    return () => sub.remove();
+  }, []);
+  useEffect(() => {
+    const key = pendingCuisine.current;
+    const match = key && categories.find((c) => c.key === key);
+    if (match) {
+      pendingCuisine.current = null;
+      setCategory(match);
+    }
+  }, [categories]);
+
   // Dès l'ouverture : on récupère la position.
   useEffect(() => {
     if (!hasApiKey) return;
