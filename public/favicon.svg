@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="82 6 76 76">
+  <!-- Icône d'onglet : gros plan sur la tête de la dame, fond transparent, lisible à 16 px -->
+  <circle cx="120" cy="20" r="14" fill="#6b4a3a"/>
+  <circle cx="120" cy="50" r="30" fill="#f3c9a8"/>
+  <path d="M90 46 Q94 18 120 18 Q146 18 150 46 Q137 31 120 33 Q103 31 90 46 Z" fill="#6b4a3a"/>
+  <circle cx="99" cy="62" r="6" fill="#f29b8a"/>
+  <circle cx="141" cy="62" r="6" fill="#f29b8a"/>
+  <g fill="none" stroke="#2b211c" stroke-width="3.5" stroke-linecap="round">
+    <path d="M99 41 l11 -4"/>
+    <path d="M141 41 l-11 -4"/>
+  </g>
+  <circle cx="107" cy="51" r="4" fill="#2b211c"/>
+  <circle cx="133" cy="51" r="4" fill="#2b211c"/>
+  <ellipse cx="120" cy="68" rx="5" ry="6.5" fill="#2b211c"/>
+</svg>
