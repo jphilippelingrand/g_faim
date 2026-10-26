@@ -18,9 +18,9 @@ export function RestaurantCard({ r, index, home, distance, selected, onSelect }:
 
   return (
     <View style={[styles.card, selected && styles.cardSelected]}>
-      <View style={styles.rank}>
-        <Text style={styles.rankText}>{index + 1}</Text>
-      </View>
+      <Text style={styles.rank}>
+        {index + 1}
+      </Text>
 
       <Pressable
         style={styles.main}
@@ -31,20 +31,15 @@ export function RestaurantCard({ r, index, home, distance, selected, onSelect }:
         accessibilityRole="link"
         accessibilityHint={t("openInMaps")}
       >
-        <View style={styles.thumb}>
-          <Text style={styles.thumbEmoji}>🍽️</Text>
-        </View>
-        <View style={styles.body}>
-          <Text style={styles.name} numberOfLines={2}>
-            {r.name}
-          </Text>
-          <Text style={styles.meta}>
-            <Text style={styles.star}>★</Text> <Text style={styles.rating}>{r.rating.toFixed(1)}</Text> · {r.reviews} {t("reviews")}
-          </Text>
-          <Text style={styles.meta} numberOfLines={1}>
-            {details}
-          </Text>
-        </View>
+        <Text style={styles.name} numberOfLines={2}>
+          {r.name}
+        </Text>
+        <Text style={styles.meta}>
+          <Text style={styles.star}>★</Text> <Text style={styles.rating}>{r.rating.toFixed(1)}</Text> · {r.reviews} {t("reviews")}
+        </Text>
+        <Text style={styles.meta} numberOfLines={1}>
+          {details}
+        </Text>
       </Pressable>
 
       <Pressable
@@ -71,38 +66,20 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 12,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.line,
     borderRadius: 14,
-    padding: 12,
+    paddingVertical: 14,
+    paddingLeft: 16,
+    paddingRight: 12,
   },
-  cardSelected: { borderColor: colors.accent, borderWidth: 2, padding: 11 },
-  rank: {
-    position: "absolute",
-    top: -8,
-    left: -8,
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: colors.ink,
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 1,
-  },
-  rankText: { color: colors.bg, fontFamily: fonts.title, fontSize: 13 },
-  main: { flex: 1, flexDirection: "row", alignItems: "center", gap: 14 },
-  thumb: {
-    width: 72,
-    height: 72,
-    borderRadius: 10,
-    backgroundColor: colors.accentSoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  thumbEmoji: { fontSize: 28 },
-  body: { flex: 1 },
+  // Bordure plus épaisse : on retire 1 px de marge pour que le contenu ne bouge pas.
+  cardSelected: { borderColor: colors.accent, borderWidth: 2, paddingVertical: 13, paddingLeft: 15, paddingRight: 11 },
+  // Le numéro du classement tient lieu de vignette : grand, en tête de carte.
+  rank: { minWidth: 22, textAlign: "center", color: colors.accent, fontFamily: fonts.title, fontSize: 30, lineHeight: 34 },
+  main: { flex: 1 },
   name: { fontFamily: fonts.title, fontSize: 17, color: colors.ink, lineHeight: 21 },
   meta: { fontFamily: fonts.body, fontSize: 13, color: colors.muted, marginTop: 2 },
   star: { color: colors.accent },
