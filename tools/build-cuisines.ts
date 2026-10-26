@@ -12,7 +12,7 @@ import { createReadStream, existsSync, mkdirSync, readFileSync, rmSync, writeFil
 import { cellKey, LEVELS, type CategoryEntry, type CuisineNode } from "../src/lib/cuisineGrid.ts";
 
 const CONFIG = {
-  countries: ["france", "canada", "usa", "spain", "england", "germany", "belgium", "italy"],
+  countries: ["france", "canada", "usa", "spain", "england", "germany", "belgium", "italy", "morocco", "tunisia", "algeria", "mexico", "japan"],
   // Une région de 0,5° avec au moins ce nombre de restos est découpée en quartiers de 0,05° (~5 km) :
   // toutes les grandes villes, sans liste à tenir à jour.
   refineMinRestaurants: 500,
@@ -49,6 +49,7 @@ const IGNORED = new Set([
   "fast food", "bar", "beer", "drinks", "coffee", "cafe", "smoothie", "slushy", "cookies", "sweets", "chocolate",
   "shaved_ice", "health_food", "dinner", "modern", "eclectic", "home_style_cooking", "small_plates", "beef",
   "canteen", "student", "dining_hall", "cafeteria", "home_style", "snow_cone", "pork",
+  "ubereats", "takeaway", "comida_rapida", "gelato",
 ]);
 // Variantes d'écriture d'une même cuisine, ramenées à une seule valeur.
 const ALIASES: Record<string, string> = {
@@ -60,6 +61,16 @@ const ALIASES: Record<string, string> = {
   english: "british", croque: "croque-monsieur", bratwurst: "sausage", grilled_chicken: "chicken",
   escalope: "schnitzel", steak: "steak_house", mongolian_grill: "mongolian", chips: "friture", romana: "pizza",
   jause: "brotzeit", peking: "chinese", new_american: "american", coney_island: "hot_dog", taco: "tacos", hamburger: "burger",
+  // Japon : les mêmes cuisines écrites en japonais, et quelques variantes.
+  "焼肉": "yakiniku", "ラーメン": "ramen", "お好み焼き": "okonomiyaki", "うどん": "udon", "そば": "soba",
+  "居酒屋": "izakaya", "たこ焼き": "takoyaki", "鰻": "unagi", "うなぎ": "unagi", eel: "unagi",
+  steamed_eel_rice: "unagi", "寿司": "sushi", japanese_noodle: "noodle", nudle: "noodle", "餃子": "gyoza",
+  "やきとり": "yakitori", "カレー": "curry", "洋食": "yoshoku", jiro: "ramen", tsukemen: "ramen",
+  monja: "okonomiyaki", myanmar: "burmese", "焼きそば": "yakisoba",
+  // Mexique
+  mexicana: "mexican", taqueria: "tacos", "taquería": "tacos", "tacos y tortas": "tacos", carne: "grill",
+  carnes: "grill", carne_crugiente: "grill", pollo_rostizado: "rotisserie", "pollo asado": "rotisserie",
+  boneless: "wings",
 };
 
 type Counts = Map<string, number>;
