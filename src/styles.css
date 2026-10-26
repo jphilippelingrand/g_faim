@@ -455,13 +455,13 @@ input:focus { border-color: var(--accent); }
 
 .card {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
   align-items: center;
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: 14px;
-  padding: 12px;
+  padding: 14px 12px 14px 16px;
   position: relative;
   animation: pop .35s ease-out both;
 }
@@ -474,10 +474,7 @@ input:focus { border-color: var(--accent); }
 .card-link, .go { -webkit-tap-highlight-color: transparent; }
 
 .card-link {
-  display: grid;
-  grid-template-columns: 72px 1fr;
-  gap: 14px;
-  align-items: center;
+  display: block;
   text-decoration: none;
   color: inherit;
   min-width: 0;
@@ -498,28 +495,13 @@ input:focus { border-color: var(--accent); }
   .go:hover { background: var(--accent); color: #fff; transform: scale(1.08); }
 }
 
+/* Le numéro du classement tient lieu de vignette : grand, en tête de carte. */
 .rank {
-  position: absolute;
-  top: -8px;
-  left: -8px;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: var(--ink);
-  color: var(--bg);
-  font: 700 .85rem/26px "Fraunces", Georgia, serif;
+  min-width: 1.1em;
+  color: var(--accent);
+  font: 700 1.9rem/1 "Fraunces", Georgia, serif;
+  font-variant-numeric: lining-nums;
   text-align: center;
-}
-
-.thumb {
-  width: 72px;
-  height: 72px;
-  border-radius: 10px;
-  object-fit: cover;
-  background: var(--accent-soft);
-  display: grid;
-  place-items: center;
-  font-size: 1.8rem;
 }
 
 .card h2 { font-family: "Fraunces", Georgia, serif; font-size: 1.15rem; margin: 0; line-height: 1.25; }

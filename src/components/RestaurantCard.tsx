@@ -35,9 +35,8 @@ export function RestaurantCard({ r, index, home, distance, selected, onSelect }:
         // Souris uniquement : sur mobile, le début d'un scroll déclencherait la sélection.
         onPointerEnter={(e) => e.pointerType === "mouse" && onSelect(r.id)}
       >
-        <span className="rank">{index + 1}</span>
+        <span className="rank" aria-hidden="true">{index + 1}</span>
         <a className="card-link" href={r.url} target="_blank" rel="noopener noreferrer">
-          <div className="thumb">🍽️</div>
           <div className="card-body">
             <h2>{r.name}</h2>
             <div className="meta">
