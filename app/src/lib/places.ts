@@ -16,17 +16,20 @@ export type Restaurant = {
   type: string;
   price: string;
   url: string;
-  photo?: string;
   location: LatLng;
 };
 
 export const TOP_N = 5;
 // Écarte les 5,0★ à 3 avis qui squatteraient le podium.
 const MIN_REVIEWS = 10;
-const START_RADIUS = 200;
-// Au démarrage, on n'élargit pas au-delà (pire cas : 6 étapes) ; dézoomer permet d'aller plus loin.
-const MAX_START_RADIUS = 6400;
-// Limite de searchNearby.
+const START_RADIUS = 500;
+// Chaque étape quadruple le rayon : 500 m, 2 km, 8 km au pire (une recherche par étape).
+const RADIUS_STEP = 4;
+// Au démarrage, on n'élargit pas au-delà ; dézoomer permet d'aller plus loin.
+const MAX_START_RADIUS = 8000;
+// Chaque recherche est facturée : on réutilise un résultat 10 min (le statut d'ouverture finit par changer).
+const CACHE_TTL = 10 * 60_000;
+// Limite de searchText.
 export const MAX_RADIUS = 50_000;
 
 // Mode rapide : ce qui se mange sur le pouce, d'après les types Google.
@@ -41,7 +44,7 @@ export const hasApiKey = Boolean(API_KEY && !API_KEY.startsWith("COLLE"));
 
 // Une clé restreinte à l'app iOS n'est acceptée que si la requête dit de quelle app elle vient.
 const BUNDLE_ID = Constants.expoConfig?.ios?.bundleIdentifier ?? "";
-export const googleHeaders: Record<string, string> =
+const googleHeaders: Record<string, string> =
   Platform.OS === "ios" ? { "X-Ios-Bundle-Identifier": BUNDLE_ID } : {};
 
 const PRICE: Record<string, string> = {
@@ -53,7 +56,7 @@ const PRICE: Record<string, string> = {
 
 const FIELD_MASK = [
   "id", "displayName", "rating", "userRatingCount", "location", "googleMapsUri",
-  "priceLevel", "primaryTypeDisplayName", "photos", "businessStatus", "currentOpeningHours.openNow", "types",
+  "priceLevel", "primaryTypeDisplayName", "businessStatus", "currentOpeningHours.openNow", "types",
 ].map((f) => `places.${f}`).join(",");
 
 type ApiPlace = {
@@ -65,7 +68,6 @@ type ApiPlace = {
   googleMapsUri?: string;
   priceLevel?: string;
   primaryTypeDisplayName?: { text: string };
-  photos?: { name: string }[];
   businessStatus?: string;
   currentOpeningHours?: { openNow?: boolean };
   types?: string[];
@@ -82,11 +84,7 @@ export function distanceMeters(a: LatLng, b: LatLng): number {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-function photoUrl(name: string): string {
-  return `https://places.googleapis.com/v1/${name}/media?maxWidthPx=200&maxHeightPx=200&key=${API_KEY}`;
-}
-
-async function placesApi(endpoint: "searchNearby" | "searchText", body: object): Promise<ApiPlace[]> {
+async function placesApi(endpoint: "searchText", body: object): Promise<ApiPlace[]> {
   const res = await fetch(`https://places.googleapis.com/v1/places:${endpoint}`, {
     method: "POST",
     headers: {
@@ -112,52 +110,54 @@ function circleRectangle({ center, radius }: Area) {
   };
 }
 
+/** Résultat d'une recherche déjà faite, gardé en mémoire tant que l'app tourne. */
+const cache = new Map<string, { at: number; list: Promise<Restaurant[]> }>();
+
+function cached(key: string, search: () => Promise<Restaurant[]>): Promise<Restaurant[]> {
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < CACHE_TTL) return hit.list;
+  const list = search();
+  cache.set(key, { at: Date.now(), list });
+  // Une erreur ne reste pas en cache : la prochaine demande retente.
+  list.catch(() => cache.get(key)?.list === list && cache.delete(key));
+  return list;
+}
+
 /**
- * Restos notés et ouverts en ce moment dans le cercle. Deux recherches en parallèle, fusionnées :
- * - searchNearby : les 20 plus populaires, mais ouverts ou non (la nuit, souvent presque tous fermés) ;
- * - searchText filtré par Google sur « ouvert maintenant » : 20 restos ouverts, même à 1 h du matin.
- * Aucune ne trie par note : le classement se fait dans rankTop.
- * En mode rapide, les mêmes recherches portent sur les types « sur le pouce » au lieu de « restaurant ».
+ * Restos notés et ouverts en ce moment dans le cercle, en une seule recherche (chacune est facturée) :
+ * searchText filtré par Google sur « ouvert maintenant », qui en trouve 20 même à 1 h du matin
+ * (searchNearby ne sait pas filtrer sur l'ouverture). Elle ne trie pas par note : le classement se fait dans rankTop.
+ * En mode rapide, on cherche « fast food » et on garde ce que Google classe dans les types « sur le pouce ».
  */
-export async function searchRestaurants(area: Area, category?: Category | null, fast = false): Promise<Restaurant[]> {
-  const radius = Math.min(area.radius, MAX_RADIUS);
-  const rectangle = circleRectangle({ center: area.center, radius });
+export function searchRestaurants(area: Area, category?: Category | null, fast = false): Promise<Restaurant[]> {
+  const radius = Math.round(Math.min(area.radius, MAX_RADIUS));
+  // Arrondi à ~10 m : rouvrir une cuisine ou un mode déjà vus depuis la même position ne coûte rien.
+  const { latitude, longitude } = area.center;
+  const key = [latitude.toFixed(4), longitude.toFixed(4), radius, category?.key ?? "", fast].join("|");
+  return cached(key, () => fetchRestaurants({ center: area.center, radius }, category, fast));
+}
 
-  const responses = await Promise.allSettled(
-    category
-      ? // Une cuisine (venue d'OSM) : recherche Google par mot-clé, comme on le taperait dans Maps.
-        [true, false].map((openNow) =>
-          placesApi("searchText", { textQuery: category.query, openNow, pageSize: 20, locationRestriction: { rectangle } }),
-        )
-      : [
-          placesApi("searchNearby", {
-            includedPrimaryTypes: fast ? FAST_TYPES : ["restaurant"],
-            maxResultCount: 20,
-            rankPreference: "POPULARITY",
-            locationRestriction: { circle: { center: area.center, radius } },
-          }),
-          placesApi("searchText", {
-            // includedType n'accepte qu'un type : on prend le plus courant, les autres viennent de searchNearby.
-            textQuery: fast ? "fast food" : "restaurant",
-            includedType: fast ? "fast_food_restaurant" : "restaurant",
-            strictTypeFiltering: true,
-            openNow: true,
-            pageSize: 20,
-            locationRestriction: { rectangle },
-          }),
-        ],
-  );
-  const ok = responses.filter((r) => r.status === "fulfilled").map((r) => r.value);
-  if (!ok.length) throw (responses[0] as PromiseRejectedResult).reason;
-  const places = [...new Map(ok.flat().map((p) => [p.id, p])).values()];
+async function fetchRestaurants(area: Area, category: Category | null | undefined, fast: boolean): Promise<Restaurant[]> {
+  const places = await placesApi("searchText", {
+    // Une cuisine (venue d'OSM) : recherche par mot-clé, comme on le taperait dans Maps.
+    textQuery: category ? category.query : fast ? "fast food" : "restaurant",
+    // includedType n'accepte qu'un type : en mode rapide, le tri par types se fait dans toRestaurants.
+    ...(!category && !fast && { includedType: "restaurant", strictTypeFiltering: true }),
+    openNow: true,
+    pageSize: 20,
+    locationRestriction: { rectangle: circleRectangle(area) },
+  });
+  return toRestaurants(places, area, fast);
+}
 
+function toRestaurants(places: ApiPlace[], area: Area, fast: boolean): Restaurant[] {
   return places
     .filter((p) => p.rating != null && p.location)
-    .filter((p) => distanceMeters(area.center, p.location!) <= radius)
+    .filter((p) => distanceMeters(area.center, p.location!) <= area.radius)
     // Fermés définitivement / temporairement, ou fermés à cette heure-ci. Horaires inconnus : on garde.
     .filter((p) => (p.businessStatus ?? "OPERATIONAL") === "OPERATIONAL" && p.currentOpeningHours?.openNow !== false)
-    // Une cuisine en mode rapide : la recherche par mot-clé ramène aussi des restos à table.
-    .filter((p) => !fast || !category || p.types?.some((type) => FAST_TYPES.includes(type)))
+    // Mode rapide : la recherche par mot-clé ramène aussi des restos à table.
+    .filter((p) => !fast || p.types?.some((type) => FAST_TYPES.includes(type)))
     .map((p) => ({
       id: p.id,
       name: p.displayName?.text ?? t("noName"),
@@ -166,18 +166,17 @@ export async function searchRestaurants(area: Area, category?: Category | null, 
       type: p.primaryTypeDisplayName?.text ?? "",
       price: p.priceLevel ? PRICE[p.priceLevel] ?? "" : "",
       url: p.googleMapsUri ?? "",
-      photo: p.photos?.[0] ? photoUrl(p.photos[0].name) : undefined,
       location: p.location!,
     }));
 }
 
-/** Double le rayon à partir de 200 m jusqu'à avoir TOP_N restos classables (ou atteindre MAX_START_RADIUS). */
+/** Élargit le rayon à partir de 500 m jusqu'à avoir TOP_N restos classables (ou atteindre MAX_START_RADIUS). */
 export async function searchUntilTop(
   center: LatLng,
   category?: Category | null,
   fast = false,
 ): Promise<{ list: Restaurant[]; area: Area }> {
-  for (let radius = START_RADIUS; ; radius *= 2) {
+  for (let radius = START_RADIUS; ; radius *= RADIUS_STEP) {
     const area = { center, radius };
     const list = await searchRestaurants(area, category, fast);
     const ranked = fast ? rankFast(list, center) : rankTop(list);

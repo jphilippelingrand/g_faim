@@ -1,6 +1,6 @@
-import { Image, Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
-import { directionsUrl, formatDistance, googleHeaders, type LatLng, type Restaurant } from "../lib/places";
+import { directionsUrl, formatDistance, type LatLng, type Restaurant } from "../lib/places";
 import { colors, fonts } from "../theme";
 import { t } from "../i18n";
 
@@ -31,13 +31,9 @@ export function RestaurantCard({ r, index, home, distance, selected, onSelect }:
         accessibilityRole="link"
         accessibilityHint={t("openInMaps")}
       >
-        {r.photo ? (
-          <Image style={styles.thumb} source={{ uri: r.photo, headers: googleHeaders }} />
-        ) : (
-          <View style={styles.thumb}>
-            <Text style={styles.thumbEmoji}>🍽️</Text>
-          </View>
-        )}
+        <View style={styles.thumb}>
+          <Text style={styles.thumbEmoji}>🍽️</Text>
+        </View>
         <View style={styles.body}>
           <Text style={styles.name} numberOfLines={2}>
             {r.name}

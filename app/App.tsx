@@ -205,7 +205,7 @@ function Main() {
     };
   }, []);
 
-  // Position (ou cuisine, ou mode rapide) connue : on élargit depuis 200 m jusqu'à trouver 5 restos,
+  // Position (ou cuisine, ou mode rapide) connue : on élargit depuis 500 m jusqu'à trouver 5 restos,
   // puis on cadre la carte dessus.
   useEffect(() => {
     if (!home) return;
