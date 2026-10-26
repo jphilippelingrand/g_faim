@@ -37,11 +37,7 @@ export function RestaurantCard({ r, index, home, distance, selected, onSelect }:
       >
         <span className="rank">{index + 1}</span>
         <a className="card-link" href={r.url} target="_blank" rel="noopener noreferrer">
-          {r.photo ? (
-            <img className="thumb" src={r.photo} alt="" loading="lazy" />
-          ) : (
-            <div className="thumb">🍽️</div>
-          )}
+          <div className="thumb">🍽️</div>
           <div className="card-body">
             <h2>{r.name}</h2>
             <div className="meta">

@@ -23,7 +23,7 @@ const PAGES = {
   <p>Avec ton accord, l'app lit ta position au moment où tu l'utilises, pour chercher les restaurants autour de toi. Cette position est envoyée à Google (Google Maps Platform) pour faire la recherche et afficher la carte. Elle n'est ni enregistrée ni transmise ailleurs par Groubl. Si tu refuses l'accès à la position, tu peux taper une adresse à la place ; sur iOS, elle est convertie en coordonnées par le service de géocodage d'Apple.</p>
   <h2>Services tiers</h2>
   <ul>
-    <li><strong>Google Maps Platform</strong> (carte, recherche de restaurants, photos) — <a href="https://policies.google.com/privacy">politique de confidentialité de Google</a>.</li>
+    <li><strong>Google Maps Platform</strong> (carte, recherche de restaurants) — <a href="https://policies.google.com/privacy">politique de confidentialité de Google</a>.</li>
     <li><strong>Apple</strong> (géocodage d'adresse sur iOS) — <a href="https://www.apple.com/legal/privacy/">politique de confidentialité d'Apple</a>.</li>
     <li><strong>Vercel</strong> (hébergement du site) peut conserver des journaux techniques (adresse IP, navigateur) — <a href="https://vercel.com/legal/privacy-policy">politique de Vercel</a>.</li>
     <li><strong>OpenStreetMap</strong> : les catégories de cuisine sont calculées à l'avance à partir de ses données ; ta position ne lui est pas envoyée.</li>
@@ -55,7 +55,7 @@ const PAGES = {
   <p>With your permission, the app reads your location while you use it to find nearby restaurants. It is sent to Google (Google Maps Platform) to run the search and display the map. Groubl does not store it or share it with anyone else. If you decline, you can type an address instead; on iOS it is geocoded by Apple.</p>
   <h2>Third parties</h2>
   <ul>
-    <li><strong>Google Maps Platform</strong> (map, restaurant search, photos) — <a href="https://policies.google.com/privacy">Google privacy policy</a>.</li>
+    <li><strong>Google Maps Platform</strong> (map, restaurant search) — <a href="https://policies.google.com/privacy">Google privacy policy</a>.</li>
     <li><strong>Apple</strong> (address geocoding on iOS) — <a href="https://www.apple.com/legal/privacy/">Apple privacy policy</a>.</li>
     <li><strong>Vercel</strong> (website hosting) may keep technical logs (IP address, browser) — <a href="https://vercel.com/legal/privacy-policy">Vercel privacy policy</a>.</li>
     <li><strong>OpenStreetMap</strong>: cuisine categories are precomputed from its data; your location is not sent to it.</li>
