@@ -230,8 +230,20 @@ export function formatClosingTime(closesIn: number, now = new Date()): string {
   return at.toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" });
 }
 
-/** Lien d'itinéraire Google Maps (une simple URL, pas l'API : gratuit). */
+// Sur iPhone et iPad, l'itinéraire s'ouvre directement dans Plans ; ailleurs, dans Google Maps.
+const APPLE = /iPhone|iPad|iPod/.test(navigator.userAgent);
+
+/** Lien d'itinéraire (une simple URL, pas d'API : gratuit). */
 export function directionsUrl(home: LatLng, r: Restaurant, walking: boolean): string {
+  if (APPLE) {
+    const params = new URLSearchParams({
+      saddr: `${home.lat},${home.lng}`,
+      daddr: `${r.location.lat},${r.location.lng}`,
+      q: r.name,
+      dirflg: walking ? "w" : "d",
+    });
+    return `https://maps.apple.com/?${params}`;
+  }
   const params = new URLSearchParams({
     api: "1",
     origin: `${home.lat},${home.lng}`,

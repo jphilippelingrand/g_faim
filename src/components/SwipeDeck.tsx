@@ -13,15 +13,18 @@ type Props = {
 // Au-delà de cette distance (px), la carte part ; sinon elle revient.
 const THRESHOLD = 90;
 const FLY_MS = 260;
+const TAP_SLOP = 6;
 
 /**
  * Le paquet de cartes, façon Tinder : à gauche, « nan », la suivante (et on reboucle après la dernière) ;
- * à droite, « miam », l'itinéraire. Les boutons ✕ et ♥ font la même chose, pour qui ne glisse pas.
+ * à droite (ou un simple tap), « miam », l'itinéraire. Les boutons ✕ et ♥ font la même chose, pour qui ne glisse pas.
  */
 export function SwipeDeck({ places, home, current, onChange }: Props) {
   const [dx, setDx] = useState(0);
   const [leaving, setLeaving] = useState<"left" | "right" | null>(null);
   const start = useRef<number | null>(null);
+  // Un geste qui n'a presque pas bougé est un simple tap : on y va, comme ♥.
+  const moved = useRef(false);
 
   const place = places[current];
   const next = places[(current + 1) % places.length];
@@ -29,10 +32,11 @@ export function SwipeDeck({ places, home, current, onChange }: Props) {
   const url = directionsUrl(home, place, trip.mode === "walk");
 
   function fly(direction: "left" | "right") {
-    // Ouvert tout de suite, pendant le geste de l'utilisateur (sinon le navigateur bloque la fenêtre).
-    if (direction === "right") window.open(url, "_blank", "noopener");
     setLeaving(direction);
     setTimeout(() => {
+      // À droite : l'itinéraire, dans le même onglet (une nouvelle fenêtre ouverte hors d'un vrai clic est
+      // bloquée par Safari sur iPhone). La carte reste en place pour le retour arrière.
+      if (direction === "right") location.assign(url);
       setLeaving(null);
       setDx(0);
       if (direction === "left") onChange((current + 1) % places.length);
@@ -42,15 +46,19 @@ export function SwipeDeck({ places, home, current, onChange }: Props) {
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest("a, button")) return;
     start.current = e.clientX;
+    moved.current = false;
     e.currentTarget.setPointerCapture(e.pointerId);
   };
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
-    if (start.current !== null) setDx(e.clientX - start.current);
+    if (start.current === null) return;
+    if (Math.abs(e.clientX - start.current) > TAP_SLOP) moved.current = true;
+    setDx(e.clientX - start.current);
   };
   const onPointerUp = () => {
     if (start.current === null) return;
     start.current = null;
-    if (dx < -THRESHOLD) fly("left");
+    if (!moved.current) fly("right");
+    else if (dx < -THRESHOLD) fly("left");
     else if (dx > THRESHOLD) fly("right");
     else setDx(0);
   };
