@@ -25,7 +25,8 @@ if (process.env.CI && !process.env.META_IG_TOKEN) {
   process.exit(0);
 }
 
-const queue = JSON.parse(readFileSync(new URL("./queue.json", import.meta.url), "utf8"));
+// QUEUE : une autre copie de la file (le robot du Mac lit celle de GitHub, sans toucher aux fichiers locaux).
+const queue = JSON.parse(readFileSync(process.env.QUEUE ?? new URL("./queue.json", import.meta.url), "utf8"));
 const mode = process.argv[2];
 const now = Date.now();
 
