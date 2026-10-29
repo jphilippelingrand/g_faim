@@ -1,13 +1,10 @@
-import Constants, { ExecutionEnvironment } from "expo-constants";
 import { useEffect, useRef } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import MapView, { Circle, Marker, PROVIDER_GOOGLE, type Region } from "react-native-maps";
-import { MAX_RADIUS, type Area, type LatLng, type Restaurant } from "../lib/places";
+import MapView, { Circle, Marker, type Region } from "react-native-maps";
+import type { Area, LatLng, Restaurant } from "../lib/places";
 import { colors, fonts } from "../theme";
 
-// Les données Places doivent s'afficher sur une carte Google. Expo Go n'embarque pas
-// Google Maps sur iOS : on y retombe sur Apple Maps, pour le dev uniquement.
-const IS_EXPO_GO = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+// Plans (Apple) sur iOS : gratuit, sans clé. Les restos viennent d'OpenStreetMap.
 
 type Props = {
   home: LatLng;
@@ -18,8 +15,8 @@ type Props = {
   selectedId: string | null;
   onSelect: (id: string) => void;
   onViewportChange: (view: Area) => void;
-  /** Hauteur cachée par la barre du haut et par le panneau du bas : la carte s'y adapte (logo Google visible, recadrage). */
-  insets: { top: number; bottom: number };
+  /** Hauteur cachée par la barre du haut et par le panneau du bas : la carte s'y adapte (logo Plans visible, recadrage). */
+  insets: { top: number; bottom: number; left?: number };
 };
 
 /** Plus grand cercle centré sur la carte qui tient dans la vue. */
@@ -28,7 +25,7 @@ function viewportCircle(region: Region): Area {
   const lngMeters = (region.longitudeDelta / 2) * 111_320 * Math.cos((region.latitude * Math.PI) / 180);
   return {
     center: { latitude: region.latitude, longitude: region.longitude },
-    radius: Math.min(Math.round(Math.min(latMeters, lngMeters)), MAX_RADIUS),
+    radius: Math.round(Math.min(latMeters, lngMeters)),
   };
 }
 
@@ -37,19 +34,17 @@ export function RestaurantMap({ home, results, area, fitKey, selectedId, onSelec
   // Les changements de vue déclenchés par nos propres recadrages ne doivent pas relancer de recherche.
   const ignoreUntil = useRef(0);
 
-  // Recadrage : seulement quand fitKey change (recherche initiale), pas après un dézoom.
+  // Recadrage sur toi + le resto de la carte du dessus, quand fitKey change (nouvelle recherche, carte glissée).
   useEffect(() => {
     if (fitKey === 0 || !map.current) return;
     ignoreUntil.current = Date.now() + 1500;
-    // On ajoute le symétrique de chaque resto par rapport à la maison pour rester centré sur toi.
-    const points = results.flatMap(({ location: p }) => [
-      p,
-      { latitude: 2 * home.latitude - p.latitude, longitude: 2 * home.longitude - p.longitude },
-    ]);
-    map.current.fitToCoordinates([home, ...points], {
+    const place = results.find((r) => r.id === selectedId);
+    if (!place) return;
+    // Le symétrique du resto par rapport à toi : le cadre reste centré sur toi.
+    const p = place.location;
+    map.current.fitToCoordinates([p, { latitude: 2 * home.latitude - p.latitude, longitude: 2 * home.longitude - p.longitude }], {
       // mapPadding exclut déjà la barre du haut et le panneau : on n'ajoute qu'une marge pour les pastilles.
-      // (Les rajouter ici les comptait deux fois et décalait le point bleu vers le haut.)
-      edgePadding: { top: 24, right: 24, bottom: 24, left: 24 },
+      edgePadding: { top: 40, right: 40, bottom: 40, left: 40 },
       animated: true,
     });
   }, [fitKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -59,9 +54,8 @@ export function RestaurantMap({ home, results, area, fitKey, selectedId, onSelec
       <MapView
         ref={map}
         style={StyleSheet.absoluteFill}
-        // Le logo Google et le centre de la carte restent dans la partie visible, au-dessus du panneau.
-        mapPadding={{ top: insets.top, right: 0, bottom: insets.bottom, left: 0 }}
-        provider={IS_EXPO_GO ? undefined : PROVIDER_GOOGLE}
+        // Le logo Plans et le centre de la carte restent dans la partie visible, au-dessus du panneau.
+        mapPadding={{ top: insets.top, right: 0, bottom: insets.bottom, left: insets.left ?? 0 }}
         initialRegion={{ ...home, latitudeDelta: 0.006, longitudeDelta: 0.006 }}
         showsUserLocation
         showsPointsOfInterests={false}
@@ -113,6 +107,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  pinSelected: { backgroundColor: colors.ink, transform: [{ scale: 1.25 }] },
+  pinSelected: { opacity: 1, transform: [{ scale: 1.3 }] },
   pinText: { color: "#fff", fontFamily: fonts.title, fontSize: 14 },
 });

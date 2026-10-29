@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { Lady } from "./Lady";
-import type { Mode } from "./ModePicker";
+import type { Mode } from "./Lady";
 
 type Props = {
   /** Recherche en cours : la dame apparaît, puis s'efface quand les restos arrivent. */

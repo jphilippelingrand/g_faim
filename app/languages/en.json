@@ -1,6 +1,6 @@
 {
   "ios": {
     "CFBundleDisplayName": "Groubl",
-    "NSLocationWhenInUseUsageDescription": "Groubl uses your location to find the best open restaurants around you."
+    "NSLocationWhenInUseUsageDescription": "Groubl uses your location to find the closest restaurants open right now."
   }
 }

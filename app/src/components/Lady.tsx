@@ -4,7 +4,9 @@ import { Animated, Easing, Pressable, StyleSheet, View } from "react-native";
 import Svg, { Circle, Ellipse, G, Path } from "react-native-svg";
 import { colors, fonts } from "../theme";
 import { t } from "../i18n";
-import type { Mode } from "./ModePicker";
+
+/** Les anciens modes de recherche : la dame les sait encore (bandeau « au pif », course « vite vite »). */
+export type Mode = "top" | "fast" | "surprise";
 
 /** starving = ça gargouille non-stop (recherche) ; hungry = gros gargouillis réguliers ; happy = elle a trouvé, elle bave. */
 export type Mood = "starving" | "hungry" | "happy";

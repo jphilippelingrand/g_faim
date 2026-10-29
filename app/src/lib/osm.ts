@@ -1,30 +1,13 @@
 import { lang } from "../i18n";
-import { cellKey, findPath, levelForRadius, type CategoryEntry, type CuisineNode } from "./cuisineGrid";
-import type { LatLng } from "./places";
 
 /**
- * COPIE adaptée de src/lib/osm.ts (site) : même table et même logique, garder les deux en phase.
+ * COPIE de src/lib/osm.ts (site) : même table, garder les deux en phase.
  *
- * Catégories de cuisine de la zone, pré-calculées depuis OpenStreetMap (tools/build-cuisines.ts)
- * dans public/cuisines/*.json. Licence ODbL : on peut agréger et redistribuer en citant la source.
- * Les données Google, elles, ne doivent servir à créer aucun contenu dérivé : on ne s'en sert que
- * pour chercher, en direct, les restos d'une catégorie.
+ * Libellés des cuisines d'OpenStreetMap (cuisine=*), affichés sur les cartes des restos.
+ * Les valeurs inconnues ne sont pas affichées : elles sont souvent vagues ou mal saisies.
  */
-export type Category = {
-  /** Valeur OSM de cuisine=* (ex. "poutine"). */
-  key: string;
-  label: string;
-  /** Ce qu'on tape dans la recherche Google pour trouver cette cuisine. */
-  query: string;
-  emoji: string;
-  /** Nettement plus présente ici qu'en moyenne dans le monde. */
-  distinctive: boolean;
-};
-
-// Libellés et requêtes par langue. Ça ne décide pas des catégories (elles viennent des données),
-// ça traduit juste les mots-clés OSM courants ; les autres sont affichés tels quels, mis en forme.
-// Format : [emoji, libellé fr, libellé en, libellé es] ; la requête Google est « restaurant <libellé> »
-// pour les nationalités (R), sinon le libellé lui-même.
+// Libellés par langue des valeurs OSM de cuisine=* courantes.
+// Format : [emoji, libellé fr, libellé en, libellé es, nationalité].
 const R = true;
 const LABELS: Record<string, [emoji: string, fr: string, en: string, es: string, nationality?: boolean]> = {
   pizza: ["🍕", "Pizza", "Pizza", "Pizza"],
@@ -276,70 +259,9 @@ const LABELS: Record<string, [emoji: string, fr: string, en: string, es: string,
   marquesitas: ["🌯", "Marquesitas", "Marquesitas", "Marquesitas"],
 };
 
-const RESTAURANT = { fr: "restaurant", en: "restaurant", es: "restaurante" };
-
-function labelFor(key: string): { emoji: string; label: string; query: string } {
+export function cuisineLabel(key: string): { emoji: string; label: string } | null {
   const known = LABELS[key];
-  if (!known) {
-    const label = key.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
-    return { emoji: "🍽️", label, query: label };
-  }
-  const [emoji, fr, en, es, nationality] = known;
-  const label = { fr, en, es }[lang];
-  // « restaurant japonais » / « Japanese restaurant » / « restaurante japonés »
-  const query = !nationality ? label : lang === "en" ? `${label} ${RESTAURANT.en}` : `${RESTAURANT[lang]} ${label.toLowerCase()}`;
-  return { emoji, label, query };
-}
-
-// Les mêmes fichiers que le site, servis par le CDN de Vercel : un nouveau calcul ne demande pas de mise à jour de l'app.
-const CUISINES_URL = "https://www.groubl.com/cuisines";
-
-// Le site met la version du calcul dans l'adresse ; l'app, publiée pour des mois, ne peut pas la connaître.
-// La date du jour change l'adresse chaque jour : nouveaux pays vus sous 24 h, et un « introuvable » d'avant
-// l'ajout d'un pays ne reste pas en cache plus d'une journée.
-const DAY = new Date().toISOString().slice(0, 10);
-
-const tiles = new Map<string, Promise<CuisineNode | null>>();
-
-/** Fichier du carré de 10° (null hors des zones couvertes). */
-function getTile(key: string): Promise<CuisineNode | null> {
-  let tile = tiles.get(key);
-  if (!tile) {
-    tile = fetch(`${CUISINES_URL}/${key}.json?v=${DAY}`).then((r) =>
-      // Zone non couverte : 404 (on vérifie aussi le type, au cas où le site renverrait une page).
-      r.ok && r.headers.get("content-type")?.includes("json") ? (r.json() as Promise<CuisineNode>) : null,
-    );
-    tile.catch(() => tiles.delete(key));
-    tiles.set(key, tile);
-  }
-  return tile;
-}
-
-// Une rangée de boutons, sans défilement : 4 cuisines au plus.
-export const MAX_SHOWN = 4;
-
-/**
- * Catégories de la zone visible (pays, région ou quartier selon le zoom, ou la zone la plus fine
- * disponible). Le plus local prime : d'abord les spécialités de la zone, puis celles des zones qui la
- * contiennent (la ville, puis la grande région), qui ne font que compléter ; enfin ses cuisines les
- * plus courantes.
- */
-export async function neighborhoodCategories(center: LatLng, radius: number): Promise<Category[]> {
-  const tile = await getTile(cellKey(center.latitude, center.longitude, 0));
-  if (!tile) return [];
-  const path = findPath(tile, center.latitude, center.longitude, levelForRadius(radius));
-  const zone = path[path.length - 1];
-
-  const ordered: CategoryEntry[] = [
-    ...[...path].reverse().flatMap((node) => node.categories.filter(([, d]) => d === 1)),
-    ...zone.categories.filter(([, d]) => d !== 1),
-  ];
-  const seen = new Set<string>();
-  const result: Category[] = [];
-  for (const [key, distinctive] of ordered) {
-    if (seen.has(key)) continue;
-    seen.add(key);
-    result.push({ key, ...labelFor(key), distinctive: distinctive === 1 });
-  }
-  return result.slice(0, MAX_SHOWN);
+  if (!known) return null;
+  const [emoji, fr, en, es] = known;
+  return { emoji, label: { fr, en, es }[lang] };
 }

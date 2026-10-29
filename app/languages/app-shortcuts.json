@@ -1,0 +1,20 @@
+{
+  "en": {
+    "I'm hungry with ${applicationName}": "I'm hungry with ${applicationName}",
+    "${applicationName}, I'm hungry": "${applicationName}, I'm hungry",
+    "Feed me with ${applicationName}": "Feed me with ${applicationName}",
+    "${applicationName}, my belly is rumbling": "${applicationName}, my belly is rumbling"
+  },
+  "fr": {
+    "I'm hungry with ${applicationName}": "J'ai faim avec ${applicationName}",
+    "${applicationName}, I'm hungry": "${applicationName}, j'ai faim",
+    "Feed me with ${applicationName}": "J'ai la dalle avec ${applicationName}",
+    "${applicationName}, my belly is rumbling": "${applicationName}, mon ventre gargouille"
+  },
+  "es": {
+    "I'm hungry with ${applicationName}": "Tengo hambre con ${applicationName}",
+    "${applicationName}, I'm hungry": "${applicationName}, tengo hambre",
+    "Feed me with ${applicationName}": "Dame de comer con ${applicationName}",
+    "${applicationName}, my belly is rumbling": "${applicationName}, me ruge la barriga"
+  }
+}

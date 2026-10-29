@@ -4,46 +4,39 @@ import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import BottomSheet, { BottomSheetScrollView, type BottomSheetScrollViewMethods } from "@gorhom/bottom-sheet";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Linking, Platform, Pressable, Settings, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Image, Linking, Platform, Pressable, Settings, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { useSharedValue } from "react-native-reanimated";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
-import { MapControls } from "./src/components/MapControls";
-import { MODES, ModePicker, type Mode } from "./src/components/ModePicker";
 import { SearchingLady } from "./src/components/SearchingLady";
-import { CategoryBar } from "./src/components/CategoryBar";
-import { RestaurantCard } from "./src/components/RestaurantCard";
+import { SwipeDeck } from "./src/components/SwipeDeck";
 import { RestaurantMap } from "./src/components/RestaurantMap";
+import { updateWidget } from "./src/lib/widget";
 import {
+  directionsUrl,
   distanceMeters,
-  formatDistance,
-  hasApiKey,
-  pickRandom,
-  rankFast,
-  rankTop,
-  searchRestaurants,
-  searchUntilTop,
+  formatClosingTime,
+  nearestOpen,
+  nearestOpenInView,
+  travelTime,
   type Area,
   type LatLng,
   type Restaurant,
 } from "./src/lib/places";
 import { colors, fonts } from "./src/theme";
 import { lang, t } from "./src/i18n";
-import { MAX_SHOWN, neighborhoodCategories, type Category } from "./src/lib/osm";
 
 SplashScreen.preventAutoHideAsync();
 
 type Phase = "locating" | "searching" | "done" | "error";
 
-// Mise en page : hauteur du bandeau du haut (sous l'encoche) et du panneau replié (catégories).
+// Hauteur du bandeau du haut, sous l'encoche.
 const TOP_BAR = 52;
+// iPhone Duo déplié (ou tout écran large) : le paquet de cartes passe dans un panneau à gauche, la carte à droite.
+const WIDE_FROM = 600;
+const SIDE_PANEL = 380;
+const MARGIN = 16;
 const SITE = "https://www.groubl.com";
-const SHEET_MIN = 190;
-
-// En dessous de cette fraction de la zone fouillée, un zoom avant relance la recherche.
-const ZOOM_IN_RATIO = 0.6;
 
 async function getPosition(): Promise<LatLng> {
   const { status } = await Location.requestForegroundPermissionsAsync();
@@ -52,7 +45,10 @@ async function getPosition(): Promise<LatLng> {
   return { latitude: coords.latitude, longitude: coords.longitude };
 }
 
-/** L'écran : carte plein écran, barre du haut, et un panneau qu'on tire du bas (dame, catégories, restos). */
+/**
+ * L'écran : carte plein écran et, en bas, le paquet de cartes (comme le site) : le resto le plus proche
+ * d'abord ; on glisse à gauche pour le suivant, à droite pour y aller. La carte suit la carte du dessus.
+ */
 function Main() {
   const [fontsLoaded, fontError] = useFonts({ Fraunces_700Bold, Fraunces_900Black_Italic, Inter_400Regular, Inter_500Medium });
   useEffect(() => {
@@ -60,66 +56,31 @@ function Main() {
   }, [fontsLoaded, fontError]);
 
   const [home, setHome] = useState<LatLng | null>(null);
-  const [places, setPlaces] = useState<Restaurant[]>([]);
+  const [top, setTop] = useState<Restaurant[]>([]);
   const [area, setArea] = useState<Area | null>(null);
+  const [current, setCurrent] = useState(0);
+  // Incrémenté quand la carte doit se recadrer sur toi + la carte du dessus.
   const [fitKey, setFitKey] = useState(0);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  // Top par note, rapide (fast-foods et vente à emporter, la distance compte) ou surprise (tirage au
-  // sort ; la graine change à chaque changement de mode).
-  const [mode, setMode] = useState<Mode>("top");
-  const surprise = mode === "surprise";
-  const fast = mode === "fast";
-  const [seed, setSeed] = useState(() => Date.now());
-  // Cuisines de la zone visible (fichiers pré-calculés sur groubl.com) et cuisine choisie.
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [category, setCategory] = useState<Category | null>(null);
-  const [phase, setPhase] = useState<Phase>(hasApiKey ? "locating" : "error");
-  const [error, setError] = useState<string | null>(
-    hasApiKey ? null : t("missingKey"),
-  );
+  const [phase, setPhase] = useState<Phase>("locating");
+  const [error, setError] = useState<string | null>(null);
   // Si la géoloc est refusée, on propose de taper une adresse à la place.
   const [askAddress, setAskAddress] = useState(false);
   const [address, setAddress] = useState("");
+  // Hauteur du panneau du bas : la carte se cadre au-dessus.
+  const [panelHeight, setPanelHeight] = useState(260);
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const wide = width >= WIDE_FROM;
+
+  // Tant que la première recherche autour de soi n'est pas faite, les mouvements de la carte ne comptent pas.
+  const searched = useRef(false);
+  // « Dis Siri, j'ai faim » (lien gfaim://?faim=1) : dès qu'on a le n°1, on part directement vers lui.
+  const goToFirst = useRef(false);
+  // Lien gfaim://?card=2 : carte à montrer dès les résultats (captures App Store, le simulateur ne sait pas glisser).
+  const startCard = useRef(0);
 
   // Seule la dernière recherche lancée a le droit d'afficher ses résultats.
   const requestId = useRef(0);
-  // Zone déjà fouillée (ou en cours) : lue depuis le handler de la carte, d'où la ref.
-  const coveredArea = useRef<Area | null>(null);
-  const categoryRef = useRef(category);
-  const fastRef = useRef(fast);
-  useEffect(() => {
-    categoryRef.current = category;
-    fastRef.current = fast;
-  }, [category, fast]);
-
-  // Catégories de la zone visible, recalculées à chaque déplacement de la carte. Seule la dernière demande compte.
-  const categoriesRequest = useRef(0);
-  const refreshCategories = useCallback((view: Area) => {
-    const id = ++categoriesRequest.current;
-    neighborhoodCategories(view.center, view.radius)
-      .then((cats) => id === categoriesRequest.current && setCategories(cats))
-      // Les catégories sont un plus : si le fichier ne se charge pas, on garde les précédentes.
-      .catch((err) => console.warn("Catégories indisponibles", err));
-  }, []);
-
-  const scroll = useRef<BottomSheetScrollViewMethods>(null);
-  const sheet = useRef<BottomSheet>(null);
-  const insets = useSafeAreaInsets();
-  const { height: screenH } = useWindowDimensions();
-  // Hauteurs du panneau : replié (catégories), ouvert (à l'ouverture), ouvert en grand jusque sous le bandeau.
-  // À 40 %, la carte garde assez de hauteur pour ne pas trop dézoomer au cadrage.
-  const snapPoints = useMemo(
-    () => [SHEET_MIN, Math.round(screenH * 0.4), Math.round(screenH - insets.top - TOP_BAR)],
-    [screenH, insets.top],
-  );
-  const [sheetIndex, setSheetIndex] = useState(1);
-  // Hauteur demandée par un lien avant que le panneau existe (polices pas encore chargées).
-  const [startSheet, setStartSheet] = useState(1);
-  // Haut du panneau, suivi en continu par le dé flottant.
-  const sheetTop = useSharedValue(screenH);
-  const listY = useRef(0);
-  const cardY = useRef(new Map<string, number>());
-
   const run = useCallback(async (search: () => Promise<{ list: Restaurant[]; area: Area }>, refit: boolean) => {
     const id = ++requestId.current;
     setPhase("searching");
@@ -127,11 +88,30 @@ function Main() {
     try {
       const { list, area } = await search();
       if (id !== requestId.current) return;
-      coveredArea.current = area;
-      if (!categoryRef.current) refreshCategories(area);
-      setPlaces(list);
+      searched.current = true;
+      setTop(list);
       setArea(area);
-      setSelectedId(null);
+      setCurrent(refit ? Math.min(startCard.current, Math.max(list.length - 1, 0)) : 0);
+      // Le widget montre le dernier verdict trouvé autour de soi (pas quand on explore la carte ailleurs).
+      if (refit) {
+        const first = list[0];
+        const trip = first && travelTime(distanceMeters(area.center, first.location));
+        updateWidget(
+          first
+            ? {
+                name: first.name,
+                minutes: trip.minutes,
+                mode: trip.mode,
+                closing: first.closesIn === undefined || first.closesIn === Infinity ? null : formatClosingTime(first.closesIn),
+              }
+            : null,
+        );
+      }
+      if (refit && goToFirst.current && list[0]) {
+        goToFirst.current = false;
+        const trip = travelTime(distanceMeters(area.center, list[0].location));
+        Linking.openURL(directionsUrl(list[0], trip.mode === "walk"));
+      }
       if (refit) setFitKey((k) => k + 1);
       setPhase("done");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -141,34 +121,24 @@ function Main() {
       setPhase("error");
       setError((err as Error).message || t("oops"));
     }
-  }, [refreshCategories]);
+  }, []);
 
-  // Liens profonds gfaim://?cuisine=poutine&mode=fast&sheet=2 : ouvrent l'app dans un état donné
-  // (cuisine choisie dès qu'elle est proposée, mode top/fast/surprise, hauteur du panneau 0/1/2).
-  // surprise=1/0 reste compris (anciens liens). Même chose au lancement avec l'argument -deeplink "mode=fast&sheet=2"
-  // (iOS le range dans les préférences) : le simulateur demande confirmation à chaque gfaim://, pas au lancement. Servent aussi
-  // à automatiser les captures App Store sur le simulateur, qui ne sait pas toucher l'écran.
-  const pendingCuisine = useRef<string | null>(null);
+  // Liens profonds : gfaim://?faim=1 (raccourci Siri, widget) part tout de suite vers le resto le plus proche ;
+  // gfaim://?card=2 montre la 3e carte. Même chose au lancement avec l'argument -deeplink "card=2" (iOS le range
+  // dans les préférences) : le simulateur demande confirmation à chaque gfaim://, pas au lancement.
   useEffect(() => {
     const apply = (url: string | null | undefined) => {
       if (!url) return;
       const params = Object.fromEntries(
         (url.split("?")[1] ?? "").split("&").filter(Boolean).map((kv) => kv.split("=").map(decodeURIComponent)),
       );
-      const next = params.mode ?? (params.surprise !== undefined ? (params.surprise === "1" ? "surprise" : "top") : undefined);
-      if (MODES.includes(next as Mode)) {
-        setMode(next as Mode);
-        setSeed(Date.now());
-      }
-      if (params.cuisine !== undefined) pendingCuisine.current = params.cuisine || null;
-      if (params.cuisine === "") setCategory(null);
-      if (params.sheet !== undefined) {
-        const index = Number(params.sheet);
-        if (sheet.current) sheet.current.snapToIndex(index);
-        else {
-          setStartSheet(index);
-          setSheetIndex(index);
-        }
+      if (params.card !== undefined) startCard.current = Number(params.card) || 0;
+      if (params.faim === "1") {
+        // L'app tournait peut-être déjà : on reprend la position pour relancer la recherche autour de soi.
+        goToFirst.current = true;
+        getPosition()
+          .then(setHome)
+          .catch(() => setHome((h) => (h ? { ...h } : h)));
       }
     };
     Linking.getInitialURL().then(apply);
@@ -179,18 +149,9 @@ function Main() {
     const sub = Linking.addEventListener("url", ({ url }) => apply(url));
     return () => sub.remove();
   }, []);
-  useEffect(() => {
-    const key = pendingCuisine.current;
-    const match = key && categories.find((c) => c.key === key);
-    if (match) {
-      pendingCuisine.current = null;
-      setCategory(match);
-    }
-  }, [categories]);
 
   // Dès l'ouverture : on récupère la position.
   useEffect(() => {
-    if (!hasApiKey) return;
     let cancelled = false;
     getPosition()
       .then((pos) => !cancelled && setHome(pos))
@@ -205,74 +166,57 @@ function Main() {
     };
   }, []);
 
-  // Position (ou cuisine, ou mode rapide) connue : on élargit depuis 500 m jusqu'à trouver 5 restos,
-  // puis on cadre la carte dessus.
+  // Position connue : les 5 restos ouverts les plus proches (on élargit depuis 500 m), la carte cadrée sur toi et le premier.
   useEffect(() => {
     if (!home) return;
-    coveredArea.current = null;
-    run(() => searchUntilTop(home, category, fast), true);
-  }, [home, category, fast, run]);
+    searched.current = false;
+    run(() => nearestOpen(home), true);
+  }, [home, run]);
 
-  // On recherche sur la vue quand l'utilisateur dézoome / se déplace au-delà de la zone fouillée,
-  // ou quand il zoome assez pour que la vue soit nettement plus petite que cette zone.
+  // La carte bouge (déplacement ou zoom) : les 5 plus proches du centre, dans la zone visible, sans la recadrer.
   const onViewportChange = useCallback(
     (view: Area) => {
-      const covered = coveredArea.current;
-      if (!covered) return;
-      refreshCategories(view);
-      const inside = distanceMeters(view.center, covered.center) + view.radius <= covered.radius * 1.05;
-      const zoomedIn = view.radius < covered.radius * ZOOM_IN_RATIO;
-      if (inside && !zoomedIn) return;
-      coveredArea.current = view;
-      const c = categoryRef.current;
-      const f = fastRef.current;
-      run(async () => ({ list: await searchRestaurants(view, c, f), area: view }), false);
+      if (searched.current) run(() => nearestOpenInView(view), false);
     },
-    [run, refreshCategories],
+    [run],
   );
 
-  // Bouton ➤ : reprend la position GPS (on a pu bouger) et relance la recherche depuis le plus petit
-  // rayon, carte recentrée sur soi, comme à l'ouverture. Sans position (refusée), on repart de la dernière connue.
-  const recenter = useCallback(() => {
-    if (!home) return;
+  // Le logo repart de zéro : on reprend la position GPS (on a pu bouger) et on recherche autour de soi.
+  const restart = useCallback(() => {
+    Haptics.selectionAsync();
+    startCard.current = 0;
     getPosition()
       .then((pos) => setHome(pos))
       .catch(() => setHome((h) => (h ? { ...h } : h)));
-  }, [home]);
-
-  const onSelectFromMap = useCallback((id: string) => {
-    setSelectedId(id);
-    Haptics.selectionAsync();
-    // Ouvre le panneau à mi-hauteur et fait défiler jusqu'au resto.
-    sheet.current?.snapToIndex(1);
-    const y = cardY.current.get(id);
-    if (y != null) scroll.current?.scrollTo({ y: listY.current + y - 16, animated: true });
   }, []);
 
-  const top = useMemo(
-    () => (surprise ? pickRandom(places, seed) : fast && home ? rankFast(places, home) : rankTop(places)),
-    [places, surprise, seed, fast, home],
+  // Une autre carte (glissée, ou son épingle touchée) : la carte la suit.
+  const show = useCallback((index: number) => {
+    if (index < 0) return;
+    setCurrent(index);
+    setFitKey((k) => k + 1);
+  }, []);
+  const onSelectFromMap = useCallback(
+    (id: string) => {
+      Haptics.selectionAsync();
+      show(top.findIndex((r) => r.id === id));
+    },
+    [show, top],
   );
 
-  // 4 cuisines au plus ; la cuisine choisie reste affichée même si elle sort du top en bougeant la carte.
-  const top4 = categories.slice(0, MAX_SHOWN);
-  const shownCategories =
-    category && !top4.some((c) => c.key === category.key) ? [...top4.slice(0, MAX_SHOWN - 1), category] : top4;
-
   const busy = phase === "locating" || phase === "searching";
+  const empty = phase === "done" && !top.length;
 
-  // Ligne de statut seulement quand il y a quelque chose à dire ; sinon, l'accroche.
   let status = "";
   if (phase === "locating") status = t("locating");
-  else if (phase === "searching") status = t("searching");
   else if (phase === "error") status = error ?? "";
-  else if (!top.length) status = t("nothingOpen");
+  else if (empty) status = t("nothingOpen");
 
   async function submitAddress() {
     if (!address.trim()) return;
     try {
       setPhase("locating");
-      // Géocodage du système (Apple sur iOS) : pas besoin de clé Google.
+      // Géocodage du système (Apple sur iOS) : pas besoin de clé.
       const [hit] = await Location.geocodeAsync(address.trim());
       if (!hit) throw new Error(t("addressNotFound"));
       setHome({ latitude: hit.latitude, longitude: hit.longitude });
@@ -297,110 +241,74 @@ function Main() {
           results={top}
           area={area}
           fitKey={fitKey}
-          selectedId={selectedId}
+          selectedId={top[current]?.id ?? null}
           onSelect={onSelectFromMap}
           onViewportChange={onViewportChange}
-          // Panneau plein écran : la carte est cachée, on garde le cadrage de la position moitié.
-          insets={{ top: topBarHeight, bottom: snapPoints[Math.min(sheetIndex, 1)] }}
+          insets={wide ? { top: topBarHeight, bottom: 0, left: SIDE_PANEL + MARGIN } : { top: topBarHeight, bottom: panelHeight }}
         />
       ) : (
         <View style={styles.mapPlaceholder} />
       )}
 
-      {/* La dame en grand, seulement pendant la recherche, au milieu de la partie visible de la carte. */}
-      <SearchingLady
-        visible={busy}
-        mode={mode}
-        top={topBarHeight}
-        bottom={snapPoints[Math.min(sheetIndex, 1)]}
-      />
+      {/* La dame en grand, seulement pendant la première recherche ou quand rien n'est ouvert. */}
+      <SearchingLady visible={(busy && !top.length) || empty} mode="top" top={topBarHeight} bottom={wide ? 0 : panelHeight} />
 
-      <View style={[styles.banner, { paddingTop: insets.top, height: topBarHeight }]}>
-        <Text style={styles.bannerTitle} accessibilityRole="header">
-          {t("appName")}
+      {/* Le logo repart de zéro autour de soi. */}
+      <Pressable
+        style={({ pressed }) => [styles.brand, { top: insets.top + 8 }, pressed && styles.pressed]}
+        onPress={restart}
+        accessibilityRole="button"
+        accessibilityLabel={t("restart")}
+      >
+        <Image source={require("./assets/icon.png")} style={styles.brandIcon} />
+        <Text style={styles.brandText}>{t("appName")}</Text>
+      </Pressable>
+
+      <View
+        style={
+          wide
+            ? [styles.panel, styles.sidePanel, { top: topBarHeight + MARGIN, bottom: insets.bottom + MARGIN, left: insets.left + MARGIN }]
+            : [styles.panel, { paddingBottom: insets.bottom + 8 }]
+        }
+        onLayout={(e) => setPanelHeight(e.nativeEvent.layout.height)}
+      >
+        {status !== "" && <Text style={[styles.status, phase === "error" && styles.statusError]}>{status}</Text>}
+
+        {askAddress && (
+          <View style={styles.address}>
+            <TextInput
+              style={styles.input}
+              placeholder={t("addressPlaceholder")}
+              placeholderTextColor={colors.muted}
+              value={address}
+              onChangeText={setAddress}
+              onSubmitEditing={submitAddress}
+              returnKeyType="search"
+            />
+            <Pressable style={styles.goButton} onPress={submitAddress}>
+              <Text style={styles.goButtonText}>{t("go")}</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {home && top.length > 0 && (
+          <View style={busy && styles.stale}>
+            <SwipeDeck places={top} home={home} current={current} onChange={show} />
+          </View>
+        )}
+
+        <Text style={styles.footer}>
+          <Text style={styles.footerLink} onPress={() => Linking.openURL(`${SITE}/${lang}/privacy`)} accessibilityRole="link">
+            {t("privacy")}
+          </Text>
+          {"  ·  "}
+          <Text style={styles.footerLink} onPress={() => Linking.openURL(`${SITE}/${lang}/support`)} accessibilityRole="link">
+            {t("support")}
+          </Text>
+          {"  ·  "}
+          {t("footer")}
         </Text>
       </View>
-      {/* Les trois modes, à gauche du bandeau. Hors du bandeau pour que le nom du mode déborde dessous. */}
-      <ModePicker
-        style={{ top: insets.top + (TOP_BAR - 42) / 2, left: 12 }}
-        mode={mode}
-        onChange={(next) => {
-          setMode(next);
-          setSeed(Date.now());
-        }}
-      />
-
-      <MapControls
-        onRecenter={recenter}
-        sheetTop={sheetTop}
-        screenHeight={screenH}
-      />
-
-      <BottomSheet
-        ref={sheet}
-        index={startSheet}
-        snapPoints={snapPoints}
-        onChange={setSheetIndex}
-        animatedPosition={sheetTop}
-        backgroundStyle={styles.sheetBackground}
-        handleIndicatorStyle={styles.sheetHandle}
-        enableDynamicSizing={false}
-      >
-        <BottomSheetScrollView ref={scroll} contentContainerStyle={styles.sheetContent}>
-          {status !== "" && <Text style={[styles.status, phase === "error" && styles.statusError]}>{status}</Text>}
-
-          {shownCategories.length > 0 && (
-            <CategoryBar categories={shownCategories} selected={category} onSelect={setCategory} />
-          )}
-
-          {askAddress && (
-            <View style={styles.address}>
-              <TextInput
-                style={styles.input}
-                placeholder={t("addressPlaceholder")}
-                placeholderTextColor={colors.muted}
-                value={address}
-                onChangeText={setAddress}
-                onSubmitEditing={submitAddress}
-                onFocus={() => sheet.current?.snapToIndex(2)}
-                returnKeyType="search"
-              />
-              <Pressable style={styles.goButton} onPress={submitAddress}>
-                <Text style={styles.goButtonText}>{t("go")}</Text>
-              </Pressable>
-            </View>
-          )}
-
-          {home && top.length > 0 && (
-            <View style={[styles.results, busy && styles.stale]} onLayout={(e) => (listY.current = e.nativeEvent.layout.y)}>
-              {top.map((r, i) => (
-                <View key={r.id} onLayout={(e) => cardY.current.set(r.id, e.nativeEvent.layout.y)}>
-                  <RestaurantCard
-                    r={r}
-                    index={i}
-                    home={home}
-                    distance={distanceMeters(home, r.location)}
-                    selected={r.id === selectedId}
-                    onSelect={setSelectedId}
-                  />
-                </View>
-              ))}
-            </View>
-          )}
-
-          <Text style={styles.footer}>
-            {t("footer")}
-            {"\n"}
-            <Text style={styles.footerLink} onPress={() => Linking.openURL(`${SITE}/${lang}/privacy`)} accessibilityRole="link">
-              {t("privacy")}
-            </Text>
-            {"  ·  "}
-            <Text style={styles.footerLink} onPress={() => Linking.openURL(`${SITE}/${lang}/support`)} accessibilityRole="link">
-              {t("support")}
-            </Text>
-          </Text>
-        </BottomSheetScrollView>
-      </BottomSheet>
     </View>
   );
 }
@@ -418,21 +326,42 @@ export default function App() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   mapPlaceholder: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: colors.accentSoft },
-  banner: {
+  brand: {
     position: "absolute",
-    top: 0,
+    left: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 4,
+    paddingLeft: 4,
+    paddingRight: 14,
+    borderRadius: 999,
+    backgroundColor: "rgba(251, 246, 239, 0.94)",
+    shadowColor: colors.ink,
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 1 },
+  },
+  brandIcon: { width: 34, height: 34, borderRadius: 17 },
+  brandText: { fontFamily: fonts.title, fontSize: 19, color: colors.ink },
+  pressed: { transform: [{ scale: 0.95 }] },
+  panel: {
+    position: "absolute",
     left: 0,
     right: 0,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(251, 246, 239, 0.94)",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.line,
+    bottom: 0,
+    paddingTop: 16,
+    paddingHorizontal: 16,
+    backgroundColor: colors.bg,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    shadowColor: colors.ink,
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: -6 },
   },
-  bannerTitle: { fontFamily: fonts.title, fontSize: 24, color: colors.ink, letterSpacing: -0.5 },
-  sheetBackground: { backgroundColor: colors.bg, borderRadius: 24 },
-  sheetHandle: { backgroundColor: colors.line, width: 44 },
-  sheetContent: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 48 },
+  // Panneau posé à gauche de la carte, sur l'écran large ; le paquet de cartes reste en haut du panneau.
+  sidePanel: { right: undefined, width: SIDE_PANEL, borderRadius: 24, paddingBottom: 12, justifyContent: "flex-start" },
   status: { fontFamily: fonts.body, fontSize: 14, color: colors.muted, textAlign: "center", marginBottom: 12 },
   statusError: { color: colors.accent },
   address: { flexDirection: "row", gap: 8, marginBottom: 16 },
@@ -450,8 +379,7 @@ const styles = StyleSheet.create({
   },
   goButton: { backgroundColor: colors.accent, borderRadius: 10, paddingHorizontal: 18, justifyContent: "center" },
   goButtonText: { color: "#fff", fontFamily: fonts.title, fontSize: 16 },
-  results: { gap: 14, paddingTop: 8, paddingLeft: 8 },
   stale: { opacity: 0.5 },
-  footer: { fontFamily: fonts.body, fontSize: 12, lineHeight: 20, color: colors.muted, textAlign: "center", marginTop: 24 },
+  footer: { fontFamily: fonts.body, fontSize: 11, color: colors.muted, textAlign: "center", marginTop: 12 },
   footerLink: { textDecorationLine: "underline" },
 });

@@ -28,9 +28,9 @@
     "info": {
       "fr-FR": {
         "title": "Groubl",
-        "subtitle": "Les meilleurs restos ouverts",
-        "promoText": "Ton ventre gargouille ? Groubl trouve les 5 meilleures tables ouvertes autour de toi, et les spécialités du coin. Ou laisse le hasard choisir !",
-        "description": "Ton ventre gargouille ? Groubl trouve en un instant les 5 restaurants les mieux notés et ouverts en ce moment, juste autour de toi.\n\n• Dès l'ouverture, ta position et la carte, sans rien taper\n• Uniquement des restos ouverts maintenant, classés par note Google\n• Les spécialités du coin : poutine au Québec, crêpes en Bretagne, basque à Bayonne…\n• Sur le pouce : fast-foods, sandwicheries et vente à emporter bien notés, au plus près\n• Le mode surprise : 5 restos tirés au sort, bien notés ou pas, pour sortir des sentiers battus\n• Dézoome la carte pour chercher plus loin\n• Un bouton pour lancer l'itinéraire\n\nPas de compte, pas de pub, pas de suivi.",
+        "subtitle": "Le resto ouvert le plus proche",
+        "promoText": "Ton ventre gargouille ? Groubl te montre les restos ouverts les plus proches. Pas celui-là ? Swipe. Celui-là ? Miam, on y va.",
+        "description": "Ton ventre gargouille et tu n'arrives plus à choisir ? Groubl choisit pour toi : le resto ouvert le plus proche, tout de suite.\n\n• Dès l'ouverture, ta position et le resto le plus proche, sans rien taper\n• Swipe à gauche pour le suivant, à droite pour lancer l'itinéraire\n• « Encore ouvert quand t'arrives » : on compte le trajet et le temps de manger\n• Le temps à pied en gros, l'heure de fermeture d'un coup d'œil\n• Même tard le soir : les 5 plus proches qui t'attendent encore\n• Bouge la carte, les restos ouverts du coin suivent\n• « Dis Siri, j'ai faim avec Groubl » et un widget pour l'écran d'accueil\n\nPas de compte, pas de pub, pas de pistage. Aucun resto ne paie pour être là. Données OpenStreetMap.",
         "keywords": [
           "restaurant",
           "resto",
@@ -38,11 +38,12 @@
           "manger",
           "ouvert",
           "près de moi",
-          "food",
+          "proche",
           "dîner",
-          "déjeuner",
-          "spécialité",
-          "cuisine"
+          "souper",
+          "midi",
+          "swipe",
+          "food"
         ],
         "supportUrl": "https://www.groubl.com/fr/support",
         "privacyPolicyUrl": "https://www.groubl.com/fr/privacy",
@@ -50,9 +51,9 @@
       },
       "en-US": {
         "title": "Groubl",
-        "subtitle": "The best open restaurants",
-        "promoText": "Tummy rumbling? Groubl finds the 5 best open restaurants around you, plus the local specialties. Or let chance decide!",
-        "description": "Tummy rumbling? Groubl instantly finds the 5 best-rated restaurants that are open right now, right around you.\n\n• Opens straight to your location and the map, nothing to type\n• Only places open right now, ranked by Google rating\n• Local specialties: poutine in Québec, crêpes in Brittany, Basque food in Bayonne…\n• Quick bite: well-rated fast food, sandwich shops and takeaway, as close as it gets\n• Surprise mode: 5 restaurants picked at random, highly rated or not, to get off the beaten track\n• Zoom out the map to search further\n• One tap for directions\n\nNo account, no ads, no tracking.",
+        "subtitle": "The closest open restaurant",
+        "promoText": "Tummy rumbling? Groubl shows you the closest restaurants open right now. Not that one? Swipe. That one? Yum, let's go.",
+        "description": "Tummy rumbling and too hungry to choose? Groubl picks for you: the closest open restaurant, right now.\n\n• Opens straight to your location and the closest spot, nothing to type\n• Swipe left for the next one, right to start directions\n• \"Still open when you arrive\": we count the walk and the time to eat\n• Walking time in big numbers, closing time at a glance\n• Even late at night: the 5 closest places still waiting for you\n• Move the map, the open spots around follow\n• \"Hey Siri, I'm hungry with Groubl\" and a home-screen widget\n\nNo account, no ads, no tracking. No restaurant pays to be there. OpenStreetMap data.",
         "keywords": [
           "restaurant",
           "food",
@@ -60,11 +61,11 @@
           "eat",
           "open now",
           "near me",
+          "closest",
           "dinner",
           "lunch",
-          "local",
-          "cuisine",
-          "nearby"
+          "late night",
+          "swipe"
         ],
         "supportUrl": "https://www.groubl.com/en/support",
         "privacyPolicyUrl": "https://www.groubl.com/en/privacy",
@@ -72,9 +73,9 @@
       },
       "es-ES": {
         "title": "Groubl",
-        "subtitle": "Mejores restaurantes abiertos",
-        "promoText": "¿Te ruge la barriga? Groubl encuentra los 5 mejores restaurantes abiertos cerca de ti, y las especialidades locales. ¡O deja que el azar elija!",
-        "description": "¿Te ruge la barriga? Groubl encuentra al instante los 5 restaurantes mejor valorados que están abiertos ahora mismo, justo a tu alrededor.\n\n• Se abre directamente en tu ubicación y el mapa, sin escribir nada\n• Solo sitios abiertos ahora, ordenados por la nota de Google\n• Especialidades locales: poutine en Quebec, crepes en Bretaña, cocina vasca en Bayona…\n• Algo rápido: comida rápida, bocadillos y para llevar bien valorados, lo más cerca posible\n• El modo sorpresa: 5 restaurantes al azar, bien valorados o no, para salirse de lo de siempre\n• Aleja el mapa para buscar más lejos\n• Un toque para ver cómo llegar\n\nSin cuenta, sin anuncios, sin seguimiento.",
+        "subtitle": "Restaurante abierto más cerca",
+        "promoText": "¿Te ruge la barriga? Groubl te muestra los restaurantes abiertos más cercanos. ¿Ese no? Desliza. ¿Ese sí? Ñam, vamos.",
+        "description": "¿Te ruge la barriga y ya no sabes qué elegir? Groubl elige por ti: el restaurante abierto más cercano, ahora mismo.\n\n• Se abre directamente en tu ubicación y el sitio más cercano, sin escribir nada\n• Desliza a la izquierda para el siguiente, a la derecha para ir\n• «Abierto cuando llegues»: contamos el camino y el tiempo para comer\n• El tiempo a pie en grande, la hora de cierre de un vistazo\n• Incluso de noche: los 5 más cercanos que todavía te esperan\n• Mueve el mapa y los sitios abiertos de la zona te siguen\n• «Oye Siri, tengo hambre con Groubl» y un widget para la pantalla de inicio\n\nSin cuenta, sin anuncios, sin seguimiento. Ningún restaurante paga por estar ahí. Datos de OpenStreetMap.",
         "keywords": [
           "restaurante",
           "comida",
@@ -82,10 +83,11 @@
           "comer",
           "abierto",
           "cerca de mí",
+          "cercano",
           "cena",
           "almuerzo",
-          "especialidad",
-          "cocina"
+          "noche",
+          "deslizar"
         ],
         "supportUrl": "https://www.groubl.com/es/support",
         "privacyPolicyUrl": "https://www.groubl.com/es/privacy",

@@ -1,9 +1,8 @@
 import type { ExpoConfig } from "expo/config";
 
-// Clé Google : Maps SDK for iOS + Places API (New), restreinte à l'app iOS (bundle ID ci-dessous).
-const GOOGLE_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
-
 export const BUNDLE_ID = "com.jphilippelingrand.gfaim";
+// Partagé entre l'app et le widget (dernier verdict). À déclarer aussi sur le portail Apple Developer.
+export const APP_GROUP = `group.${BUNDLE_ID}`;
 
 const config: ExpoConfig = {
   name: "Groubl",
@@ -22,6 +21,10 @@ const config: ExpoConfig = {
       ITSAppUsesNonExemptEncryption: false,
       // Nécessaire pour que les traductions de languages/*.json (permission, nom) soient utilisées.
       CFBundleAllowMixedLocalizations: true,
+    },
+    // Le widget lit le dernier verdict dans les UserDefaults de ce groupe (recopié sur la cible du widget).
+    entitlements: {
+      "com.apple.security.application-groups": [APP_GROUP],
     },
   },
   android: {
@@ -42,10 +45,9 @@ const config: ExpoConfig = {
     [
       "expo-location",
       {
-        locationWhenInUsePermission: "Groubl utilise ta position pour trouver les meilleurs restos ouverts autour de toi.",
+        locationWhenInUsePermission: "Groubl utilise ta position pour trouver les restos ouverts les plus proches de toi.",
       },
     ],
-    ["react-native-maps", { iosGoogleMapsApiKey: GOOGLE_KEY, androidGoogleMapsApiKey: GOOGLE_KEY }],
     [
       "expo-splash-screen",
       {
@@ -55,6 +57,10 @@ const config: ExpoConfig = {
       },
     ],
     "expo-font",
+    // Cibles natives de targets/ : le widget (SwiftUI) et le raccourci Siri « J'ai faim » (targets/widget/_shared).
+    "@bacons/apple-targets",
+    // Phrases Siri du raccourci en fr / en / es (languages/app-shortcuts.json).
+    "./plugins/withAppShortcutsStrings",
   ],
   extra: {
     eas: {
