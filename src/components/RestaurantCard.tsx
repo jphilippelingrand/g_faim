@@ -1,4 +1,5 @@
-import { formatDistance, type LatLng, type Restaurant } from "../lib/places";
+import { formatClosingTime, formatDistance, travelTime, type LatLng, type Restaurant } from "../lib/places";
+import { cuisineLabel } from "../lib/osm";
 import { t } from "../i18n";
 
 type Props = {
@@ -10,22 +11,35 @@ type Props = {
   onSelect: (id: string) => void;
 };
 
-// Au-delà, on laisse Google choisir le mode de transport.
-const WALKING_MAX = 1500;
+// En dessous, on prévient que ça ferme bientôt.
+const CLOSING_SOON = 60;
 
-function directionsUrl(home: LatLng, r: Restaurant, distance: number): string {
+/** Lien d'itinéraire Google Maps (une simple URL, pas l'API : gratuit). */
+function directionsUrl(home: LatLng, r: Restaurant, walking: boolean): string {
   const params = new URLSearchParams({
     api: "1",
     origin: `${home.lat},${home.lng}`,
-    destination: r.name,
-    destination_place_id: r.id,
+    destination: `${r.location.lat},${r.location.lng}`,
+    travelmode: walking ? "walking" : "driving",
   });
-  if (distance <= WALKING_MAX) params.set("travelmode", "walking");
   return `https://www.google.com/maps/dir/?${params}`;
 }
 
+function openingLine(r: Restaurant): { text: string; soon: boolean } {
+  if (r.closesIn === undefined) return { text: t("hoursUnknown"), soon: false };
+  if (r.closesIn === Infinity) return { text: t("openAllDay"), soon: false };
+  return { text: t("openUntil", { time: formatClosingTime(r.closesIn) }), soon: r.closesIn < CLOSING_SOON };
+}
+
+const WALKER = "M13.5 5.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM9.8 8.9 7 23h2.1l1.8-8 2.1 2v6h2v-7.5l-2.1-2 .6-3A7.3 7.3 0 0 0 19 13v-2a5 5 0 0 1-4.3-2.4l-1-1.6a2 2 0 0 0-1.7-1c-.3 0-.5 0-.8.1L6 8.3V13h2V9.6l1.8-.7";
+const CAR = "M18.9 6c-.2-.6-.8-1-1.4-1h-11c-.7 0-1.2.4-1.4 1L3 12v8c0 .6.4 1 1 1h1c.6 0 1-.4 1-1v-1h12v1c0 .6.4 1 1 1h1c.6 0 1-.4 1-1v-8l-2.1-6zM6.5 16c-.8 0-1.5-.7-1.5-1.5S5.7 13 6.5 13s1.5.7 1.5 1.5S7.3 16 6.5 16zm11 0c-.8 0-1.5-.7-1.5-1.5s.7-1.5 1.5-1.5 1.5.7 1.5 1.5-.7 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z";
+
 export function RestaurantCard({ r, index, home, distance, selected, onSelect }: Props) {
-  const details = [r.type, r.price, formatDistance(distance)].filter(Boolean).join(" · ");
+  const cuisine = r.cuisine ? cuisineLabel(r.cuisine) : null;
+  const opening = openingLine(r);
+  const trip = travelTime(distance);
+  const url = directionsUrl(home, r, trip.mode === "walk");
+  const tripLabel = t(trip.mode === "walk" ? "walkMinutes" : "driveMinutes", { minutes: trip.minutes });
 
   return (
     <li id={`resto-${r.id}`}>
@@ -35,30 +49,34 @@ export function RestaurantCard({ r, index, home, distance, selected, onSelect }:
         // Souris uniquement : sur mobile, le début d'un scroll déclencherait la sélection.
         onPointerEnter={(e) => e.pointerType === "mouse" && onSelect(r.id)}
       >
-        <span className="rank" aria-hidden="true">{index + 1}</span>
-        <a className="card-link" href={r.url} target="_blank" rel="noopener noreferrer">
+        <a className="card-link" href={url} target="_blank" rel="noopener noreferrer">
+          <span className="rank" aria-hidden="true">{index + 1}</span>
           <div className="card-body">
             <h2>{r.name}</h2>
-            <div className="meta">
-              <span className="rating">
-                <span className="star">★</span> {r.rating.toFixed(1)}
-              </span>{" "}
-              · {r.reviews} {t("reviews")}
-            </div>
-            <div className="meta meta-line">{details}</div>
+            {cuisine && (
+              <div className="meta meta-line">
+                {cuisine.emoji} {cuisine.label}
+              </div>
+            )}
+            <div className={`meta${r.open === undefined ? " unknown" : opening.soon ? " soon" : " open"}`}>{opening.text}</div>
           </div>
         </a>
         <a
           className="go"
-          href={directionsUrl(home, r, distance)}
+          href={url}
           target="_blank"
           rel="noopener noreferrer"
           title={t("directions")}
-          aria-label={t("directionsTo", { name: r.name })}
+          aria-label={`${t("directionsTo", { name: r.name })} : ${tripLabel}, ${formatDistance(distance)}`}
         >
-          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-            <path d="M21.7 11.3l-9-9a1 1 0 0 0-1.4 0l-9 9a1 1 0 0 0 0 1.4l9 9a1 1 0 0 0 1.4 0l9-9a1 1 0 0 0 0-1.4zM14 14.5V12h-4v3H8v-4a1 1 0 0 1 1-1h5V7.5l3.5 3.5-3.5 3.5z" fill="currentColor" />
-          </svg>
+          <span className="eta">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+              <path d={trip.mode === "walk" ? WALKER : CAR} fill="currentColor" />
+            </svg>
+            <b>{trip.minutes}</b>
+            <span>min</span>
+          </span>
+          <span className="dist">{formatDistance(distance)}</span>
         </a>
       </div>
     </li>

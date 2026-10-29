@@ -1,17 +1,8 @@
 import { useEffect, useState, type RefObject } from "react";
-import { ModePicker, type Mode } from "./ModePicker";
 import { t } from "../i18n";
 
 /** Barre compacte fixée en haut, qui apparaît quand l'élément surveillé (la grande dame) sort de l'écran. */
-export function MiniBar({
-  watch,
-  mode,
-  onMode,
-}: {
-  watch: RefObject<HTMLElement | null>;
-  mode: Mode;
-  onMode: (mode: Mode) => void;
-}) {
+export function MiniBar({ watch }: { watch: RefObject<HTMLElement | null> }) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -36,7 +27,6 @@ export function MiniBar({
         <img src="/icon.svg" alt="" width={34} height={34} />
         <span>{t("appName")}</span>
       </button>
-      <ModePicker mode={mode} onChange={onMode} compact />
     </div>
   );
 }

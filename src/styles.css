@@ -415,7 +415,6 @@ header { text-align: center; position: relative; }
   border: 3px solid #fff;
   box-shadow: 0 0 0 0 rgb(59 130 246 / .5);
   animation: pulse 2s infinite;
-  transform: translateY(50%);
 }
 @keyframes pulse {
   70% { box-shadow: 0 0 0 14px rgb(59 130 246 / 0); }
@@ -455,7 +454,7 @@ input:focus { border-color: var(--accent); }
 
 .card {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 1fr auto;
   gap: 12px;
   align-items: center;
   background: var(--card);
@@ -474,32 +473,51 @@ input:focus { border-color: var(--accent); }
 .card-link, .go { -webkit-tap-highlight-color: transparent; }
 
 .card-link {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 12px;
   text-decoration: none;
   color: inherit;
   min-width: 0;
 }
 
+/* Le temps à pied, en gros : c'est ce qui compte quand on a faim. Toute la pastille lance l'itinéraire. */
 .go {
   display: grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
+  justify-items: center;
+  gap: 1px;
+  width: 84px;
+  box-sizing: border-box;
+  padding: 8px 6px;
+  border-radius: 14px;
   background: var(--accent-soft);
   color: var(--accent);
+  text-decoration: none;
   transition: background .15s, color .15s, transform .15s;
+}
+.eta { display: flex; align-items: baseline; gap: 3px; }
+.eta svg { align-self: center; }
+.eta b { font: 700 1.7rem/1 "Fraunces", Georgia, serif; font-variant-numeric: lining-nums; }
+.eta span { font-weight: 500; font-size: .85rem; }
+.dist { font-size: .75rem; color: var(--muted); transition: color .15s; }
+.go:active .dist, .go:focus-visible .dist { color: rgb(255 255 255 / .85); }
+@media (hover: hover) {
+  .go:hover .dist { color: rgb(255 255 255 / .85); }
 }
 .go:active, .go:focus-visible { background: var(--accent); color: #fff; transform: scale(1.08); }
 @media (hover: hover) {
   .go:hover { background: var(--accent); color: #fff; transform: scale(1.08); }
 }
 
-/* Le numéro du classement tient lieu de vignette : grand, en tête de carte. */
+/* Le numéro, comme l'épingle de la carte, pour retrouver le resto dessus. */
 .rank {
-  min-width: 1.1em;
-  color: var(--accent);
-  font: 700 1.9rem/1 "Fraunces", Georgia, serif;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font: 700 .9rem/28px "Fraunces", Georgia, serif;
   font-variant-numeric: lining-nums;
   text-align: center;
 }
@@ -508,8 +526,8 @@ input:focus { border-color: var(--accent); }
 .meta { font-size: .85rem; color: var(--muted); margin-top: 2px; }
 .card-body { min-width: 0; }
 .meta-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.rating { color: var(--ink); font-weight: 500; }
-.star { color: var(--accent); }
+.meta.open { color: #3f8f5a; font-weight: 500; }
+.meta.soon { color: var(--accent); font-weight: 500; }
 
 @keyframes pop {
   from { opacity: 0; transform: translateY(6px); }
@@ -537,6 +555,17 @@ footer a { color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   .lady *, .lady svg, .card, .home-pin { animation: none !important; }
   .grr span { opacity: 1; }
+}
+
+/* ============ Téléphone : le resto n°1 doit se voir sans faire défiler ============ */
+
+@media (max-width: 600px) {
+  main { padding-top: 12px; }
+  .lady { padding-top: 28px; }
+  .lady svg { width: 140px; height: 158px; }
+  .tagline { margin-bottom: 12px; }
+  .map { height: 240px; }
+  .map-wrap { margin-bottom: 14px; }
 }
 
 /* ============ Grand écran : liste à gauche, carte à droite (façon Google Maps) ============ */

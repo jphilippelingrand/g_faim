@@ -13,19 +13,19 @@ const LANGS = {
   fr: {
     locale: "fr_FR",
     name: "Groubl",
-    description: "Les 5 meilleures tables ouvertes, juste à côté.",
+    description: "Les 5 restos ouverts les plus proches.",
     imageAlt: "La petite dame de Groubl, le ventre qui gargouille",
   },
   en: {
     locale: "en_US",
     name: "Groubl",
-    description: "The 5 best open tables, right around the corner.",
+    description: "The 5 closest places open right now.",
     imageAlt: "The little lady from Groubl, with a rumbling tummy",
   },
   es: {
     locale: "es_ES",
     name: "Groubl",
-    description: "Las 5 mejores mesas abiertas, a la vuelta de la esquina.",
+    description: "Los 5 restaurantes abiertos más cercanos.",
     imageAlt: "La señora de Groubl, con la barriga rugiendo",
   },
 };

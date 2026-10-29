@@ -1,108 +1,41 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Lady, type Mood } from "./components/Lady";
 import { RestaurantCard } from "./components/RestaurantCard";
-import { RestaurantMap } from "./components/RestaurantMap";
 import { MiniBar } from "./components/MiniBar";
-import { ModePicker, type Mode } from "./components/ModePicker";
-import { hasApiKey } from "./lib/google";
-import { MAX_SHOWN, neighborhoodCategories, type Category } from "./lib/osm";
 import { LANGS, lang, setLang, t } from "./i18n";
 import {
   distanceMeters,
   formatDistance,
   geocode,
   getBrowserPosition,
-  pickRandom,
-  rankFast,
-  rankTop,
-  searchRestaurants,
-  searchUntilTop,
+  nearestOpen,
+  nearestOpenInView,
   type Area,
   type LatLng,
   type Restaurant,
 } from "./lib/places";
 
-type Phase = "locating" | "searching" | "done" | "error";
+// La carte (MapLibre) pèse lourd : chargée à part, pendant qu'on cherche la position.
+const RestaurantMap = lazy(() => import("./components/RestaurantMap").then((m) => ({ default: m.RestaurantMap })));
 
-// En dessous de cette fraction de la zone fouillée, un zoom avant relance la recherche.
-const ZOOM_IN_RATIO = 0.6;
+type Phase = "locating" | "searching" | "done" | "error";
 
 export default function App() {
   const [home, setHome] = useState<LatLng | null>(null);
-  const [places, setPlaces] = useState<Restaurant[]>([]);
-  // Cuisines du quartier (OSM), recalculées sur les recherches « toutes cuisines », gardées pendant qu'on filtre.
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [category, setCategory] = useState<Category | null>(null);
+  const [top, setTop] = useState<Restaurant[]>([]);
   const [area, setArea] = useState<Area | null>(null);
   const [fitKey, setFitKey] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  // Top par note, rapide (fast-foods et vente à emporter, la distance compte) ou surprise (tirage au
-  // sort ; la graine change à chaque « Autre tirage »).
-  const [mode, setMode] = useState<Mode>("top");
-  const surprise = mode === "surprise";
-  const fast = mode === "fast";
-  const [seed, setSeed] = useState(() => Date.now());
   // Quand la grande dame sort de l'écran, une barre compacte prend le relais en haut.
   const heroRef = useRef<HTMLElement>(null);
-  const [phase, setPhase] = useState<Phase>(hasApiKey ? "locating" : "error");
-  const [error, setError] = useState<string | null>(
-    hasApiKey ? null : t("missingKey"),
-  );
+  const [phase, setPhase] = useState<Phase>("locating");
+  const [error, setError] = useState<string | null>(null);
   // Si la géoloc est refusée, on propose de taper une adresse à la place.
   const [askAddress, setAskAddress] = useState(false);
   const [address, setAddress] = useState("");
 
-  // Seule la dernière recherche lancée a le droit d'afficher ses résultats.
-  const requestId = useRef(0);
-  // Zone déjà fouillée (ou en cours) : lue depuis le handler de la carte, d'où la ref.
-  const coveredArea = useRef<Area | null>(null);
-  const categoryRef = useRef(category);
-  const fastRef = useRef(fast);
-  useEffect(() => {
-    categoryRef.current = category;
-    fastRef.current = fast;
-  }, [category, fast]);
-
-  // Catégories de la zone visible : recalculées à chaque déplacement de la carte (le fichier de la
-  // zone est en cache, c'est instantané). Seule la dernière demande compte.
-  const categoriesRequest = useRef(0);
-  const refreshCategories = useCallback((view: Area) => {
-    const id = ++categoriesRequest.current;
-    neighborhoodCategories(view.center, view.radius)
-      .then((cats) => id === categoriesRequest.current && setCategories(cats))
-      // Les catégories sont un plus : si le fichier ne se charge pas, on garde les précédentes.
-      .catch((err) => console.warn("Catégories indisponibles", err));
-  }, []);
-
-  const run = useCallback(async (
-    search: () => Promise<{ list: Restaurant[]; area: Area }>,
-    filtered: boolean,
-    refit: boolean,
-  ) => {
-    const id = ++requestId.current;
-    setPhase("searching");
-    setError(null);
-    try {
-      const { list, area } = await search();
-      if (id !== requestId.current) return;
-      coveredArea.current = area;
-      setPlaces(list);
-      if (!filtered) refreshCategories(area);
-      setArea(area);
-      setSelectedId(null);
-      if (refit) setFitKey((k) => k + 1);
-      setPhase("done");
-    } catch (err) {
-      if (id !== requestId.current) return;
-      console.error(err);
-      setPhase("error");
-      setError((err as Error).message || t("oops"));
-    }
-  }, [refreshCategories]);
-
   // Dès l'ouverture : on récupère la position.
   useEffect(() => {
-    if (!hasApiKey) return;
     let cancelled = false;
     getBrowserPosition()
       .then((pos) => !cancelled && setHome(pos))
@@ -117,47 +50,41 @@ export default function App() {
     };
   }, []);
 
-  // Position (ou catégorie, ou mode rapide) connue : on élargit depuis 500 m jusqu'à trouver 5 restos,
-  // puis on cadre la carte dessus.
-  useEffect(() => {
-    if (!home) return;
-    coveredArea.current = null;
-    run(() => searchUntilTop(home, category, fast), category != null, true);
-  }, [home, category, fast, run]);
+  // Seule la dernière recherche lancée a le droit d'afficher ses résultats.
+  const requestId = useRef(0);
+  const run = useCallback(async (search: () => Promise<{ list: Restaurant[]; area: Area }>, refit: boolean) => {
+    const id = ++requestId.current;
+    setPhase("searching");
+    setError(null);
+    try {
+      const { list, area } = await search();
+      if (id !== requestId.current) return;
+      setTop(list);
+      setArea(area);
+      setSelectedId(null);
+      if (refit) setFitKey((k) => k + 1);
+      setPhase("done");
+    } catch (err) {
+      if (id !== requestId.current) return;
+      console.error(err);
+      setPhase("error");
+      setError((err as Error).message || t("oops"));
+    }
+  }, []);
 
-  // On recherche sur la vue quand l'utilisateur dézoome / se déplace au-delà de la zone fouillée,
-  // ou quand il zoome assez pour que la vue soit nettement plus petite que cette zone.
-  const onViewportChange = useCallback(
-    (view: Area) => {
-      const covered = coveredArea.current;
-      if (!covered) return;
-      refreshCategories(view);
-      const inside = distanceMeters(view.center, covered.center) + view.radius <= covered.radius * 1.05;
-      const zoomedIn = view.radius < covered.radius * ZOOM_IN_RATIO;
-      if (inside && !zoomedIn) return;
-      coveredArea.current = view;
-      const c = categoryRef.current;
-      const f = fastRef.current;
-      run(async () => ({ list: await searchRestaurants(view, c, f), area: view }), c != null, false);
-    },
-    [run, refreshCategories],
-  );
+  // Position connue : les 5 restos ouverts les plus proches, puis on cadre la carte dessus.
+  const searchAroundHome = useCallback(() => home && run(() => nearestOpen(home), true), [home, run]);
+  useEffect(() => {
+    searchAroundHome();
+  }, [searchAroundHome]);
+
+  // La carte bouge : les 5 plus proches du centre, dans la zone visible.
+  const onViewportChange = useCallback((view: Area) => run(() => nearestOpenInView(view), false), [run]);
 
   const onSelectFromMap = useCallback((id: string) => {
     setSelectedId(id);
     document.getElementById(`resto-${id}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, []);
-
-  const top = useMemo(
-    () => (surprise ? pickRandom(places, seed) : fast && home ? rankFast(places, home) : rankTop(places)),
-    [places, surprise, seed, fast, home],
-  );
-
-  // 4 cuisines au plus ; la cuisine choisie reste affichée même si elle sort du top en bougeant la carte.
-  const shownCategories = (() => {
-    const top4 = categories.slice(0, MAX_SHOWN);
-    return category && !top4.some((c) => c.key === category.key) ? [...top4.slice(0, MAX_SHOWN - 1), category] : top4;
-  })();
 
   const busy = phase === "locating" || phase === "searching";
   const mood: Mood = busy ? "starving" : phase === "done" && top.length ? "happy" : "hungry";
@@ -181,65 +108,44 @@ export default function App() {
     }
   }
 
-  const changeMode = (next: Mode) => {
-    setMode(next);
-    setSeed(Date.now());
-  };
-
   return (
     <>
-      <MiniBar watch={heroRef} mode={mode} onMode={changeMode} />
+      <MiniBar watch={heroRef} />
       <main>
         <header ref={heroRef}>
-          <Lady mood={mood} mode={mode} />
-          <p className="tagline">{surprise ? t("taglineSurprise") : fast ? t("taglineFast") : t("tagline")}</p>
-          <ModePicker mode={mode} onChange={changeMode} />
+          <Lady mood={mood} />
+          <p className="tagline">{t("tagline")}</p>
         </header>
 
-        {shownCategories.length > 0 && (
-          <div className="categories" role="toolbar" aria-label={t("cuisineType")}>
-            {shownCategories.map((c) => {
-              const active = c.key === category?.key;
-              return (
-                <button
-                  key={c.key}
-                  type="button"
-                  aria-pressed={active}
-                  className={active ? "active" : ""}
-                  title={c.distinctive ? t("localSpecialty") : undefined}
-                  onClick={() => setCategory(active ? null : c)}
-                >
-                  <span className="emoji" aria-hidden="true">
-                    {c.emoji}
-                  </span>
-                  <span className="label">{c.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
-
         {home && (
-          <RestaurantMap
-            home={home}
-            results={top}
-            area={area}
-            fitKey={fitKey}
-            selectedId={selectedId}
-            onSelect={onSelectFromMap}
-            onViewportChange={onViewportChange}
+          <Suspense
+            fallback={
+              <div className="map-wrap">
+                <div className="map" />
+              </div>
+            }
           >
-            {busy ? (
-              <span className="pill">{t("sniffing")}</span>
-            ) : (
-              area && <span className="pill">{formatDistance(area.radius)}</span>
-            )}
-            {surprise && phase === "done" && top.length > 0 && (
-              <button type="button" className="pill pill-button" onClick={() => setSeed(Date.now())}>
-                {t("reroll")}
-              </button>
-            )}
-          </RestaurantMap>
+            <RestaurantMap
+              home={home}
+              results={top}
+              area={area}
+              fitKey={fitKey}
+              selectedId={selectedId}
+              onSelect={onSelectFromMap}
+              onViewportChange={onViewportChange}
+            >
+              {busy ? (
+                <span className="pill">{t("sniffing")}</span>
+              ) : (
+                area && <span className="pill">{formatDistance(area.radius)}</span>
+              )}
+              {area && home && distanceMeters(area.center, home) > 50 && (
+                <button type="button" className="pill pill-button" onClick={searchAroundHome}>
+                  {t("aroundMe")}
+                </button>
+              )}
+            </RestaurantMap>
+          </Suspense>
         )}
 
         {status && (

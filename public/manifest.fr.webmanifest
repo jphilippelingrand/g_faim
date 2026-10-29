@@ -1,7 +1,7 @@
 {
   "name": "Groubl",
   "short_name": "Groubl",
-  "description": "Les 5 meilleures tables ouvertes, juste à côté.",
+  "description": "Les 5 restos ouverts les plus proches.",
   "lang": "fr",
   "start_url": "/fr",
   "scope": "/",

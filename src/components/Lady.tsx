@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { t } from "../i18n";
-import type { Mode } from "./ModePicker";
+
+/** Les anciens modes de recherche : la dame les sait encore (bandeau « au pif », course « vite vite »). */
+export type Mode = "top" | "fast" | "surprise";
 
 /** starving = ça gargouille non-stop (recherche) ; hungry = gros gargouillis réguliers ; happy = elle a trouvé, elle bave. */
 export type Mood = "starving" | "hungry" | "happy";

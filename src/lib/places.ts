@@ -1,6 +1,5 @@
-import { importLibrary } from "./google";
-import type { Category } from "./osm";
-import { locale, t } from "../i18n";
+import { lang, locale, t } from "../i18n";
+import { leafFor, LEVELS, WEEK_MINUTES, type PlaceRow, type PlacesIndex } from "./placesGrid";
 
 export type LatLng = { lat: number; lng: number };
 
@@ -10,43 +9,23 @@ export type Area = { center: LatLng; radius: number };
 export type Restaurant = {
   id: string;
   name: string;
-  rating: number;
-  reviews: number;
-  type: string;
-  /** Ouvert en ce moment ; undefined si Google ne connaît pas les horaires. */
+  /** Clé OSM de cuisine=* (ex. "pizza"), si renseignée. */
+  cuisine?: string;
+  /** Ouvert en ce moment (d'après ses horaires OSM) ; undefined si on ne les connaît pas. */
   open?: boolean;
-  price: string;
-  url: string;
+  /** Minutes avant la fermeture ; Infinity si ouvert 24 h/24. */
+  closesIn?: number;
   location: LatLng;
 };
 
 export const TOP_N = 5;
-// Écarte les 5,0★ à 3 avis qui squatteraient le podium.
-const MIN_REVIEWS = 10;
-const START_RADIUS = 500;
-// Chaque étape quadruple le rayon : 500 m, 2 km, 8 km au pire (une recherche par étape).
-const RADIUS_STEP = 4;
-// Au démarrage, on n'élargit pas au-delà ; dézoomer permet d'aller plus loin.
-const MAX_START_RADIUS = 8000;
-// Chaque recherche est facturée : on réutilise un résultat 10 min (le statut d'ouverture finit par changer).
-const CACHE_TTL = 10 * 60_000;
-const CACHE_PREFIX = "jaifaim:places:";
-// Limite de searchText.
-export const MAX_RADIUS = 50_000;
-
-// Mode rapide : ce qui se mange sur le pouce, d'après les types Google.
-const FAST_TYPES = ["fast_food_restaurant", "hamburger_restaurant", "sandwich_shop", "meal_takeaway"];
-// En dessous, on n'en veut pas même tout près (écarte surtout les chaînes mal notées).
-const FAST_MIN_RATING = 3.8;
-// Étoiles perdues par km : à 500 m, il faut 0,4★ de plus que le voisin d'à côté pour passer devant.
-const FAST_STARS_PER_KM = 0.8;
-
-const PRICE: Record<string, string> = {
-  INEXPENSIVE: "€",
-  MODERATE: "€€",
-  EXPENSIVE: "€€€",
-  VERY_EXPENSIVE: "€€€€",
-};
+// On élargit jusqu'à trouver TOP_N restos ouverts : 500 m, 1 km, 2 km… 32 km au pire.
+const RADII = [500, 1000, 2000, 4000, 8000, 16_000, 32_000];
+// À partir de ce rayon, plutôt que d'aller plus loin, on complète avec les restos proches aux horaires inconnus.
+const FILL_UNKNOWN_FROM = 2000;
+const MAX_RADIUS = RADII[RADII.length - 1];
+// Le temps d'y aller et de commander : un resto qui ferme avant ne compte pas comme ouvert.
+const MIN_OPEN_MINUTES = 20;
 
 export function getBrowserPosition(): Promise<LatLng> {
   return new Promise((resolve, reject) => {
@@ -62,12 +41,13 @@ export function getBrowserPosition(): Promise<LatLng> {
   });
 }
 
+/** Adresse → coordonnées, avec Nominatim (OpenStreetMap) : une requête par adresse tapée, c'est dans ses règles d'usage. */
 export async function geocode(address: string): Promise<LatLng> {
-  const { Geocoder } = await importLibrary<google.maps.GeocodingLibrary>("geocoding");
-  const { results } = await new Geocoder().geocode({ address });
+  const params = new URLSearchParams({ q: address, format: "json", limit: "1", "accept-language": lang });
+  const res = await fetch(`https://nominatim.openstreetmap.org/search?${params}`);
+  const results = res.ok ? ((await res.json()) as { lat: string; lon: string }[]) : [];
   if (!results.length) throw new Error(t("addressNotFound"));
-  const loc = results[0].geometry.location;
-  return { lat: loc.lat(), lng: loc.lng() };
+  return { lat: Number(results[0].lat), lng: Number(results[0].lon) };
 }
 
 export function distanceMeters(a: LatLng, b: LatLng): number {
@@ -81,167 +61,150 @@ export function distanceMeters(a: LatLng, b: LatLng): number {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-const WEEK_MINUTES = 7 * 24 * 60;
-
 /**
- * Ouvert en ce moment, d'après les horaires du jour (exceptions comprises) et le fuseau du resto.
- * undefined si Google ne connaît pas les horaires. (Place.isOpen() existe, mais seulement en bêta.)
+ * Minutes avant la fermeture, à l'heure de l'appareil (le resto est à côté, donc dans le même fuseau) ;
+ * 0 si fermé, Infinity si ouvert 24 h/24, undefined si horaires inconnus. Les intervalles qui se suivent
+ * (ouvert après minuit, ou du dimanche au lundi) sont enchaînés.
  */
-function isOpenNow(place: google.maps.places.Place, now = new Date()): boolean | undefined {
-  const hours = place.currentOpeningHours ?? place.regularOpeningHours;
-  if (!hours?.periods.length || place.utcOffsetMinutes == null) return undefined;
-
-  // Minute de la semaine à l'heure locale du resto, 0 = dimanche 00:00 comme dans l'API.
-  const local = new Date(now.getTime() + place.utcOffsetMinutes * 60_000);
-  const t = local.getUTCDay() * 1440 + local.getUTCHours() * 60 + local.getUTCMinutes();
-
-  return hours.periods.some(({ open, close }) => {
-    if (!close) return true; // 24h/24
-    const start = open.day * 1440 + open.hour * 60 + open.minute;
-    let end = close.day * 1440 + close.hour * 60 + close.minute;
-    if (end <= start) end += WEEK_MINUTES; // passe minuit dans la nuit de samedi à dimanche
-    return (t >= start && t < end) || (t + WEEK_MINUTES >= start && t + WEEK_MINUTES < end);
-  });
+function minutesUntilClose(hours: number[] | 0, now: Date): number | undefined {
+  if (!hours) return undefined;
+  const current = ((now.getDay() + 6) % 7) * 1440 + now.getHours() * 60 + now.getMinutes();
+  const intervals: [number, number][] = [];
+  for (let i = 0; i < hours.length; i += 2) intervals.push([hours[i], hours[i + 1]]);
+  let at = current;
+  let open = 0;
+  // Une semaine au plus : au-delà, c'est ouvert en continu.
+  while (open < WEEK_MINUTES) {
+    const slot = intervals.find(([start, end]) => start <= at && at < end);
+    if (!slot) return open;
+    open += slot[1] - at;
+    at = slot[1] % WEEK_MINUTES;
+  }
+  return Infinity;
 }
 
-const FIELDS = [
-  "id", "displayName", "rating", "userRatingCount", "location",
-  "googleMapsURI", "priceLevel", "primaryTypeDisplayName",
-  "businessStatus", "currentOpeningHours", "regularOpeningHours", "utcOffsetMinutes", "types",
-];
+let indexPromise: Promise<{ version: string; split: Set<string> }> | null = null;
 
-/** Le carré qui contient le cercle (searchByText n'accepte que des rectangles). */
-function circleBounds({ center, radius }: Area): google.maps.LatLngBoundsLiteral {
+/** Liste des carrés découpés (et version des fichiers), chargée une fois. */
+function getIndex() {
+  indexPromise ??= fetch("/places/index.json")
+    .then((r) => {
+      if (!r.ok) throw new Error(t("oops"));
+      return r.json() as Promise<PlacesIndex>;
+    })
+    .then(({ version, split }) => ({ version, split: new Set(split) }));
+  indexPromise.catch(() => (indexPromise = null));
+  return indexPromise;
+}
+
+const files = new Map<string, Promise<PlaceRow[]>>();
+
+/** Un fichier de restos ; vide hors des pays couverts. */
+function getFile(level: number, key: string, version: string): Promise<PlaceRow[]> {
+  const path = `${level}/${key}`;
+  let file = files.get(path);
+  if (!file) {
+    file = fetch(`/places/${path}.json?v=${version}`).then((r) =>
+      // Vite et Vercel renvoient la page d'accueil pour un fichier absent : on vérifie le type.
+      r.ok && r.headers.get("content-type")?.includes("json") ? (r.json() as Promise<PlaceRow[]>) : [],
+    );
+    file.catch(() => files.delete(path));
+    files.set(path, file);
+  }
+  return file;
+}
+
+/** Tous les restos des fichiers qui touchent le carré autour du cercle (un point tous les 0,05°, pour n'en rater aucun). */
+async function restaurantsAround({ center, radius }: Area): Promise<Restaurant[]> {
+  const { version, split } = await getIndex();
+  const step = LEVELS[LEVELS.length - 1];
   const dLat = radius / 111_320;
   const dLng = radius / (111_320 * Math.cos((center.lat * Math.PI) / 180));
-  return { north: center.lat + dLat, south: center.lat - dLat, east: center.lng + dLng, west: center.lng - dLng };
-}
-
-/** Résultat d'une recherche déjà faite : en mémoire, sinon dans sessionStorage (survit à un rechargement). */
-const memoryCache = new Map<string, { at: number; list: Promise<Restaurant[]> }>();
-
-function cached(key: string, search: () => Promise<Restaurant[]>): Promise<Restaurant[]> {
-  const hit = memoryCache.get(key);
-  if (hit && Date.now() - hit.at < CACHE_TTL) return hit.list;
-  try {
-    const saved = JSON.parse(sessionStorage.getItem(CACHE_PREFIX + key) ?? "null") as { at: number; list: Restaurant[] } | null;
-    if (saved && Date.now() - saved.at < CACHE_TTL) {
-      memoryCache.set(key, { at: saved.at, list: Promise.resolve(saved.list) });
-      return Promise.resolve(saved.list);
+  const leaves = new Map<string, { level: number; key: string }>();
+  for (let lat = center.lat - dLat; lat < center.lat + dLat + step; lat += step) {
+    for (let lng = center.lng - dLng; lng < center.lng + dLng + step; lng += step) {
+      const la = Math.min(lat, center.lat + dLat);
+      const ln = Math.min(lng, center.lng + dLng);
+      const leaf = leafFor(split, la, ln);
+      leaves.set(`${leaf.level}/${leaf.key}`, leaf);
     }
-  } catch {
-    // sessionStorage indisponible (navigation privée…) : on se contente de la mémoire.
   }
-  const at = Date.now();
-  const list = search();
-  memoryCache.set(key, { at, list });
-  list.then(
-    (value) => {
-      try {
-        sessionStorage.setItem(CACHE_PREFIX + key, JSON.stringify({ at, list: value }));
-      } catch {
-        // Plein ou indisponible : tant pis.
-      }
-    },
-    () => memoryCache.get(key)?.list === list && memoryCache.delete(key),
-  );
-  return list;
-}
-
-/**
- * Restos notés et ouverts en ce moment dans le cercle, en une seule recherche (chacune est facturée) :
- * searchText filtré par Google sur « ouvert maintenant », qui en trouve 20 même à 1 h du matin
- * (searchNearby ne sait pas filtrer sur l'ouverture). Elle ne trie pas par note : le classement se fait dans rankTop.
- * En mode rapide, on cherche « fast food » et on garde ce que Google classe dans les types « sur le pouce ».
- */
-export function searchRestaurants(area: Area, category?: Category | null, fast = false): Promise<Restaurant[]> {
-  const radius = Math.round(Math.min(area.radius, MAX_RADIUS));
-  // Arrondi à ~10 m : rouvrir une cuisine ou un mode déjà vus depuis la même position ne coûte rien.
-  const key = [area.center.lat.toFixed(4), area.center.lng.toFixed(4), radius, category?.key ?? "", fast].join("|");
-  return cached(key, () => fetchRestaurants({ center: area.center, radius }, category, fast));
-}
-
-async function fetchRestaurants(area: Area, category: Category | null | undefined, fast: boolean): Promise<Restaurant[]> {
-  const { Place } = await importLibrary<google.maps.PlacesLibrary>("places");
-  const { places } = await Place.searchByText({
-    fields: FIELDS,
-    // Une cuisine (venue d'OSM) : recherche par mot-clé, comme on le taperait dans Maps.
-    textQuery: category ? category.query : fast ? "fast food" : "restaurant",
-    // includedType n'accepte qu'un type : en mode rapide, le tri par types se fait dans toRestaurants.
-    ...(!category && !fast && { includedType: "restaurant", useStrictTypeFiltering: true }),
-    isOpenNow: true,
-    locationRestriction: circleBounds(area),
-    maxResultCount: 20,
+  const now = new Date();
+  const rows = (await Promise.all([...leaves.values()].map(({ level, key }) => getFile(level, key, version)))).flat();
+  return rows.map(([name, lat, lng, hours, cuisine]) => {
+    const closesIn = minutesUntilClose(hours, now);
+    return {
+      id: `${lat},${lng},${name}`,
+      name,
+      cuisine,
+      open: closesIn === undefined ? undefined : closesIn >= MIN_OPEN_MINUTES,
+      closesIn,
+      location: { lat, lng },
+    };
   });
-  return toRestaurants(places, area, fast);
 }
 
-function toRestaurants(
-  places: google.maps.places.Place[],
-  area: Area,
-  fast: boolean,
-): Restaurant[] {
-  return places
-    .filter((p) => p.rating != null && p.location)
-    .filter((p) => distanceMeters(area.center, { lat: p.location!.lat(), lng: p.location!.lng() }) <= area.radius)
-    // Fermés définitivement ou temporairement (« ouvert maintenant » ne suffit pas toujours à les écarter).
-    .filter((p) => (p.businessStatus ?? "OPERATIONAL") === "OPERATIONAL")
-    // Mode rapide : la recherche par mot-clé ramène aussi des restos à table.
-    .filter((p) => !fast || p.types?.some((type) => FAST_TYPES.includes(type)))
-    .map((p) => ({
-      id: p.id,
-      name: p.displayName ?? t("noName"),
-      rating: p.rating!,
-      reviews: p.userRatingCount ?? 0,
-      type: p.primaryTypeDisplayName ?? "",
-      open: isOpenNow(p),
-      price: p.priceLevel ? PRICE[p.priceLevel] ?? "" : "",
-      url: p.googleMapsURI ?? "",
-      location: { lat: p.location!.lat(), lng: p.location!.lng() },
-    }));
-}
+// Un même resto est parfois saisi deux fois dans OSM (un point et le contour du bâtiment).
+const DUPLICATE_DISTANCE = 100;
 
-/** Élargit le rayon à partir de 500 m jusqu'à avoir TOP_N restos classables (ou atteindre MAX_START_RADIUS). */
-export async function searchUntilTop(
-  center: LatLng,
-  category?: Category | null,
-  fast = false,
-): Promise<{ list: Restaurant[]; area: Area }> {
-  for (let radius = START_RADIUS; ; radius *= RADIUS_STEP) {
-    const area = { center, radius };
-    const list = await searchRestaurants(area, category, fast);
-    const ranked = fast ? rankFast(list, center) : rankTop(list);
-    if (ranked.length >= TOP_N || radius >= MAX_START_RADIUS) return { list, area };
+/** Garde le premier de chaque nom à moins de DUPLICATE_DISTANCE d'un homonyme déjà gardé. */
+function withoutDuplicates(list: Restaurant[]): Restaurant[] {
+  const kept: Restaurant[] = [];
+  for (const r of list) {
+    const name = r.name.toLowerCase();
+    if (!kept.some((k) => k.name.toLowerCase() === name && distanceMeters(k.location, r.location) < DUPLICATE_DISTANCE)) kept.push(r);
   }
+  return kept;
 }
 
-const hasEnoughReviews = (r: Restaurant) => r.reviews >= MIN_REVIEWS;
-
-/** Trie par note puis nombre d'avis, en ignorant les restos fermés (horaires inconnus : gardés) ou trop peu notés. */
-export function rankTop(list: Restaurant[]): Restaurant[] {
-  return list
-    .filter((r) => r.open !== false && hasEnoughReviews(r))
-    .sort((a, b) => b.rating - a.rating || b.reviews - a.reviews)
-    .slice(0, TOP_N);
-}
+const byDistance = (center: LatLng) => (a: Restaurant, b: Restaurant) =>
+  distanceMeters(center, a.location) - distanceMeters(center, b.location);
 
 /**
- * Mode rapide : la note moins une pénalité de distance (quand on veut manger vite, la porte d'à côté
- * compte), une seule adresse par enseigne, et rien sous FAST_MIN_RATING.
+ * Les TOP_N restos ouverts les plus proches, en élargissant le rayon jusqu'à les trouver. Passé
+ * FILL_UNKNOWN_FROM, on complète avec les plus proches aux horaires inconnus plutôt que d'aller plus loin.
+ * Les restos sûrement ouverts passent toujours devant.
  */
-export function rankFast(list: Restaurant[], origin: LatLng): Restaurant[] {
-  const score = (r: Restaurant) => r.rating - (distanceMeters(origin, r.location) / 1000) * FAST_STARS_PER_KM;
-  const seen = new Set<string>();
-  return list
-    .filter((r) => r.open !== false && hasEnoughReviews(r) && r.rating >= FAST_MIN_RATING)
-    .sort((a, b) => score(b) - score(a))
-    .filter((r) => {
-      const brand = r.name.toLowerCase();
-      if (seen.has(brand)) return false;
-      seen.add(brand);
-      return true;
-    })
-    .slice(0, TOP_N);
+export function nearestOpen(center: LatLng): Promise<{ list: Restaurant[]; area: Area }> {
+  return nearestWithin(center, RADII);
+}
+
+/** Pareil, mais dans le cercle visible de la carte seulement (plafonné : au-delà, trop de fichiers à charger). */
+export function nearestOpenInView(view: Area): Promise<{ list: Restaurant[]; area: Area }> {
+  return nearestWithin(view.center, [Math.min(view.radius, MAX_RADIUS)]);
+}
+
+async function nearestWithin(center: LatLng, radii: number[]): Promise<{ list: Restaurant[]; area: Area }> {
+  let area: Area = { center, radius: radii[0] };
+  let list: Restaurant[] = [];
+  for (const radius of radii) {
+    area = { center, radius };
+    const inside = (await restaurantsAround(area))
+      .filter((r) => distanceMeters(center, r.location) <= radius)
+      .sort(byDistance(center));
+    const open = withoutDuplicates(inside.filter((r) => r.open === true));
+    list = open.slice(0, TOP_N);
+    if (list.length < TOP_N && radius >= FILL_UNKNOWN_FROM) {
+      list = withoutDuplicates([...list, ...inside.filter((r) => r.open === undefined)]).slice(0, TOP_N);
+    }
+    if (list.length >= TOP_N) break;
+  }
+  return { list, area };
+}
+
+// Grosso modo : 4,8 km/h à pied, en voiture 24 km/h en ville plus 3 min pour se garer ; les rues font
+// des détours, d'où un trajet 30 à 40 % plus long que la ligne droite.
+const WALK_METERS_PER_MIN = 80;
+const DRIVE_METERS_PER_MIN = 400;
+const PARKING_MIN = 3;
+// Au-delà, on donne le temps en voiture.
+const MAX_WALK_MIN = 30;
+
+/** Temps de trajet estimé depuis la distance à vol d'oiseau : à pied si c'est raisonnable, sinon en voiture. */
+export function travelTime(meters: number): { mode: "walk" | "drive"; minutes: number } {
+  const walk = Math.max(1, Math.round((meters * 1.3) / WALK_METERS_PER_MIN));
+  if (walk <= MAX_WALK_MIN) return { mode: "walk", minutes: walk };
+  return { mode: "drive", minutes: Math.round((meters * 1.4) / DRIVE_METERS_PER_MIN) + PARKING_MIN };
 }
 
 export function formatDistance(m: number): string {
@@ -250,30 +213,12 @@ export function formatDistance(m: number): string {
     : `${Math.round(m)} m`;
 }
 
-
-/** Générateur pseudo-aléatoire à graine (mulberry32) : même graine → même tirage. */
-function seededRandom(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-/**
- * Mode surprise : TOP_N restos ouverts tirés au sort, bien notés ou pas, même avec peu d'avis.
- * La graine fige le tirage tant qu'on ne demande pas « Autre tirage ».
- */
-export function pickRandom(list: Restaurant[], seed: number): Restaurant[] {
-  const random = seededRandom(seed);
-  const pool = list.filter((r) => r.open !== false);
-  // Mélange de Fisher-Yates.
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
+/** Heure de fermeture lisible (« 22 h 30 », « 10:30 PM »…). */
+export function formatClosingTime(closesIn: number, now = new Date()): string {
+  const at = new Date(now.getTime() + closesIn * 60_000);
+  if (lang === "fr") {
+    const minutes = at.getMinutes();
+    return `${at.getHours()} h${minutes ? ` ${String(minutes).padStart(2, "0")}` : ""}`;
   }
-  return pool.slice(0, TOP_N);
+  return at.toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" });
 }

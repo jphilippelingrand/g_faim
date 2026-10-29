@@ -1,7 +1,7 @@
 {
   "name": "Groubl",
   "short_name": "Groubl",
-  "description": "The 5 best open tables, right around the corner.",
+  "description": "The 5 closest places open right now.",
   "lang": "en",
   "start_url": "/en",
   "scope": "/",
