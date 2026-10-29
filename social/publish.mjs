@@ -9,6 +9,8 @@
  * considéré publié si une publication récente du compte a la même légende. Une story n'a pas de
  * légende : elle n'est publiée qu'à la main (hors CI), et marquée "published" dans la file ensuite.
  * Les images doivent être en ligne (public/social/, déployées par Vercel) avant l'heure du post.
+ * Un post peut identifier des comptes sur la photo : "tags": [{ "username": "bar.darling", "x": 0.6, "y": 0.4 }]
+ * (position relative dans l'image, de 0 à 1). L'API ne le permet pas pour les stories.
  */
 import { readFileSync } from "node:fs";
 import { ig, me, sameCaption, SITE } from "./instagram.mjs";
@@ -61,7 +63,9 @@ for (const post of due) {
 
   const container = await ig(`${account.user_id}/media`, {
     method: "POST",
-    params: post.story ? { image_url: imageUrl, media_type: "STORIES" } : { image_url: imageUrl, caption: post.caption },
+    params: post.story
+      ? { image_url: imageUrl, media_type: "STORIES" }
+      : { image_url: imageUrl, caption: post.caption, ...(post.tags && { user_tags: JSON.stringify(post.tags) }) },
   });
   // Meta prépare l'image avant qu'on puisse publier : on attend qu'elle soit prête (une minute au plus).
   for (let i = 0; ; i++) {
