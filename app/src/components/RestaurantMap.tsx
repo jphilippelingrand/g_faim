@@ -44,7 +44,7 @@ export function RestaurantMap({ home, results, area, fitKey, selectedId, onSelec
     const p = place.location;
     map.current.fitToCoordinates([p, { latitude: 2 * home.latitude - p.latitude, longitude: 2 * home.longitude - p.longitude }], {
       // mapPadding exclut déjà la barre du haut et le panneau : on n'ajoute qu'une marge pour les pastilles.
-      edgePadding: { top: 40, right: 40, bottom: 40, left: 40 },
+      edgePadding: { top: 60, right: 50, bottom: 90, left: 50 },
       animated: true,
     });
   }, [fitKey]); // eslint-disable-line react-hooks/exhaustive-deps
