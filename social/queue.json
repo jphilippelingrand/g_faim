@@ -44,15 +44,87 @@
     "caption": "We have all typed it. 🫠\n\nGroubl skips the search: the closest places open right now, right around you.\n\n📲 Coming soon to iPhone · groubl.com (link in bio)\n\n#groubl #lunchtime #mtlfood #foodie #wheretoeat"
   },
   {
+    "id": "story-mobile-fr",
+    "story": true,
+    "at": "2026-10-30T17:30:00-04:00",
+    "image": "social/c2-story-mobile-fr.png",
+    "caption": ""
+  },
+  {
+    "id": "story-mobile-en",
+    "story": true,
+    "at": "2026-10-30T17:35:00-04:00",
+    "image": "social/c2-story-mobile-en.png",
+    "caption": ""
+  },
+  {
+    "id": "reel-fr",
+    "at": "2026-10-31T22:30:00-04:00",
+    "video": "social/c2-reel-fr.mp4",
+    "cover": "social/c2-reel-fr-cover.png",
+    "caption": "Ton ventre a des goûts. Pas toujours les tiens. 🍟\n\nGroubl te montre les restos les plus proches qui sont ouverts là, maintenant (et encore quand t'arrives). Nan → la suivante. Miam → l'itinéraire.\n\nPas de notes, pas de pubs, pas de compte. 📲 Bientôt sur iPhone.\n\n#mtlfood #montréal #poutine #groubl\ngroubl.com (lien en bio)"
+  },
+  {
+    "id": "match",
+    "at": "2026-11-01T12:00:00-05:00",
+    "images": [
+      "social/c2-t1v.png",
+      "social/c2-t2v.png"
+    ],
+    "caption": "C'est un match. 🌮 It's a match.\n\nSur mobile, Groubl est maintenant un paquet de cartes : à gauche la suivante, à droite l'itinéraire. Toujours les plus proches qui sont ouverts.\nOn mobile, swipe left for the next one, right to go. The closest places, open now.\n\n#mtlfood #montréal #taco #groubl\ngroubl.com (lien en bio / link in bio)"
+  },
+  {
     "id": "diner",
     "at": "2026-11-02T11:00:00-05:00",
     "image": "social/f3-diner.png",
     "caption": "Tague ton groupe du dîner. 👇\n\nLa prochaine fois, ouvrez Groubl : les restos ouverts les plus proches, un à la fois. Nan, nan, miam. Débat réglé.\n\n📲 Bientôt sur iPhone · groubl.com (lien en bio)\n\n#groubl #montréal #mtlfood #dîner #entreamis"
   },
   {
+    "id": "reel-en",
+    "at": "2026-11-03T12:00:00-05:00",
+    "video": "social/c2-reel-en.mp4",
+    "cover": "social/c2-reel-en-cover.png",
+    "caption": "Your belly has opinions. Not always yours. 🍟\n\nGroubl shows you the closest places open right now (and still open when you get there). Nope → next. Yum → directions.\n\nNo ratings, no ads, no account. 📲 iPhone app coming soon.\n\n#mtlfood #montreal #poutine #groubl\ngroubl.com (link in bio)"
+  },
+  {
     "id": "forecast",
     "at": "2026-11-04T11:00:00-05:00",
     "image": "social/f4-forecast.png",
     "caption": "Stay safe out there. 🌩️\n\nWhen the growl warning hits, Groubl finds the closest places open right now.\n\n📲 Coming soon to iPhone · groubl.com (link in bio)\n\n#groubl #hangry #mtlfood #lunchtime #wheretoeat"
+  },
+  {
+    "id": "date-fr",
+    "at": "2026-11-05T18:00:00-05:00",
+    "image": "social/c2-date-fr.png",
+    "tags": [
+      {
+        "username": "bar.darling",
+        "x": 0.22,
+        "y": 0.3
+      }
+    ],
+    "caption": "Le date au Darling s'est bien passé. Le deuxième aussi. 🍸🍟\n\nCelui de 1 h du mat', c'est Groubl qui l'arrange : les restos les plus proches encore ouverts, à deux pas.\n\nTague ton date (ou ta poutine) 👇\n\n#mtlfood #montréal #datenight #groubl\ngroubl.com (lien en bio)"
+  },
+  {
+    "id": "nuit",
+    "at": "2026-11-06T22:30:00-05:00",
+    "images": [
+      "social/c2-nuit1.png",
+      "social/c2-nuit2.png",
+      "social/c2-nuit3.png",
+      "social/c2-nuit4.png"
+    ],
+    "caption": "Samedi, 3 h du mat'. On a compté qui est encore ouvert. 🌙\n\nLe centre-ville gagne (12), le Plateau suit (9). Le Mile End, lui, dort à poings fermés.\n\nSelon OpenStreetMap, et seulement les restos dont on connaît les horaires : en vrai, il y en a sûrement un peu plus. Ton spot de 3 h manque ? Dis-le-nous 👇\n\n#mtlfood #montréal #mtlnightlife #groubl\ngroubl.com (lien en bio)"
+  },
+  {
+    "id": "night",
+    "at": "2026-11-07T22:30:00-05:00",
+    "images": [
+      "social/c2-night1.png",
+      "social/c2-night2.png",
+      "social/c2-night3.png",
+      "social/c2-night4.png"
+    ],
+    "caption": "Saturday, 3 a.m. We counted who's still open. 🌙\n\nDowntown wins (12), the Plateau follows (9). Mile End is fast asleep.\n\nPer OpenStreetMap, and only places with known hours, so the real numbers are probably a bit higher. Is your 3 a.m. spot missing? Tell us 👇\n\n#mtlfood #montreal #mtlnightlife #groubl\ngroubl.com (link in bio)"
   }
 ]
