@@ -15,12 +15,13 @@ const DECIMALS = [0, 2, 2];
 export const MAX_PER_FILE = 1500;
 
 /**
- * Un resto : [nom, lat, lng, horaires, cuisine OSM, source des horaires].
+ * Un resto : [nom, lat, lng, horaires, cuisine OSM, source des horaires, adresse].
  * Horaires : intervalles d'ouverture à l'heure locale, en minutes depuis lundi 00:00, à plat
  * ([début, fin, début, fin…], au plus 7 × 24 × 60) ; 0 quand on ne les connaît pas (ou qu'on ne sait pas les lire).
- * Cuisine : "" si inconnue mais qu'une source suit. Source : absente = OpenStreetMap, sinon HOURS_SOURCE.
+ * Cuisine : "" si inconnue mais qu'une valeur suit. Source : absente ou 0 = OpenStreetMap, sinon HOURS_SOURCE.
+ * Adresse : « numéro rue, code postal ville », si connue (pour ouvrir la fiche du commerce dans les cartes).
  */
-export type PlaceRow = [name: string, lat: number, lng: number, hours: number[] | 0, cuisine?: string, source?: number];
+export type PlaceRow = [name: string, lat: number, lng: number, hours: number[] | 0, cuisine?: string, source?: number, address?: string];
 
 /** D'où viennent les horaires, quand ce n'est pas d'OpenStreetMap. */
 export const HOURS_SOURCE = {

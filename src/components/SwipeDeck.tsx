@@ -1,6 +1,7 @@
 import { useRef, useState, type PointerEvent } from "react";
 import { PlaceCard, shareRestaurant } from "./PlaceCard";
-import { directionsUrl, distanceMeters, travelTime, type LatLng, type Restaurant } from "../lib/places";
+import { distanceMeters, travelTime, type LatLng, type Restaurant } from "../lib/places";
+import { directionsUrl, getMapsApp, IS_APPLE, openDirections, setMapsApp, type MapsApp } from "../lib/mapsApp";
 import { t } from "../i18n";
 
 type Props = {
@@ -8,6 +9,8 @@ type Props = {
   home: LatLng;
   current: number;
   onChange: (index: number) => void;
+  /** Appli de cartes choisie la première fois (pour l'afficher en bas de l'écran). */
+  onMapsApp: (app: MapsApp) => void;
 };
 
 // Au-delà de cette distance (px), la carte part ; sinon elle revient.
@@ -19,9 +22,11 @@ const TAP_SLOP = 6;
  * Le paquet de cartes, façon Tinder : à gauche, « nan », la suivante (et on reboucle après la dernière) ;
  * à droite (ou un simple tap), « miam », l'itinéraire. Les boutons ✕ et ♥ font la même chose, pour qui ne glisse pas.
  */
-export function SwipeDeck({ places, home, current, onChange }: Props) {
+export function SwipeDeck({ places, home, current, onChange, onMapsApp }: Props) {
   const [dx, setDx] = useState(0);
   const [leaving, setLeaving] = useState<"left" | "right" | null>(null);
+  // Sur iPhone, la première fois qu'on y va : « Ouvrir avec Plans ou Google Maps ? »
+  const [choosing, setChoosing] = useState(false);
   const start = useRef<number | null>(null);
   // Un geste qui n'a presque pas bougé est un simple tap : on y va, comme ♥.
   const moved = useRef(false);
@@ -29,19 +34,33 @@ export function SwipeDeck({ places, home, current, onChange }: Props) {
   const place = places[current];
   const next = places[(current + 1) % places.length];
   const trip = travelTime(distanceMeters(home, place.location));
-  const url = directionsUrl(home, place, trip.mode === "walk");
+
+  const go = (app?: MapsApp) => openDirections(directionsUrl(home, place, trip.mode === "walk", app));
 
   function fly(direction: "left" | "right") {
+    if (direction === "right" && !getMapsApp()) {
+      setDx(0);
+      setChoosing(true);
+      return;
+    }
+    // Hors iPhone, le nouvel onglet doit s'ouvrir pendant le geste lui-même, sinon le navigateur le bloque.
+    if (direction === "right" && !IS_APPLE) go();
     setLeaving(direction);
     setTimeout(() => {
-      // À droite : l'itinéraire, dans le même onglet (une nouvelle fenêtre ouverte hors d'un vrai clic est
-      // bloquée par Safari sur iPhone). La carte reste en place pour le retour arrière.
-      if (direction === "right") location.assign(url);
+      // Sur iPhone : dans le même onglet, une fois la carte partie ; elle revient pour le retour arrière.
+      if (direction === "right" && IS_APPLE) go();
       setLeaving(null);
       setDx(0);
       if (direction === "left") onChange((current + 1) % places.length);
     }, FLY_MS);
   }
+
+  const choose = (app: MapsApp) => {
+    setMapsApp(app);
+    onMapsApp(app);
+    setChoosing(false);
+    go(app);
+  };
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest("a, button")) return;
@@ -95,6 +114,18 @@ export function SwipeDeck({ places, home, current, onChange }: Props) {
           </span>
         </div>
       </div>
+
+      {choosing && (
+        <div className="maps-choice" role="dialog" aria-label={t("openWith")}>
+          <p>{t("openWith")}</p>
+          <button type="button" onClick={() => choose("apple")}>
+            Plans
+          </button>
+          <button type="button" onClick={() => choose("google")}>
+            Google Maps
+          </button>
+        </div>
+      )}
 
       <div className="deck-actions">
         <button type="button" className="round nope" onClick={() => fly("left")} aria-label={t("next")}>

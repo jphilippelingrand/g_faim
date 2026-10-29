@@ -49,6 +49,17 @@ function representativePoint(geometry: { type: string; coordinates: unknown }): 
   return [flat.reduce((s, p) => s + p[0], 0) / flat.length, flat.reduce((s, p) => s + p[1], 0) / flat.length];
 }
 
+/**
+ * Adresse courte (« 1077 boulevard Saint-Laurent, H2Z 1J8 Montréal ») : avec le nom, les applis de carte
+ * trouvent la fiche du commerce, bien mieux qu'avec des coordonnées. "" si OSM ne la donne pas.
+ */
+function addressOf(props: Record<string, string>): string {
+  const street = [props["addr:housenumber"], props["addr:street"]].filter(Boolean).join(" ");
+  const place = [props["addr:postcode"], props["addr:city"]].filter(Boolean).join(" ");
+  if (street) return [street, place].filter(Boolean).join(", ");
+  return props["addr:full"] ?? props["addr:street_address"] ?? "";
+}
+
 const minuteOfWeek = (d: Date) => Math.round((d.getTime() - WEEK_START.getTime()) / 60_000);
 
 /**
@@ -155,7 +166,9 @@ for (const country of countries) {
     }
     const cuisine = String(props.cuisine ?? "").split(";")[0].trim().toLowerCase();
     const row: PlaceRow = [props.name, round(lat), round(lng), hours];
-    if (cuisine) row.push(cuisine);
+    const address = addressOf(props);
+    if (cuisine || address) row.push(cuisine);
+    if (address) row.push(0, address);
     addRow(world, row);
     addToMatch(matchIndex, { row, brand: props["brand:wikidata"], name: normalize(props.name) });
     n++;
@@ -189,11 +202,15 @@ for await (const line of readLines(atp.file)) {
     match.row[3] = hours;
     match.row[4] ??= "";
     match.row[5] = HOURS_SOURCE.chain;
+    match.row[6] ??= addressOf(props) || undefined;
+    if (match.row[6] === undefined) match.row.length = 6;
     filled++;
     continue;
   }
   const cuisine = String(props.cuisine ?? "").split(";")[0].trim().toLowerCase();
   const row: PlaceRow = [name, round(lat), round(lng), hours, cuisine, HOURS_SOURCE.chain];
+  const address = addressOf(props);
+  if (address) row.push(address);
   addRow(world, row);
   // Une même adresse peut venir de deux collectes : la deuxième trouvera la première.
   addToMatch(matchIndex, { row, brand: props["brand:wikidata"], name: normalize(name) });

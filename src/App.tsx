@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState, type FormEven
 import { Lady } from "./components/Lady";
 import { PlaceCard } from "./components/PlaceCard";
 import { SwipeDeck } from "./components/SwipeDeck";
+import { getMapsApp, IS_APPLE, setMapsApp } from "./lib/mapsApp";
 import { LANGS, lang, setLang, t } from "./i18n";
 import {
   distanceMeters,
@@ -124,6 +125,14 @@ export default function App() {
   }, []);
   const onSelectFromMap = useCallback((id: string) => show(top.findIndex((r) => r.id === id)), [show, top]);
 
+  // Sur iPhone : l'appli de cartes retenue, qu'on peut changer en bas de l'écran.
+  const [mapsApp, setMapsAppState] = useState(getMapsApp);
+  const switchMapsApp = () => {
+    const next = mapsApp === "apple" ? "google" : "apple";
+    setMapsApp(next);
+    setMapsAppState(next);
+  };
+
   const busy = phase === "locating" || phase === "searching";
   const empty = phase === "done" && !top.length;
   const firstSearch = busy && !top.length;
@@ -218,7 +227,7 @@ export default function App() {
               </ol>
             ) : (
               <div className={busy ? "stale" : undefined}>
-                <SwipeDeck places={top} home={home} current={current} onChange={show} />
+                <SwipeDeck places={top} home={home} current={current} onChange={show} onMapsApp={setMapsAppState} />
               </div>
             )}
           </>
@@ -226,6 +235,11 @@ export default function App() {
 
         <nav className="legal" aria-label={t("language")}>
           <a href={`/${lang}/privacy`}>{t("privacy")}</a>
+          {IS_APPLE && (
+            <button type="button" onClick={switchMapsApp}>
+              {t("mapsWith", { app: mapsApp === "google" ? "Google Maps" : mapsApp === "apple" ? "Plans" : "…" })}
+            </button>
+          )}
           {LANGS.map((l) => (
             <button key={l} type="button" aria-current={l === lang} onClick={() => l !== lang && setLang(l)}>
               {l.toUpperCase()}

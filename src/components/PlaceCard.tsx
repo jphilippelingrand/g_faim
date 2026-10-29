@@ -1,4 +1,5 @@
-import { directionsUrl, formatClosingTime, formatDistance, shareUrl, travelTime, type LatLng, type Restaurant } from "../lib/places";
+import { formatClosingTime, formatDistance, shareUrl, travelTime, type LatLng, type Restaurant } from "../lib/places";
+import { directionsUrl } from "../lib/mapsApp";
 import { cuisineLabel } from "../lib/osm";
 import { t } from "../i18n";
 

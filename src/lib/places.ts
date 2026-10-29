@@ -15,6 +15,8 @@ export type Restaurant = {
   open?: boolean;
   /** Minutes avant la fermeture ; Infinity si ouvert 24 h/24. */
   closesIn?: number;
+  /** « numéro rue, code postal ville », si connue. */
+  address?: string;
   location: LatLng;
 };
 
@@ -131,13 +133,14 @@ async function restaurantsAround({ center, radius }: Area): Promise<Restaurant[]
   }
   const now = new Date();
   const rows = (await Promise.all([...leaves.values()].map(({ level, key }) => getFile(level, key, version)))).flat();
-  return rows.map(([name, lat, lng, hours, cuisine]) => {
+  return rows.map(([name, lat, lng, hours, cuisine, , address]) => {
     const closesIn = minutesUntilClose(hours, now);
     return {
       id: `${lat},${lng},${name}`,
       name,
-      cuisine,
+      cuisine: cuisine || undefined,
       closesIn,
+      address,
       location: { lat, lng },
     };
   });
@@ -230,31 +233,9 @@ export function formatClosingTime(closesIn: number, now = new Date()): string {
   return at.toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" });
 }
 
-// Sur iPhone et iPad, l'itinéraire s'ouvre directement dans Plans ; ailleurs, dans Google Maps.
-const APPLE = /iPhone|iPad|iPod/.test(navigator.userAgent);
-
-/** Lien d'itinéraire (une simple URL, pas d'API : gratuit). */
-export function directionsUrl(home: LatLng, r: Restaurant, walking: boolean): string {
-  if (APPLE) {
-    const params = new URLSearchParams({
-      saddr: `${home.lat},${home.lng}`,
-      daddr: `${r.location.lat},${r.location.lng}`,
-      q: r.name,
-      dirflg: walking ? "w" : "d",
-    });
-    return `https://maps.apple.com/?${params}`;
-  }
-  const params = new URLSearchParams({
-    api: "1",
-    origin: `${home.lat},${home.lng}`,
-    destination: `${r.location.lat},${r.location.lng}`,
-    travelmode: walking ? "walking" : "driving",
-  });
-  return `https://www.google.com/maps/dir/?${params}`;
-}
-
 /** Lien à envoyer aux copains : le resto sur une carte, sans notre position de départ. */
 export function shareUrl(r: Restaurant): string {
-  const params = new URLSearchParams({ api: "1", query: `${r.location.lat},${r.location.lng}` });
+  // Le nom et l'adresse ouvrent la fiche du commerce ; sans adresse, la position.
+  const params = new URLSearchParams({ api: "1", query: r.address ? `${r.name}, ${r.address}` : `${r.location.lat},${r.location.lng}` });
   return `https://www.google.com/maps/search/?${params}`;
 }
