@@ -12,9 +12,11 @@ type Props = {
   home: LatLng;
   results: Restaurant[];
   area: Area | null;
-  /** Incrémenté quand il faut recadrer la carte sur la maison + les résultats. */
+  /** Incrémenté quand il faut recadrer la carte sur toi + le resto choisi. */
   fitKey: number;
   selectedId: string | null;
+  /** Ce que la fiche cache de la carte (en px) : on cadre dans le reste. */
+  insets: { bottom: number; left: number };
   onSelect: (id: string) => void;
   /** Quand l'utilisateur déplace ou zoome la carte (pas quand on la recadre nous-mêmes). */
   onViewportChange: (view: Area) => void;
@@ -58,7 +60,7 @@ function marker(className: string, position: LatLng, text = "") {
   return { el, marker: new maplibregl.Marker({ element: root }).setLngLat(position) };
 }
 
-export function RestaurantMap({ home, results, area, fitKey, selectedId, onSelect, onViewportChange, children }: Props) {
+export function RestaurantMap({ home, results, area, fitKey, selectedId, insets, onSelect, onViewportChange, children }: Props) {
   const divRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const pins = useRef(new Map<string, HTMLElement>());
@@ -78,12 +80,14 @@ export function RestaurantMap({ home, results, area, fitKey, selectedId, onSelec
       style: STYLE,
       center: [home.lng, home.lat],
       zoom: 15,
-      attributionControl: { compact: true },
+      // Boutons et crédits en haut à droite : le bas de la carte est caché par la fiche.
+      attributionControl: false,
       dragRotate: false,
       pitchWithRotate: false,
     });
     m.touchZoomRotate.disableRotation();
-    m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+    m.addControl(new maplibregl.AttributionControl({ compact: true }), "top-right");
+    m.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     m.on("load", () => {
       m.addSource("area", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
       m.addLayer({ id: "area-fill", type: "fill", source: "area", paint: { "fill-color": ACCENT, "fill-opacity": 0.05 } });
@@ -137,27 +141,24 @@ export function RestaurantMap({ home, results, area, fitKey, selectedId, onSelec
 
   useEffect(() => {
     pins.current.forEach((el, id) => el.classList.toggle("selected", id === selectedId));
-  }, [selectedId, results]);
+  }, [map, selectedId, results]);
 
-  // Recadrage : seulement quand fitKey change (nouvelle recherche).
+  // Recadrage sur toi + le resto de la fiche affichée, quand fitKey change (nouvelle recherche, fiche glissée).
   useEffect(() => {
     if (!map || fitKey === 0) return;
-    // Sans animation, jumpTo et fitBounds émettent leur moveend tout de suite, pendant que le drapeau est levé.
+    // Le drapeau reste levé jusqu'à la fin du mouvement : nos recadrages ne relancent pas de recherche.
     programmatic.current = true;
-    if (!results.length) {
-      map.jumpTo({ center: [home.lng, home.lat], zoom: 14 });
-      programmatic.current = false;
+    map.once("moveend", () => (programmatic.current = false));
+    const padding = { top: 72, right: 40, bottom: insets.bottom + 32, left: insets.left + 40 };
+    const place = results.find((r) => r.id === selectedId);
+    if (!place) {
+      map.easeTo({ center: [home.lng, home.lat], zoom: 14, padding, duration: 0 });
       return;
     }
-    // On ajoute aussi le symétrique de chaque resto par rapport à la maison,
-    // pour que le cadre soit centré sur toi et pas sur le milieu des résultats.
-    const bounds = new maplibregl.LngLatBounds([home.lng, home.lat], [home.lng, home.lat]);
-    results.forEach(({ location: p }) => {
-      bounds.extend([p.lng, p.lat]);
-      bounds.extend([2 * home.lng - p.lng, 2 * home.lat - p.lat]);
-    });
-    map.fitBounds(bounds, { padding: 48, maxZoom: 17, duration: 0 });
-    programmatic.current = false;
+    // Le symétrique du resto par rapport à toi : le cadre reste centré sur toi.
+    const p = place.location;
+    const bounds = new maplibregl.LngLatBounds([p.lng, p.lat], [p.lng, p.lat]).extend([2 * home.lng - p.lng, 2 * home.lat - p.lat]);
+    map.fitBounds(bounds, { padding, maxZoom: 17, duration: 600 });
   }, [map, fitKey]);
 
   return (

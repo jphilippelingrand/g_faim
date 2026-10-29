@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { Lady, type Mood } from "./components/Lady";
-import { RestaurantCard } from "./components/RestaurantCard";
-import { MiniBar } from "./components/MiniBar";
+import { Lady } from "./components/Lady";
+import { PlaceCard } from "./components/PlaceCard";
+import { SwipeDeck } from "./components/SwipeDeck";
 import { LANGS, lang, setLang, t } from "./i18n";
 import {
   distanceMeters,
@@ -20,19 +20,48 @@ const RestaurantMap = lazy(() => import("./components/RestaurantMap").then((m) =
 
 type Phase = "locating" | "searching" | "done" | "error";
 
+// Grand écran : la fiche est un panneau à gauche, la carte se cadre à sa droite.
+const WIDE = "(min-width: 900px)";
+const PANEL_WIDTH = 452;
+
+/**
+ * Carte plein écran et, en bas, une fiche par resto : le plus proche d'abord, on glisse pour le suivant.
+ * La carte suit la fiche affichée. La dame ne prend toute la place que pendant la recherche ou quand il n'y a rien.
+ */
 export default function App() {
   const [home, setHome] = useState<LatLng | null>(null);
   const [top, setTop] = useState<Restaurant[]>([]);
   const [area, setArea] = useState<Area | null>(null);
+  const [current, setCurrent] = useState(0);
+  // Incrémenté quand la carte doit se recadrer sur toi + la fiche affichée.
   const [fitKey, setFitKey] = useState(0);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  // Quand la grande dame sort de l'écran, une barre compacte prend le relais en haut.
-  const heroRef = useRef<HTMLElement>(null);
   const [phase, setPhase] = useState<Phase>("locating");
   const [error, setError] = useState<string | null>(null);
   // Si la géoloc est refusée, on propose de taper une adresse à la place.
   const [askAddress, setAskAddress] = useState(false);
   const [address, setAddress] = useState("");
+
+  const sheetRef = useRef<HTMLDivElement>(null);
+  // Mobile : le paquet de cartes à glisser. Grand écran : la liste des 5, à gauche.
+  const [isWide, setIsWide] = useState(() => window.matchMedia(WIDE).matches);
+  // Ce que la fiche cache de la carte : la carte se cadre dans le reste.
+  const [insets, setInsets] = useState({ bottom: 0, left: 0 });
+  useEffect(() => {
+    const sheet = sheetRef.current;
+    if (!sheet) return;
+    const wide = window.matchMedia(WIDE);
+    const measure = () => {
+      setIsWide(wide.matches);
+      setInsets(wide.matches ? { bottom: 0, left: PANEL_WIDTH } : { bottom: sheet.offsetHeight, left: 0 });
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(sheet);
+    wide.addEventListener("change", measure);
+    return () => {
+      observer.disconnect();
+      wide.removeEventListener("change", measure);
+    };
+  }, []);
 
   // Dès l'ouverture : on récupère la position.
   useEffect(() => {
@@ -61,7 +90,7 @@ export default function App() {
       if (id !== requestId.current) return;
       setTop(list);
       setArea(area);
-      setSelectedId(null);
+      setCurrent(0);
       if (refit) setFitKey((k) => k + 1);
       setPhase("done");
     } catch (err) {
@@ -72,28 +101,37 @@ export default function App() {
     }
   }, []);
 
-  // Position connue : les 5 restos ouverts les plus proches, puis on cadre la carte dessus.
+  // Position connue : les 5 restos ouverts les plus proches, la carte cadrée sur toi et le premier.
   const searchAroundHome = useCallback(() => home && run(() => nearestOpen(home), true), [home, run]);
   useEffect(() => {
     searchAroundHome();
   }, [searchAroundHome]);
 
-  // La carte bouge : les 5 plus proches du centre, dans la zone visible.
+  const restart = () => {
+    getBrowserPosition()
+      .then((pos) => setHome(pos))
+      .catch(() => searchAroundHome());
+  };
+
+  // L'utilisateur déplace ou zoome la carte : les 5 plus proches du centre, sans la recadrer.
   const onViewportChange = useCallback((view: Area) => run(() => nearestOpenInView(view), false), [run]);
 
-  const onSelectFromMap = useCallback((id: string) => {
-    setSelectedId(id);
-    document.getElementById(`resto-${id}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  // Une autre fiche (glissée, cliquée, ou son épingle touchée) : la carte la suit.
+  const show = useCallback((index: number) => {
+    if (index < 0) return;
+    setCurrent(index);
+    setFitKey((k) => k + 1);
   }, []);
+  const onSelectFromMap = useCallback((id: string) => show(top.findIndex((r) => r.id === id)), [show, top]);
 
   const busy = phase === "locating" || phase === "searching";
-  const mood: Mood = busy ? "starving" : phase === "done" && top.length ? "happy" : "hungry";
+  const empty = phase === "done" && !top.length;
+  const firstSearch = busy && !top.length;
 
-  // Ligne de texte seulement quand il y a quelque chose à dire ; sinon, le rayon est une étiquette sur la carte.
   let status = "";
   if (phase === "locating") status = t("locating");
   else if (phase === "error") status = error ?? "";
-  else if (phase === "done" && !top.length) status = t("nothingOpen");
+  else if (empty) status = t("nothingOpen");
 
   async function submitAddress(e: FormEvent) {
     e.preventDefault();
@@ -109,45 +147,46 @@ export default function App() {
   }
 
   return (
-    <>
-      <MiniBar watch={heroRef} />
-      <main>
-        <header ref={heroRef}>
-          <Lady mood={mood} />
-          <p className="tagline">{t("tagline")}</p>
-        </header>
-
-        {home && (
-          <Suspense
-            fallback={
-              <div className="map-wrap">
-                <div className="map" />
-              </div>
-            }
+    <div className="shell">
+      {home ? (
+        <Suspense fallback={<div className="map" />}>
+          <RestaurantMap
+            home={home}
+            results={top}
+            area={area}
+            fitKey={fitKey}
+            selectedId={top[current]?.id ?? null}
+            insets={insets}
+            onSelect={onSelectFromMap}
+            onViewportChange={onViewportChange}
           >
-            <RestaurantMap
-              home={home}
-              results={top}
-              area={area}
-              fitKey={fitKey}
-              selectedId={selectedId}
-              onSelect={onSelectFromMap}
-              onViewportChange={onViewportChange}
-            >
-              {busy ? (
-                <span className="pill">{t("sniffing")}</span>
-              ) : (
-                area && <span className="pill">{formatDistance(area.radius)}</span>
-              )}
-              {area && home && distanceMeters(area.center, home) > 50 && (
-                <button type="button" className="pill pill-button" onClick={searchAroundHome}>
-                  {t("aroundMe")}
-                </button>
-              )}
-            </RestaurantMap>
-          </Suspense>
-        )}
+            {!busy && area && <span className="pill">{formatDistance(area.radius)}</span>}
+            {area && distanceMeters(area.center, home) > 50 && (
+              <button type="button" className="pill pill-button" onClick={searchAroundHome}>
+                {t("aroundMe")}
+              </button>
+            )}
+          </RestaurantMap>
+        </Suspense>
+      ) : (
+        <div className="map" />
+      )}
 
+      {/* Le logo repart de zéro : on reprend la position (on a pu bouger) et on recherche autour de soi. */}
+      <button type="button" className={`brand${busy ? " busy" : ""}`} onClick={restart} aria-label={t("restart")}>
+        <img src="/icon.svg" alt="" />
+        {t("appName")}
+      </button>
+
+      {/* La dame : en grand pendant la première recherche, quand rien n'est ouvert, ou sans position. */}
+      {(firstSearch || empty || phase === "error") && (
+        <div className="stage">
+          <div className="stage-backdrop" />
+          <Lady mood={busy ? "starving" : "hungry"} />
+        </div>
+      )}
+
+      <div className="sheet" ref={sheetRef}>
         {status && (
           <p className={`status${phase === "error" ? " error" : ""}`} role="status">
             {status}
@@ -168,36 +207,32 @@ export default function App() {
         )}
 
         {home && top.length > 0 && (
-          <ol className={`results${busy ? " stale" : ""}`}>
-            {top.map((r, i) => (
-              <RestaurantCard
-                key={r.id}
-                r={r}
-                index={i}
-                home={home}
-                distance={distanceMeters(home, r.location)}
-                selected={r.id === selectedId}
-                onSelect={setSelectedId}
-              />
-            ))}
-          </ol>
+          <>
+            {isWide ? (
+              <ol className={`list${busy ? " stale" : ""}`}>
+                {top.map((r, i) => (
+                  <li key={r.id} className={i === current ? "current" : undefined} onClick={() => show(i)}>
+                    <PlaceCard r={r} home={home} distance={distanceMeters(home, r.location)} />
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <div className={busy ? "stale" : undefined}>
+                <SwipeDeck places={top} home={home} current={current} onChange={show} />
+              </div>
+            )}
+          </>
         )}
-      </main>
 
-      <footer>
-        {t("footerData")}{" "}
-        <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">
-          OpenStreetMap
-        </a>{" "}
-        · {t("footerPoke")} · <a href={`/${lang}/privacy`}>{t("privacy")}</a>
-        <nav className="langs" aria-label={t("language")}>
+        <nav className="legal" aria-label={t("language")}>
+          <a href={`/${lang}/privacy`}>{t("privacy")}</a>
           {LANGS.map((l) => (
             <button key={l} type="button" aria-current={l === lang} onClick={() => l !== lang && setLang(l)}>
               {l.toUpperCase()}
             </button>
           ))}
         </nav>
-      </footer>
-    </>
+      </div>
+    </div>
   );
 }

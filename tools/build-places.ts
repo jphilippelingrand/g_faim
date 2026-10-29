@@ -6,11 +6,14 @@
  *   node tools/build-places.ts canada     (seulement ces pays)
  *
  * Prérequis : les extraits data/osm/<pays>-restos.geojsonseq, produits par tools/build-cuisines.ts
- * (osmium + extraits Geofabrik). À relancer avec eux. Fichiers sous licence ODbL (© contributeurs OSM).
+ * (osmium + extraits Geofabrik). Les horaires manquants sont complétés par All The Places (sites des
+ * enseignes, CC0), dont la dernière publication hebdomadaire est téléchargée toute seule (tools/alltheplaces.ts).
+ * Fichiers sous licence ODbL (© contributeurs OSM).
  */
 import { createReadStream, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import OpeningHours from "opening_hours";
-import { cellKey, LEVELS, MAX_PER_FILE, type PlaceRow, type PlacesIndex } from "../src/lib/placesGrid.ts";
+import { cellKey, HOURS_SOURCE, LEVELS, MAX_PER_FILE, type PlaceRow, type PlacesIndex } from "../src/lib/placesGrid.ts";
+import { atpRestaurants } from "./alltheplaces.ts";
 
 const OSM_DIR = "data/osm";
 const OUT_DIR = "public/places";
@@ -69,13 +72,68 @@ const newCell = (): Cell => ({ rows: [], children: new Map() });
 
 const round = (v: number) => Math.round(v * 1e5) / 1e5;
 
+/** Range un resto à tous les niveaux ; on décide à l'écriture où s'arrêter. */
+function addRow(world: Map<string, Cell>, row: PlaceRow) {
+  let level = world;
+  for (let l = 0; l < LEVELS.length; l++) {
+    const key = cellKey(row[1], row[2], l);
+    let cell = level.get(key);
+    if (!cell) level.set(key, (cell = newCell()));
+    cell.rows.push(row);
+    level = cell.children;
+  }
+}
+
+// Rapprochement d'un resto All The Places avec son équivalent OSM : même enseigne (Wikidata) ou même nom, tout près.
+const MATCH_BRAND_METERS = 150;
+const MATCH_NAME_METERS = 100;
+// Carrés de ~1 km pour chercher les voisins.
+const MATCH_CELL = 0.01;
+type MatchEntry = { row: PlaceRow; brand?: string; name: string };
+
+/** Nom comparable : sans accents, casse, ponctuation ni espaces (« McDonald's » = « mcdonalds »). */
+const normalize = (name: string) =>
+  name.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+
+const matchKey = (lat: number, lng: number) => `${Math.floor(lat / MATCH_CELL)}_${Math.floor(lng / MATCH_CELL)}`;
+
+function addToMatch(index: Map<string, MatchEntry[]>, entry: MatchEntry) {
+  const key = matchKey(entry.row[1], entry.row[2]);
+  const list = index.get(key);
+  if (list) list.push(entry);
+  else index.set(key, [entry]);
+}
+
+function meters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const r = Math.PI / 180;
+  const x = (lng2 - lng1) * r * Math.cos(((lat1 + lat2) / 2) * r);
+  return 6_371_000 * Math.hypot(x, (lat2 - lat1) * r);
+}
+
+/** Le resto déjà connu le plus proche qui correspond, ou null. */
+function findMatch(index: Map<string, MatchEntry[]>, lat: number, lng: number, brand: string | undefined, name: string) {
+  let best: MatchEntry | null = null;
+  let bestDistance = Infinity;
+  const [i, j] = [Math.floor(lat / MATCH_CELL), Math.floor(lng / MATCH_CELL)];
+  for (let di = -1; di <= 1; di++) {
+    for (let dj = -1; dj <= 1; dj++) {
+      for (const entry of index.get(`${i + di}_${j + dj}`) ?? []) {
+        const d = meters(lat, lng, entry.row[1], entry.row[2]);
+        const same = (brand && entry.brand === brand && d < MATCH_BRAND_METERS) || (entry.name === name && d < MATCH_NAME_METERS);
+        if (same && d < bestDistance) [best, bestDistance] = [entry, d];
+      }
+    }
+  }
+  return best;
+}
+
 const countries =
   process.argv.length > 2
     ? process.argv.slice(2)
     : readdirSync(OSM_DIR).filter((f) => f.endsWith("-restos.geojsonseq")).map((f) => f.replace("-restos.geojsonseq", ""));
 
-// Chaque resto est rangé à tous les niveaux ; on décide à l'écriture où s'arrêter.
 const world = new Map<string, Cell>();
+const matchIndex = new Map<string, MatchEntry[]>();
 const stats = { ok: 0, bad: 0 };
 let total = 0;
 let closedForGood = 0;
@@ -98,20 +156,51 @@ for (const country of countries) {
     const cuisine = String(props.cuisine ?? "").split(";")[0].trim().toLowerCase();
     const row: PlaceRow = [props.name, round(lat), round(lng), hours];
     if (cuisine) row.push(cuisine);
-
-    let level = world;
-    for (let l = 0; l < LEVELS.length; l++) {
-      const key = cellKey(lat, lng, l);
-      let cell = level.get(key);
-      if (!cell) level.set(key, (cell = newCell()));
-      cell.rows.push(row);
-      level = cell.children;
-    }
+    addRow(world, row);
+    addToMatch(matchIndex, { row, brand: props["brand:wikidata"], name: normalize(props.name) });
     n++;
   }
   console.log(`${country} : ${n} restos`);
   total += n;
 }
+
+// All The Places : complète les horaires des restos OSM qui n'en ont pas, et ajoute les restos d'enseignes
+// absents d'OSM, seulement dans les pays couverts (les carrés de 1° qui ont déjà des restos OSM).
+const atp = await atpRestaurants();
+const atpStats = { ok: 0, bad: 0 };
+let filled = 0;
+let added = 0;
+for await (const line of readLines(atp.file)) {
+  if (!line.trim()) continue;
+  const feature = JSON.parse(line);
+  const props = feature.properties ?? {};
+  const name = props.name ?? props.brand;
+  const point = feature.geometry && representativePoint(feature.geometry);
+  if (!name || !point) continue;
+  const [lng, lat] = point;
+  if (!world.has(cellKey(lat, lng, 0))) continue;
+  const hours = parseHours(props.opening_hours, atpStats);
+  if (!hours || !hours.length) continue;
+
+  const match = findMatch(matchIndex, lat, lng, props["brand:wikidata"], normalize(name));
+  if (match) {
+    // On ne remplace jamais des horaires OSM : ils ont été vérifiés sur place.
+    if (match.row[3]) continue;
+    match.row[3] = hours;
+    match.row[4] ??= "";
+    match.row[5] = HOURS_SOURCE.chain;
+    filled++;
+    continue;
+  }
+  const cuisine = String(props.cuisine ?? "").split(";")[0].trim().toLowerCase();
+  const row: PlaceRow = [name, round(lat), round(lng), hours, cuisine, HOURS_SOURCE.chain];
+  addRow(world, row);
+  // Une même adresse peut venir de deux collectes : la deuxième trouvera la première.
+  addToMatch(matchIndex, { row, brand: props["brand:wikidata"], name: normalize(name) });
+  added++;
+}
+console.log(`All The Places (${atp.run}) : horaires ajoutés à ${filled} restos OSM, ${added} restos ajoutés`);
+total += added;
 
 rmSync(OUT_DIR, { recursive: true, force: true });
 const split: string[] = [];
@@ -136,9 +225,10 @@ writeFileSync(`${OUT_DIR}/index.json`, JSON.stringify(index));
 writeFileSync(
   `${OUT_DIR}/README.md`,
   `# Restos par zone\n\nGénéré par \`tools/build-places.ts\` le ${new Date().toISOString().slice(0, 10)} ` +
-    `à partir d'OpenStreetMap (${countries.join(", ")}).\n\n` +
-    `Données © contributeurs OpenStreetMap, disponibles sous licence ODbL : https://www.openstreetmap.org/copyright\n`,
+    `à partir d'OpenStreetMap (${countries.join(", ")}) et de All The Places (publication ${atp.run}).\n\n` +
+    `Données © contributeurs OpenStreetMap, disponibles sous licence ODbL : https://www.openstreetmap.org/copyright\n` +
+    `Horaires des enseignes : All The Places (https://alltheplaces.xyz), sous CC0.\n`,
 );
-const share = Math.round((100 * stats.ok) / total);
-console.log(`${total} restos, ${share} % avec des horaires lisibles (${stats.bad} illisibles, ${closedForGood} jamais ouverts écartés)`);
+const withHours = stats.ok - closedForGood + filled + added;
+console.log(`${total} restos, ${Math.round((100 * withHours) / total)} % avec des horaires (${stats.bad} illisibles, ${closedForGood} jamais ouverts écartés)`);
 console.log(`${files} fichiers et ${split.length} carrés découpés dans ${OUT_DIR}/`);

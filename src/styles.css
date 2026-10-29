@@ -6,115 +6,84 @@
   --accent: #e2583e;
   --accent-soft: #fde3da;
   --line: #eadfd3;
+  --open: #3f8f5a;
   --skin: #f3c9a8;
   --hair: #6b4a3a;
   --blush: #f29b8a;
   --dress: #e2583e;
   --dress-dark: #c94a33;
+  /* Hauteur réservée à la fiche en bas de l'écran (la carte se cadre au-dessus). */
+  --sheet: 236px;
 }
 
 * { box-sizing: border-box; }
 
+html, body, #root { height: 100%; }
 body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
   font: 16px/1.5 "Inter", system-ui, sans-serif;
+  overflow: hidden;
 }
 
-#root { min-height: 100vh; display: flex; flex-direction: column; }
+/* ============ L'écran : carte plein écran, marque en haut, fiche en bas ============ */
 
-main {
-  width: 100%;
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 24px 16px 48px;
-  flex: 1;
-}
-
-header { text-align: center; position: relative; }
-
-/* ============ Barre compacte (au scroll) ============ */
-
-.minibar {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 10;
+.shell { position: fixed; inset: 0; }
+.map-wrap, .map { position: absolute; inset: 0; }
+/* MapLibre se met en position relative : on garde la carte plein écran. */
+.map-wrap > .map { position: absolute; width: 100%; height: 100%; }
+.map { background: var(--accent-soft); }
+.map-overlay {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 64px);
+  left: 12px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 6px 16px;
-  background: rgb(251 246 239 / .92);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--line);
-  transform: translateY(-100%);
-  transition: transform .2s ease;
+  gap: 6px;
+  pointer-events: none;
 }
-.minibar.visible { transform: none; }
-.minibar-home {
+.pill {
+  font: 500 .8rem "Inter", system-ui, sans-serif;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / .92);
+  color: var(--ink);
+  box-shadow: 0 1px 4px rgb(43 33 28 / .18);
+}
+.pill-button { border: 0; color: var(--accent); cursor: pointer; pointer-events: auto; -webkit-tap-highlight-color: transparent; }
+
+.brand {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 12px);
+  left: 12px;
   display: flex;
   align-items: center;
   gap: 8px;
-  background: none;
-  border: 0;
-  padding: 0;
-  cursor: pointer;
-  font: 700 1.25rem "Fraunces", Georgia, serif;
-  color: var(--ink);
-  -webkit-tap-highlight-color: transparent;
+  padding: 4px 14px 4px 4px;
+  border-radius: 999px;
+  background: rgb(251 246 239 / .94);
+  box-shadow: 0 1px 6px rgb(43 33 28 / .15);
+  font: 700 1.15rem "Fraunces", Georgia, serif;
+  letter-spacing: -.01em;
 }
-.minibar-home img { border-radius: 50%; }
+.brand { border: 0; color: var(--ink); cursor: pointer; -webkit-tap-highlight-color: transparent; transition: transform .15s; }
+.brand:active { transform: scale(.95); }
+.brand img { width: 34px; height: 34px; border-radius: 50%; }
+/* Pendant la recherche, la petite dame du logo gigote. */
+.brand.busy img { animation: wiggle .5s ease-in-out infinite alternate; }
+@keyframes wiggle { from { transform: rotate(-10deg); } to { transform: rotate(10deg); } }
 
-/* ============ Choix du mode : les meilleurs, sur le pouce, au hasard ============ */
-
-.modes {
+/* La dame en grand, seulement pendant la recherche ou quand il n'y a rien : au milieu de la carte. */
+.stage {
+  position: absolute;
+  inset: 0 0 var(--sheet);
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
-  padding: 4px;
-  margin: 0 0 14px;
-  border-radius: 20px;
-  background: var(--card);
-  border: 1px solid var(--line);
-  box-shadow: 0 2px 6px rgb(43 33 28 / .06);
+  place-items: center;
+  pointer-events: none;
 }
-/* Emoji au-dessus du texte : trois choix tiennent côte à côte même sur un petit téléphone. */
-.modes button {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  min-width: 0;
-  padding: 7px 4px 6px;
-  border: 0;
-  border-radius: 16px;
-  background: none;
-  color: var(--muted);
-  font: 600 .82rem "Inter", system-ui, sans-serif;
-  white-space: nowrap;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: background .15s, color .15s;
-}
-.modes button > span:first-child { font-size: 1.3rem; line-height: 1.2; }
-.modes button[aria-checked="true"] { background: var(--accent); color: #fff; }
-@media (hover: hover) {
-  .modes button:hover:not([aria-checked="true"]) { color: var(--ink); }
-}
-/* Dans la barre du haut : les emojis seuls. */
-.modes.compact { margin: 0; gap: 2px; padding: 3px; border-radius: 999px; box-shadow: none; }
-.modes.compact button { width: 38px; height: 32px; padding: 0; border-radius: 999px; }
-.modes.compact button > span:first-child { font-size: 1.05rem; }
-
-
-
-.tagline { margin: 4px 0 16px; color: var(--muted); }
+.stage > * { pointer-events: auto; }
+.stage .lady svg { width: 180px; height: 202px; }
+.stage-backdrop { position: absolute; inset: 0; background: rgb(251 246 239 / .7); backdrop-filter: blur(2px); pointer-events: none; }
 
 /* ============ La petite dame ============ */
 
@@ -315,83 +284,8 @@ header { text-align: center; position: relative; }
   100% { transform: scaleY(1.6); opacity: 0; }
 }
 
-/* ============ Catégories : gros emoji rond + nom ============ */
-
-/* Une seule ligne, qui défile au doigt si elle déborde (centrée quand elle tient). */
-.categories {
-  display: flex;
-  gap: 6px;
-  margin: 0 -16px 18px;
-  padding: 0 16px;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.categories::-webkit-scrollbar { display: none; }
-.categories > :first-child { margin-left: auto; }
-.categories > :last-child { margin-right: auto; }
-.categories button {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 11px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--card);
-  color: var(--ink);
-  font: 500 .82rem "Inter", system-ui, sans-serif;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: border-color .15s, color .15s;
-}
-.categories .emoji { font-size: 1rem; line-height: 1; }
-.categories .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.categories button:active { transform: scale(.96); }
-.categories button.active { border-color: var(--accent); color: var(--accent); font-weight: 700; }
-.categories button.active .emoji { display: inline-block; animation: boing .45s cubic-bezier(.3, 1.6, .5, 1) both; }
-@keyframes boing {
-  0% { transform: scale(.85) rotate(0); }
-  60% { transform: scale(1.25) rotate(-12deg); }
-  100% { transform: none; }
-}
-@media (hover: hover) {
-  .categories button:hover:not(.active) { border-color: var(--accent); }
-}
 
 /* ============ Carte ============ */
-
-.map-wrap { position: relative; margin-bottom: 20px; }
-.map-overlay {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  display: flex;
-  gap: 6px;
-  pointer-events: none;
-}
-.pill {
-  font: 500 .8rem "Inter", system-ui, sans-serif;
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: rgb(255 255 255 / .92);
-  color: var(--ink);
-  box-shadow: 0 1px 4px rgb(43 33 28 / .18);
-}
-.pill-button {
-  border: 0;
-  color: var(--accent);
-  cursor: pointer;
-  pointer-events: auto;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.map {
-  height: 340px;
-  border-radius: 16px;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  background: var(--accent-soft);
-}
 
 .pin {
   width: 30px;
@@ -403,9 +297,11 @@ header { text-align: center; position: relative; }
   box-shadow: 0 2px 6px rgb(0 0 0 / .25);
   font: 700 .9rem/25px "Fraunces", Georgia, serif;
   text-align: center;
-  transition: transform .15s, background .15s;
+  opacity: .55;
+  cursor: pointer;
+  transition: transform .2s, opacity .2s, background .2s;
 }
-.pin.selected { background: var(--ink); transform: scale(1.3); }
+.pin.selected { opacity: 1; transform: scale(1.35); }
 
 .home-pin {
   width: 16px;
@@ -420,6 +316,116 @@ header { text-align: center; position: relative; }
   70% { box-shadow: 0 0 0 14px rgb(59 130 246 / 0); }
   100% { box-shadow: 0 0 0 0 rgb(59 130 246 / 0); }
 }
+.maplibregl-ctrl-top-right { top: env(safe-area-inset-top); }
+
+/* ============ La fiche du bas : un resto à la fois, on glisse pour le suivant ============ */
+
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 14px 0 calc(env(safe-area-inset-bottom) + 10px);
+  background: var(--bg);
+  border-radius: 24px 24px 0 0;
+  box-shadow: 0 -6px 24px rgb(43 33 28 / .12);
+}
+
+.place {
+  height: 100%;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 14px 14px 12px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "name time" "info time" "go go";
+  column-gap: 12px;
+}
+.place h2 { grid-area: name; margin: 0; font: 700 1.3rem/1.15 "Fraunces", Georgia, serif; overflow-wrap: anywhere; }
+.place-info { grid-area: info; margin: 4px 0 0; font-size: .85rem; color: var(--muted); }
+.place-info .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--open); margin-right: 6px; vertical-align: 1px; }
+.place-info .dot.soon { background: var(--accent); }
+.place-info .dot.unknown { background: var(--line); }
+.place-time { grid-area: time; text-align: right; line-height: 1; color: var(--accent); }
+.place-time b { display: block; font: 700 2.4rem/1 "Fraunces", Georgia, serif; }
+.place-time span { font-size: .8rem; font-weight: 500; }
+.place-actions { grid-area: go; display: flex; gap: 8px; margin-top: 12px; }
+.go {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--accent);
+  color: #fff;
+  font: 700 1.05rem "Fraunces", Georgia, serif;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .15s;
+}
+.go:active { transform: scale(.97); }
+.share {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+/* Le paquet de cartes (mobile) : celle du dessus se glisse, la suivante attend derrière. */
+.deck { padding: 0 16px; touch-action: pan-y; }
+.deck-cards { position: relative; display: grid; }
+.deck-card { grid-area: 1 / 1; position: relative; cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none; }
+.deck-card.behind { transform: scale(.95) translateY(8px); opacity: .7; pointer-events: none; }
+.deck-card:active { cursor: grabbing; }
+.stamp {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  background: var(--card);
+  padding: 2px 10px;
+  border: 3px solid currentColor;
+  border-radius: 8px;
+  font: 900 1.6rem "Fraunces", Georgia, serif;
+  letter-spacing: .04em;
+  pointer-events: none;
+}
+.stamp.nope { color: var(--muted); transform: translate(-50%, -50%) rotate(12deg); }
+.stamp.yum { color: var(--accent); transform: translate(-50%, -50%) rotate(-12deg); }
+.deck-actions { display: flex; justify-content: center; align-items: center; gap: 18px; margin-top: 12px; }
+.round {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--card);
+  display: grid;
+  place-items: center;
+  font-size: 1.5rem;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgb(43 33 28 / .12);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform .15s;
+}
+.round:active { transform: scale(.92); }
+.round.nope { color: var(--muted); }
+.round.yum { background: var(--accent); border-color: var(--accent); color: #fff; width: 68px; height: 68px; font-size: 1.8rem; }
+.round.small { width: 46px; height: 46px; color: var(--ink); }
+
+/* La liste (grand écran) : les 5, on clique pour voir le resto sur la carte. */
+.list { list-style: none; margin: 0; padding: 0 16px; display: grid; gap: 10px; max-height: calc(100vh - 160px); overflow-y: auto; }
+.list > li { cursor: pointer; }
+.list > li .place { transition: border-color .15s; }
+.list > li.current .place { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.stale { opacity: .5; transition: opacity .2s; }
+
+.status { text-align: center; color: var(--muted); margin: 4px 16px 10px; }
+.status.error { color: var(--accent); }
 
 input[type="text"] {
   font: inherit;
@@ -431,8 +437,7 @@ input[type="text"] {
   outline: none;
 }
 input:focus { border-color: var(--accent); }
-
-.address { display: flex; gap: 8px; margin-bottom: 16px; }
+.address { display: flex; gap: 8px; margin: 0 16px 10px; }
 .address input { flex: 1; min-width: 0; }
 .address button {
   font: 700 1rem "Fraunces", Georgia, serif;
@@ -444,139 +449,20 @@ input:focus { border-color: var(--accent); }
   cursor: pointer;
 }
 
-.status { text-align: center; color: var(--muted); margin: 0 0 16px; }
-.status.error { color: var(--accent); }
-
-/* ============ Résultats ============ */
-
-.results { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; transition: opacity .2s; }
-.results.stale { opacity: .5; }
-
-.card {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 12px;
-  align-items: center;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 14px 12px 14px 16px;
-  position: relative;
-  animation: pop .35s ease-out both;
-}
-.card.selected { border-color: var(--accent); }
-@media (hover: hover) {
-  .card:hover { border-color: var(--accent); }
-}
-.card.selected { box-shadow: 0 0 0 1px var(--accent); }
-
-.card-link, .go { -webkit-tap-highlight-color: transparent; }
-
-.card-link {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  text-decoration: none;
-  color: inherit;
-  min-width: 0;
-}
-
-/* Le temps à pied, en gros : c'est ce qui compte quand on a faim. Toute la pastille lance l'itinéraire. */
-.go {
-  display: grid;
-  justify-items: center;
-  gap: 1px;
-  width: 84px;
-  box-sizing: border-box;
-  padding: 8px 6px;
-  border-radius: 14px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  text-decoration: none;
-  transition: background .15s, color .15s, transform .15s;
-}
-.eta { display: flex; align-items: baseline; gap: 3px; }
-.eta svg { align-self: center; }
-.eta b { font: 700 1.7rem/1 "Fraunces", Georgia, serif; font-variant-numeric: lining-nums; }
-.eta span { font-weight: 500; font-size: .85rem; }
-.dist { font-size: .75rem; color: var(--muted); transition: color .15s; }
-.go:active .dist, .go:focus-visible .dist { color: rgb(255 255 255 / .85); }
-@media (hover: hover) {
-  .go:hover .dist { color: rgb(255 255 255 / .85); }
-}
-.go:active, .go:focus-visible { background: var(--accent); color: #fff; transform: scale(1.08); }
-@media (hover: hover) {
-  .go:hover { background: var(--accent); color: #fff; transform: scale(1.08); }
-}
-
-/* Le numéro, comme l'épingle de la carte, pour retrouver le resto dessus. */
-.rank {
-  flex: none;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
-  font: 700 .9rem/28px "Fraunces", Georgia, serif;
-  font-variant-numeric: lining-nums;
-  text-align: center;
-}
-
-.card h2 { font-family: "Fraunces", Georgia, serif; font-size: 1.15rem; margin: 0; line-height: 1.25; }
-.meta { font-size: .85rem; color: var(--muted); margin-top: 2px; }
-.card-body { min-width: 0; }
-.meta-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.meta.open { color: #3f8f5a; font-weight: 500; }
-.meta.soon { color: var(--accent); font-weight: 500; }
-
-@keyframes pop {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: none; }
-}
-
-footer { text-align: center; font-size: .75rem; color: var(--muted); padding: 16px; }
-footer a { color: inherit; }
-.langs { display: flex; justify-content: center; gap: 4px; margin-top: 10px; }
-.langs button {
-  font: 500 .75rem "Inter", system-ui, sans-serif;
-  padding: 4px 8px;
-  border-radius: 999px;
-  border: 1px solid transparent;
-  background: none;
-  color: var(--muted);
-  cursor: pointer;
-}
-.langs button[aria-current="true"] { border-color: var(--line); background: var(--card); color: var(--ink); }
-
-@media (max-width: 420px) {
-  .grr { font-size: 1.35rem; }
-}
+.legal { display: flex; justify-content: center; gap: 10px; margin-top: 8px; font-size: .7rem; color: var(--muted); }
+.legal a { color: inherit; }
+.legal button { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+.legal button[aria-current="true"] { color: var(--ink); font-weight: 600; }
 
 @media (prefers-reduced-motion: reduce) {
-  .lady *, .lady svg, .card, .home-pin { animation: none !important; }
+  .lady *, .lady svg, .home-pin { animation: none !important; }
   .grr span { opacity: 1; }
 }
 
-/* ============ Téléphone : le resto n°1 doit se voir sans faire défiler ============ */
-
-@media (max-width: 600px) {
-  main { padding-top: 12px; }
-  .lady { padding-top: 28px; }
-  .lady svg { width: 140px; height: 158px; }
-  .tagline { margin-bottom: 12px; }
-  .map { height: 240px; }
-  .map-wrap { margin-bottom: 14px; }
-}
-
-/* ============ Grand écran : liste à gauche, carte à droite (façon Google Maps) ============ */
-
+/* Grand écran : la fiche devient un panneau posé en bas à gauche. */
 @media (min-width: 900px) {
-  /* Le panneau de gauche défile avec la page ; la carte est fixée sur tout le reste de l'écran. */
-  main, footer { width: 420px; max-width: none; margin: 0; box-sizing: border-box; }
-  main { padding: 24px 20px; }
-
-  .map-wrap { position: fixed; top: 0; right: 0; bottom: 0; left: 420px; margin: 0; }
-  .map { height: 100%; border: 0; border-left: 1px solid var(--line); border-radius: 0; }
-
-  .minibar { right: auto; width: 420px; margin: 0; }
+  :root { --sheet: 0px; }
+  .sheet { left: 16px; right: auto; top: 76px; bottom: auto; width: 420px; border-radius: 24px; }
+  .stage { inset: 0 0 0 452px; }
+  .map-overlay { top: 16px; left: 452px; }
 }

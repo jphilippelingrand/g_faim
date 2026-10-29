@@ -11,7 +11,7 @@ export type Restaurant = {
   name: string;
   /** Clé OSM de cuisine=* (ex. "pizza"), si renseignée. */
   cuisine?: string;
-  /** Ouvert en ce moment (d'après ses horaires OSM) ; undefined si on ne les connaît pas. */
+  /** Encore ouvert quand on arrive et qu'on a mangé (d'après ses horaires) ; undefined si on ne les connaît pas. */
   open?: boolean;
   /** Minutes avant la fermeture ; Infinity si ouvert 24 h/24. */
   closesIn?: number;
@@ -24,8 +24,8 @@ const RADII = [500, 1000, 2000, 4000, 8000, 16_000, 32_000];
 // À partir de ce rayon, plutôt que d'aller plus loin, on complète avec les restos proches aux horaires inconnus.
 const FILL_UNKNOWN_FROM = 2000;
 const MAX_RADIUS = RADII[RADII.length - 1];
-// Le temps d'y aller et de commander : un resto qui ferme avant ne compte pas comme ouvert.
-const MIN_OPEN_MINUTES = 20;
+// « Encore ouvert quand t'arrives » : le trajet, plus le temps de manger. Un resto qui ferme avant ne compte pas comme ouvert.
+const EAT_MINUTES = 20;
 
 export function getBrowserPosition(): Promise<LatLng> {
   return new Promise((resolve, reject) => {
@@ -137,7 +137,6 @@ async function restaurantsAround({ center, radius }: Area): Promise<Restaurant[]
       id: `${lat},${lng},${name}`,
       name,
       cuisine,
-      open: closesIn === undefined ? undefined : closesIn >= MIN_OPEN_MINUTES,
       closesIn,
       location: { lat, lng },
     };
@@ -155,6 +154,12 @@ function withoutDuplicates(list: Restaurant[]): Restaurant[] {
     if (!kept.some((k) => k.name.toLowerCase() === name && distanceMeters(k.location, r.location) < DUPLICATE_DISTANCE)) kept.push(r);
   }
   return kept;
+}
+
+/** Encore ouvert à l'arrivée, avec le temps de manger ; undefined si horaires inconnus. */
+function openOnArrival(r: Restaurant, meters: number): boolean | undefined {
+  if (r.closesIn === undefined) return undefined;
+  return r.closesIn >= travelTime(meters).minutes + EAT_MINUTES;
 }
 
 const byDistance = (center: LatLng) => (a: Restaurant, b: Restaurant) =>
@@ -181,7 +186,8 @@ async function nearestWithin(center: LatLng, radii: number[]): Promise<{ list: R
     area = { center, radius };
     const inside = (await restaurantsAround(area))
       .filter((r) => distanceMeters(center, r.location) <= radius)
-      .sort(byDistance(center));
+      .sort(byDistance(center))
+      .map((r) => ({ ...r, open: openOnArrival(r, distanceMeters(center, r.location)) }));
     const open = withoutDuplicates(inside.filter((r) => r.open === true));
     list = open.slice(0, TOP_N);
     if (list.length < TOP_N && radius >= FILL_UNKNOWN_FROM) {
@@ -216,9 +222,27 @@ export function formatDistance(m: number): string {
 /** Heure de fermeture lisible (« 22 h 30 », « 10:30 PM »…). */
 export function formatClosingTime(closesIn: number, now = new Date()): string {
   const at = new Date(now.getTime() + closesIn * 60_000);
+  if (at.getHours() === 0 && at.getMinutes() === 0) return t("midnight");
   if (lang === "fr") {
     const minutes = at.getMinutes();
     return `${at.getHours()} h${minutes ? ` ${String(minutes).padStart(2, "0")}` : ""}`;
   }
   return at.toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" });
+}
+
+/** Lien d'itinéraire Google Maps (une simple URL, pas l'API : gratuit). */
+export function directionsUrl(home: LatLng, r: Restaurant, walking: boolean): string {
+  const params = new URLSearchParams({
+    api: "1",
+    origin: `${home.lat},${home.lng}`,
+    destination: `${r.location.lat},${r.location.lng}`,
+    travelmode: walking ? "walking" : "driving",
+  });
+  return `https://www.google.com/maps/dir/?${params}`;
+}
+
+/** Lien à envoyer aux copains : le resto sur une carte, sans notre position de départ. */
+export function shareUrl(r: Restaurant): string {
+  const params = new URLSearchParams({ api: "1", query: `${r.location.lat},${r.location.lng}` });
+  return `https://www.google.com/maps/search/?${params}`;
 }
