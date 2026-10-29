@@ -22,38 +22,38 @@ const SIZES = {
   "duo-inner": { w: 669, h: 951 }, // 2007 × 2853
 };
 
-// Une capture par diapositive, prise sur l'iPhone dans la langue concernée.
-const RAW = ["01-carte.png", "02-liste.png", "03-cuisines.png", "04-rapide.png", "05-surprise.png"];
+// Une capture par diapositive, prise sur l'iPhone dans la langue concernée (capture.mjs).
+const RAW = ["01-proche.png", "02-suivant.png", "03-ouvert.png", "04-nuit.png", "05-ailleurs.png"];
 
 const TEXT = {
   fr: {
-    tagline: "Les meilleures tables ouvertes, juste à côté.",
+    tagline: "Les restos ouverts les plus proches.",
     slides: [
-      ["Ton ventre gargouille ?", "Groubl trouve les meilleures tables ouvertes autour de toi."],
-      ["Les 5 meilleures, là, maintenant", "Classées par note Google, ouvertes uniquement. Un tap pour l'itinéraire."],
-      ["Les spécialités du coin", "Poutine, crêpes, basque… selon l'endroit où tu es."],
-      ["Une faim pressée ?", "Sur le pouce : fast-foods et sandwicheries bien notés, au plus près."],
-      ["Laisse le hasard choisir", "Le mode surprise tire 5 restos au pif."],
+      ["Ton ventre gargouille ?", "Groubl te montre le resto ouvert le plus proche. Rien à taper."],
+      ["Pas celui-là ? Swipe.", "À gauche, le suivant. À droite, on y va."],
+      ["Encore ouvert quand t'arrives", "On compte le trajet et le temps de manger."],
+      ["Même à minuit", "Les 5 plus proches qui t'attendent encore."],
+      ["La carte suit", "Bouge-la : les restos ouverts du coin suivent."],
     ],
   },
   en: {
-    tagline: "The best open tables, right around the corner.",
+    tagline: "The closest places open right now.",
     slides: [
-      ["Tummy rumbling?", "Groubl finds the best open restaurants around you."],
-      ["The top 5, right here, right now", "Ranked by Google rating, open places only. One tap for directions."],
-      ["Local specialties", "Poutine, crêpes, Basque food… depending on where you are."],
-      ["In a hurry?", "Quick bite: well-rated fast food and sandwiches, as close as it gets."],
-      ["Let chance decide", "Surprise mode picks 5 restaurants at random."],
+      ["Tummy rumbling?", "Groubl shows you the closest open restaurant. Nothing to type."],
+      ["Not that one? Swipe.", "Left for the next one. Right to go."],
+      ["Still open when you arrive", "We count the walk and the time to eat."],
+      ["Even at midnight", "The 5 closest places still waiting for you."],
+      ["The map follows", "Move it: the open spots around follow."],
     ],
   },
   es: {
-    tagline: "Las mejores mesas abiertas, a la vuelta de la esquina.",
+    tagline: "Los restaurantes abiertos más cercanos.",
     slides: [
-      ["¿Te ruge la barriga?", "Groubl encuentra los mejores restaurantes abiertos cerca de ti."],
-      ["Los 5 mejores, aquí y ahora", "Ordenados por nota de Google, solo abiertos. Un toque para llegar."],
-      ["Especialidades locales", "Poutine, crepes, cocina vasca… según dónde estés."],
-      ["¿Con prisa?", "Algo rápido: comida rápida y bocadillos bien valorados, lo más cerca posible."],
-      ["Deja que el azar elija", "El modo sorpresa elige 5 restaurantes al azar."],
+      ["¿Te ruge la barriga?", "Groubl te muestra el restaurante abierto más cercano. Sin escribir nada."],
+      ["¿Ese no? Desliza.", "A la izquierda, el siguiente. A la derecha, vamos."],
+      ["Abierto cuando llegues", "Contamos el camino y el tiempo para comer."],
+      ["Incluso a medianoche", "Los 5 más cercanos que todavía te esperan."],
+      ["El mapa te sigue", "Muévelo: los sitios abiertos de la zona te siguen."],
     ],
   },
 };
@@ -62,11 +62,13 @@ const C = { bg: "#fbf6ef", peach: "#fde3da", ink: "#2b211c", muted: "#8a7b70", a
 const FONTS =
   "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,700;9..144,900&family=Inter:wght@500&display=swap";
 
-/** Capture de l'app en data URL, ou null si elle n'a pas encore été déposée. */
-function rawShot(lang, i) {
-  for (const l of [lang, "fr"]) {
-    const p = new URL(`./raw/${l}/${RAW[i]}`, import.meta.url);
-    if (existsSync(p)) return `data:image/png;base64,${readFileSync(p).toString("base64")}`;
+/** Capture de l'app en data URL (celle de l'iPhone Duo pour ses tailles, si elle existe), ou null si elle n'a pas encore été déposée. */
+function rawShot(lang, i, device = "") {
+  for (const dir of [device, ""].filter((d, k, all) => all.indexOf(d) === k)) {
+    for (const l of [lang, "fr"]) {
+      const p = new URL(`./raw/${l}/${dir}${RAW[i]}`, import.meta.url);
+      if (existsSync(p)) return `data:image/png;base64,${readFileSync(p).toString("base64")}`;
+    }
   }
   return null;
 }
@@ -97,7 +99,7 @@ function route(W, H, n, y0, amp) {
 const EMOJIS = ["🍟", "🍣", "🥞", "🍕", "🍜", "🌮"];
 
 /** La scène panoramique complète : n diapositives côte à côte, de w × h points chacune. */
-function panorama(lang, { w, h }) {
+function panorama(lang, { w, h }, device = "") {
   const n = TEXT[lang].slides.length;
   const W = w * n;
   const phoneW = Math.min(w * 0.74, h * 0.36);
@@ -109,7 +111,7 @@ function panorama(lang, { w, h }) {
           <h1 style="margin:0;font:700 ${w * 0.088}px/1.05 Fraunces;letter-spacing:-.02em;color:${C.ink}">${title}</h1>
           <p style="margin:${h * 0.012}px 0 0;font:500 ${w * 0.04}px/1.35 Inter;color:${C.muted}">${sub}</p>
         </div>
-        <div style="position:absolute;top:${h * 0.255}px;left:${first ? w * 0.3 : (w - phoneW) / 2}px">${phone(rawShot(lang, i), RAW[i], first ? phoneW * 0.8 : phoneW)}</div>
+        <div style="position:absolute;top:${h * 0.255}px;left:${first ? w * 0.3 : (w - phoneW) / 2}px">${phone(rawShot(lang, i, device), RAW[i], first ? phoneW * 0.8 : phoneW)}</div>
       </section>`;
     })
     .join("");
@@ -173,7 +175,7 @@ for (const lang of langs) {
     mkdirSync(dir, { recursive: true });
     const n = TEXT[lang].slides.length;
     const clips = Array.from({ length: n }, (_, i) => ({ path: new URL(`0${i + 1}.png`, dir).pathname, x: i * size.w }));
-    await render(panorama(lang, size), size.w * n, size.h, 3, clips);
+    await render(panorama(lang, size, name.startsWith("duo") ? "duo/" : ""), size.w * n, size.h, 3, clips);
   }
   const dir = new URL(`./out/${lang}/`, import.meta.url);
   // 3840 × 1646 et 3840 × 2560, rendus en points × 2.
