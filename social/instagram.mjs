@@ -13,11 +13,24 @@ export function token() {
   return value;
 }
 
+// Une lecture coupée par le réseau (« fetch failed », « other side closed ») est retentée, avec une pause.
+// Une écriture ne l'est pas : elle a pu arriver chez Meta, la refaire publierait deux fois.
+const GET_RETRIES = 3;
+
 /** Appel GET ou POST ; les erreurs de Meta remontent avec leur message. */
 export async function ig(path, { method = "GET", params = {} } = {}) {
   const query = new URLSearchParams({ ...params, access_token: token() });
   const url = path.startsWith("https://") ? `${path}?${query}` : `${API}/${path}?${query}`;
-  const res = await fetch(url, { method });
+  let res;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      res = await fetch(url, { method });
+      break;
+    } catch (err) {
+      if (method !== "GET" || attempt === GET_RETRIES) throw err;
+      await new Promise((r) => setTimeout(r, attempt * 5000));
+    }
+  }
   const body = await res.json().catch(() => ({}));
   if (!res.ok || body.error) {
     const e = body.error ?? {};
