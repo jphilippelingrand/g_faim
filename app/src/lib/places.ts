@@ -15,6 +15,8 @@ export type Restaurant = {
   open?: boolean;
   /** Minutes avant la fermeture ; Infinity si ouvert 24 h/24. */
   closesIn?: number;
+  /** « numéro rue, code postal ville », si connue. */
+  address?: string;
   location: LatLng;
 };
 
@@ -109,13 +111,14 @@ async function restaurantsAround({ center, radius }: Area): Promise<Restaurant[]
   }
   const now = new Date();
   const rows = (await Promise.all([...leaves.values()].map(({ level, key }) => getFile(level, key, version)))).flat();
-  return rows.map(([name, latitude, longitude, hours, cuisine]) => {
+  return rows.map(([name, latitude, longitude, hours, cuisine, , address]) => {
     const closesIn = minutesUntilClose(hours, now);
     return {
       id: `${latitude},${longitude},${name}`,
       name,
       cuisine: cuisine || undefined,
       closesIn,
+      address,
       location: { latitude, longitude },
     };
   });
@@ -208,18 +211,11 @@ export function formatClosingTime(closesIn: number, now = new Date()): string {
   return at.toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" });
 }
 
-/** Itinéraire dans Plans (Apple), à pied ou en voiture selon la distance : une simple URL, gratuite. */
-export function directionsUrl(r: Restaurant, walking: boolean): string {
-  const params = new URLSearchParams({
-    daddr: `${r.location.latitude},${r.location.longitude}`,
-    q: r.name,
-    dirflg: walking ? "w" : "d",
-  });
-  return `https://maps.apple.com/?${params}`;
-}
-
 /** Lien à envoyer aux copains : le resto dans Plans, sans notre position de départ. */
 export function shareUrl(r: Restaurant): string {
-  const params = new URLSearchParams({ q: r.name, ll: `${r.location.latitude},${r.location.longitude}` });
+  // Avec l'adresse, Plans retrouve la fiche du commerce ; sinon, le nom autour de sa position.
+  const params = new URLSearchParams(
+    r.address ? { q: `${r.name}, ${r.address}` } : { q: r.name, ll: `${r.location.latitude},${r.location.longitude}` },
+  );
   return `https://maps.apple.com/?${params}`;
 }

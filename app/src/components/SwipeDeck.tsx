@@ -1,12 +1,13 @@
 import * as Haptics from "expo-haptics";
 import { useEffect } from "react";
-import { Linking, Pressable, Share, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Pressable, Share, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import Svg, { Path } from "react-native-svg";
 import { scheduleOnRN } from "react-native-worklets";
 import { PlaceCard } from "./PlaceCard";
-import { directionsUrl, distanceMeters, shareUrl, travelTime, type LatLng, type Restaurant } from "../lib/places";
+import { distanceMeters, shareUrl, travelTime, type LatLng, type Restaurant } from "../lib/places";
+import { getMapsApp, openDirections, type MapsApp } from "../lib/mapsApp";
 import { colors, fonts } from "../theme";
 import { t } from "../i18n";
 
@@ -15,6 +16,8 @@ type Props = {
   home: LatLng;
   current: number;
   onChange: (index: number) => void;
+  /** Appli de cartes choisie la première fois (pour l'afficher en bas de l'écran). */
+  onMapsApp: (app: MapsApp) => void;
 };
 
 // Au-delà de cette distance, la carte part ; sinon elle revient.
@@ -26,7 +29,7 @@ const FLY_MS = 240;
  * la suivante (et on reboucle après la dernière) ; à droite, « miam », l'itinéraire dans Plans.
  * Les boutons ✕ et ♥ font la même chose, pour qui ne glisse pas.
  */
-export function SwipeDeck({ places, home, current, onChange }: Props) {
+export function SwipeDeck({ places, home, current, onChange, onMapsApp }: Props) {
   const { width } = useWindowDimensions();
   const x = useSharedValue(0);
 
@@ -42,14 +45,21 @@ export function SwipeDeck({ places, home, current, onChange }: Props) {
   const nextCard = () => onChange((current + 1) % places.length);
   const go = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Linking.openURL(directionsUrl(place, trip.mode === "walk"));
+    openDirections(place, trip.mode === "walk").then((app) => app && onMapsApp(app));
   };
   const share = () =>
     Share.share({ message: `${t("shareText", { name: place.name, minutes: trip.minutes })} ${shareUrl(place)}` });
 
   function fly(direction: "left" | "right") {
     Haptics.selectionAsync();
-    if (direction === "right") go();
+    if (direction === "right") {
+      go();
+      // La première fois, la feuille « Ouvrir avec… » s'affiche : la carte reste en place.
+      if (!getMapsApp()) {
+        x.set(withSpring(0));
+        return;
+      }
+    }
     x.set(
       withTiming(direction === "left" ? -width * 1.3 : width * 1.3, { duration: FLY_MS }, (done) => {
         if (!done) return;

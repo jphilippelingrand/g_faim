@@ -12,8 +12,8 @@ import { SearchingLady } from "./src/components/SearchingLady";
 import { SwipeDeck } from "./src/components/SwipeDeck";
 import { RestaurantMap } from "./src/components/RestaurantMap";
 import { updateWidget } from "./src/lib/widget";
+import { askMapsApp, getMapsApp, openDirections, setMapsApp } from "./src/lib/mapsApp";
 import {
-  directionsUrl,
   distanceMeters,
   formatClosingTime,
   nearestOpen,
@@ -110,7 +110,7 @@ function Main() {
       if (refit && goToFirst.current && list[0]) {
         goToFirst.current = false;
         const trip = travelTime(distanceMeters(area.center, list[0].location));
-        Linking.openURL(directionsUrl(list[0], trip.mode === "walk"));
+        openDirections(list[0], trip.mode === "walk").then((app) => app && setMapsAppState(app));
       }
       if (refit) setFitKey((k) => k + 1);
       setPhase("done");
@@ -204,6 +204,15 @@ function Main() {
     [show, top],
   );
 
+  // L'appli de cartes retenue, qu'on peut changer en bas de l'écran.
+  const [mapsApp, setMapsAppState] = useState(getMapsApp);
+  const changeMapsApp = async () => {
+    const app = await askMapsApp();
+    if (!app) return;
+    setMapsApp(app);
+    setMapsAppState(app);
+  };
+
   const busy = phase === "locating" || phase === "searching";
   const empty = phase === "done" && !top.length;
 
@@ -293,7 +302,7 @@ function Main() {
 
         {home && top.length > 0 && (
           <View style={busy && styles.stale}>
-            <SwipeDeck places={top} home={home} current={current} onChange={show} />
+            <SwipeDeck places={top} home={home} current={current} onChange={show} onMapsApp={setMapsAppState} />
           </View>
         )}
 
@@ -305,7 +314,15 @@ function Main() {
           <Text style={styles.footerLink} onPress={() => Linking.openURL(`${SITE}/${lang}/support`)} accessibilityRole="link">
             {t("support")}
           </Text>
-          {"  ·  "}
+          {Platform.OS === "ios" && (
+            <>
+              {"  ·  "}
+              <Text style={styles.footerLink} onPress={changeMapsApp} accessibilityRole="button">
+                {t("mapsWith", { app: mapsApp === "google" ? "Google Maps" : mapsApp === "apple" ? "Plans" : "…" })}
+              </Text>
+            </>
+          )}
+          {"\n"}
           {t("footer")}
         </Text>
       </View>
