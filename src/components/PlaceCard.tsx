@@ -10,14 +10,16 @@ type Props = {
   actions?: boolean;
 };
 
-// En dessous, la pastille d'ouverture passe au rouge.
+// En dessous, l'heure de fermeture passe au rouge.
 const CLOSING_SOON = 60;
 
-/** Pastille + heure de fermeture : « ● 23 h », « ● 24/7 », ou rien quand on ne sait pas. */
-function opening(r: Restaurant): { dot: string; text: string } {
-  if (r.closesIn === undefined) return { dot: "unknown", text: "" };
-  if (r.closesIn === Infinity) return { dot: "", text: t("openAllDay") };
-  return { dot: r.closesIn < CLOSING_SOON ? "soon" : "", text: t("until", { time: formatClosingTime(r.closesIn) }) };
+const LINES = ["verdict1", "verdict2", "verdict3", "verdict4", "verdict5"] as const;
+
+/** Une phrase du ventre par resto, toujours la même pour lui. */
+function lineFor(id: string) {
+  let hash = 0;
+  for (const ch of id) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
+  return LINES[Math.abs(hash) % LINES.length];
 }
 
 /** Envoie le resto aux copains (feuille de partage, sinon presse-papiers). */
@@ -31,23 +33,32 @@ export async function shareRestaurant(r: Restaurant, minutes: number) {
   }
 }
 
-/** Une fiche : le nom, d'un coup d'œil le temps pour y aller, et un seul gros bouton sous le pouce. */
+/**
+ * Une carte, style étiquette un peu rétro : une phrase du ventre, le nom en grand, une ligne d'infos,
+ * et le temps pour y aller.
+ */
 export function PlaceCard({ r, home, distance, actions = true }: Props) {
   const trip = travelTime(distance);
   const cuisine = r.cuisine ? cuisineLabel(r.cuisine) : null;
-  const open = opening(r);
-  const info = [open.text, cuisine && `${cuisine.emoji} ${cuisine.label}`, formatDistance(distance)].filter(Boolean).join(" · ");
+  const closing =
+    r.closesIn === undefined ? null : r.closesIn === Infinity ? t("openAllDay") : t("until", { time: formatClosingTime(r.closesIn) });
+  const soon = r.closesIn !== undefined && r.closesIn < CLOSING_SOON;
 
   return (
     <article className="place">
+      <p className="place-line">{t(lineFor(r.id))}</p>
       <h2>{r.name}</h2>
       <p className="place-info">
-        <span className={`dot ${open.dot}`} aria-hidden="true" />
-        {info}
+        {[cuisine && `${cuisine.emoji} ${cuisine.label}`, formatDistance(distance)].filter(Boolean).join(" · ")}
+        {closing && (
+          <>
+            {" · "}
+            <span className={soon ? "soon" : undefined}>{closing}</span>
+          </>
+        )}
       </p>
       <p className="place-time" aria-label={t(trip.mode === "walk" ? "walkMinutes" : "driveMinutes", { minutes: trip.minutes })}>
-        <b>{trip.minutes}</b>
-        <span>min {trip.mode === "walk" ? "🚶" : "🚗"}</span>
+        {trip.mode === "walk" ? "🚶" : "🚗"} <b>{trip.minutes}</b> min
       </p>
       {actions && (
         <div className="place-actions">

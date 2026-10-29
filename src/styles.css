@@ -331,26 +331,23 @@ body {
   box-shadow: 0 -6px 24px rgb(43 33 28 / .12);
 }
 
+/* La carte : style étiquette un peu rétro, bordure rouge, tout centré. */
 .place {
   height: 100%;
   background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 14px 14px 12px;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  grid-template-areas: "name time" "info time" "go go";
-  column-gap: 12px;
+  border: 2px solid var(--accent);
+  border-radius: 20px;
+  padding: 16px 16px 14px;
+  text-align: center;
+  box-shadow: 0 8px 24px rgb(226 88 62 / .12);
 }
-.place h2 { grid-area: name; margin: 0; font: 700 1.3rem/1.15 "Fraunces", Georgia, serif; overflow-wrap: anywhere; }
-.place-info { grid-area: info; margin: 4px 0 0; font-size: .85rem; color: var(--muted); }
-.place-info .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--open); margin-right: 6px; vertical-align: 1px; }
-.place-info .dot.soon { background: var(--accent); }
-.place-info .dot.unknown { background: var(--line); }
-.place-time { grid-area: time; text-align: right; line-height: 1; color: var(--accent); }
-.place-time b { display: block; font: 700 2.4rem/1 "Fraunces", Georgia, serif; }
-.place-time span { font-size: .8rem; font-weight: 500; }
-.place-actions { grid-area: go; display: flex; gap: 8px; margin-top: 12px; }
+.place-line { margin: 0; font: italic 900 1rem "Fraunces", Georgia, serif; color: var(--accent); }
+.place h2 { margin: 6px 0 0; font: 700 1.6rem/1.1 "Fraunces", Georgia, serif; overflow-wrap: anywhere; }
+.place-info { margin: 6px 0 0; font-size: .85rem; color: var(--muted); }
+.place-info .soon { color: var(--accent); font-weight: 600; }
+.place-time { margin: 8px 0 0; color: var(--accent); font-weight: 500; }
+.place-time b { font: 700 2.2rem/1 "Fraunces", Georgia, serif; }
+.place-actions { display: flex; gap: 8px; margin-top: 12px; }
 .go {
   flex: 1;
   display: grid;
@@ -421,7 +418,8 @@ body {
 .list { list-style: none; margin: 0; padding: 0 16px; display: grid; gap: 10px; max-height: calc(100vh - 160px); overflow-y: auto; }
 .list > li { cursor: pointer; }
 .list > li .place { transition: border-color .15s; }
-.list > li.current .place { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.list > li .place { border-color: var(--line); box-shadow: none; }
+.list > li.current .place { border-color: var(--accent); box-shadow: 0 8px 24px rgb(226 88 62 / .12); }
 .stale { opacity: .5; transition: opacity .2s; }
 
 .status { text-align: center; color: var(--muted); margin: 4px 16px 10px; }
