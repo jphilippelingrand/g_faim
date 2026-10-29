@@ -1,8 +1,11 @@
 import type { ExpoConfig } from "expo/config";
 
 export const BUNDLE_ID = "com.jphilippelingrand.gfaim";
-// Partagé entre l'app et le widget (dernier verdict). À déclarer aussi sur le portail Apple Developer.
+// Partagé entre l'app et le widget (dernier verdict). À déclarer aussi sur le portail Apple Developer :
+// l'API d'Apple ne sait pas créer un App Group, et sans lui la signature échoue. Tant qu'il n'existe pas,
+// on compile sans (WITH_APP_GROUP = false) : le widget affiche alors toujours « Touche-moi ».
 export const APP_GROUP = `group.${BUNDLE_ID}`;
+const WITH_APP_GROUP = false;
 
 const config: ExpoConfig = {
   name: "Groubl",
@@ -23,9 +26,7 @@ const config: ExpoConfig = {
       CFBundleAllowMixedLocalizations: true,
     },
     // Le widget lit le dernier verdict dans les UserDefaults de ce groupe (recopié sur la cible du widget).
-    entitlements: {
-      "com.apple.security.application-groups": [APP_GROUP],
-    },
+    entitlements: WITH_APP_GROUP ? { "com.apple.security.application-groups": [APP_GROUP] } : {},
   },
   android: {
     package: BUNDLE_ID,

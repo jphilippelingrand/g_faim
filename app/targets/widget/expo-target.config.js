@@ -18,8 +18,9 @@ module.exports = (config) => ({
     groublAccent: "#e2583e",
     groublMuted: "#8a7b70",
   },
-  entitlements: {
-    // Même groupe que l'app (app.config.ts) : c'est là que l'app dépose le dernier verdict.
-    "com.apple.security.application-groups": config.ios.entitlements["com.apple.security.application-groups"],
-  },
+  // Même groupe que l'app (app.config.ts) : c'est là que l'app dépose le dernier verdict. Absent tant que
+  // l'App Group n'est pas créé sur le portail Apple Developer (WITH_APP_GROUP dans app.config.ts).
+  entitlements: config.ios.entitlements?.["com.apple.security.application-groups"]
+    ? { "com.apple.security.application-groups": config.ios.entitlements["com.apple.security.application-groups"] }
+    : {},
 });
