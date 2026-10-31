@@ -39,6 +39,10 @@ function pollsDev(): Plugin {
 
 export default defineConfig({
   plugins: [react(), pollsDev()],
+  // Le site compile aussi app/src/lib/pollsApi.ts (partagé avec l'app) : sans ça, Vite irait lire
+  // app/tsconfig.json, qui hérite d'Expo, absent sur Vercel (seules les dépendances du site y sont installées).
+  // Mêmes options utiles que tsconfig.json.
+  esbuild: { tsconfigRaw: JSON.stringify({ compilerOptions: { target: "ES2022", jsx: "react-jsx" } }) },
   build: {
     rollupOptions: {
       // Le site, et la page de vote (groubl.com/v/<id>, réécrite vers vote.html par vercel.json).

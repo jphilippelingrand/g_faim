@@ -1,0 +1,10 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["N5BUALY7Q8.com.jphilippelingrand.gfaim"],
+        "components": [{ "/": "/v/*", "comment": "Les liens de vote « On mange où ? » ouvrent l'app" }]
+      }
+    ]
+  }
+}

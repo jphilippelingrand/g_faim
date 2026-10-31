@@ -19,6 +19,9 @@ const config: ExpoConfig = {
   userInterfaceStyle: "light",
   ios: {
     bundleIdentifier: BUNDLE_ID,
+    // L'équipe Apple (developer.apple.com → Membership) : signature, widget, et les Universal Links
+    // (public/.well-known/apple-app-site-association du site la cite aussi).
+    appleTeamId: "N5BUALY7Q8",
     supportsTablet: false,
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
