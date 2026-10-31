@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Lady } from "./components/Lady";
 import { PlaceCard } from "./components/PlaceCard";
+import { PollDialog } from "./components/PollDialog";
 import { SwipeDeck } from "./components/SwipeDeck";
 import { getMapsApp, IS_APPLE, setMapsApp } from "./lib/mapsApp";
 import { LANGS, lang, setLang, t } from "./i18n";
@@ -127,6 +128,8 @@ export default function App() {
 
   // Sur iPhone : l'appli de cartes retenue, qu'on peut changer en bas de l'écran.
   const [mapsApp, setMapsAppState] = useState(getMapsApp);
+  // « On mange où ? » : le vote entre copains.
+  const [pollOpen, setPollOpen] = useState(false);
   const switchMapsApp = () => {
     const next = mapsApp === "apple" ? "google" : "apple";
     setMapsApp(next);
@@ -186,6 +189,12 @@ export default function App() {
         <img src="/icon.svg" alt="" />
         {t("appName")}
       </button>
+
+      {/* Faire voter les copains, et retrouver ses votes en cours. */}
+      <button type="button" className="friends" onClick={() => setPollOpen(true)} aria-label={t("friends")}>
+        🧑‍🤝‍🧑
+      </button>
+      {pollOpen && <PollDialog places={top} preselected={top[current]?.id} onClose={() => setPollOpen(false)} />}
 
       {/* La dame : en grand pendant la première recherche, quand rien n'est ouvert, ou sans position. */}
       {(firstSearch || empty || phase === "error") && (

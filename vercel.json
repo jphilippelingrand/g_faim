@@ -1,6 +1,25 @@
 {
   "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/api/polls/:id",
+      "destination": "/api/polls?id=:id"
+    },
+    {
+      "source": "/v/:id",
+      "destination": "/vote"
+    }
+  ],
   "headers": [
+    {
+      "source": "/.well-known/apple-app-site-association",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/json"
+        }
+      ]
+    },
     {
       "source": "/assets/(.*)",
       "headers": [

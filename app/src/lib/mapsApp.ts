@@ -55,7 +55,7 @@ export function placeUrl(r: Restaurant, app: MapsApp): string {
 export function askMapsApp(): Promise<MapsApp | null> {
   return new Promise((resolve) => {
     ActionSheetIOS.showActionSheetWithOptions(
-      { title: t("openWith"), options: ["Plans", "Google Maps", t("cancel")], cancelButtonIndex: 2 },
+      { title: t("openWith"), options: [t("appleMaps"), "Google Maps", t("cancel")], cancelButtonIndex: 2 },
       (i) => resolve(i === 0 ? "apple" : i === 1 ? "google" : null),
     );
   });

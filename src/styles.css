@@ -316,7 +316,9 @@ body {
   70% { box-shadow: 0 0 0 14px rgb(59 130 246 / 0); }
   100% { box-shadow: 0 0 0 0 rgb(59 130 246 / 0); }
 }
-.maplibregl-ctrl-top-right { top: env(safe-area-inset-top); }
+/* Sous le bouton 🧑‍🤝‍🧑 (en haut à droite). */
+/* (plus précis que la règle de MapLibre, chargée après celle-ci.) */
+.maplibregl-map .maplibregl-ctrl-top-right { top: calc(env(safe-area-inset-top) + 58px); }
 
 /* ============ La fiche du bas : un resto à la fois, on glisse pour le suivant ============ */
 
@@ -470,3 +472,49 @@ input:focus { border-color: var(--accent); }
   .stage { inset: 0 0 0 452px; }
   .map-overlay { top: 16px; left: 452px; }
 }
+
+/* « On mange où ? » : le bouton en haut à droite, et la fenêtre pour lancer un vote entre copains. */
+.friends {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 12px);
+  right: 12px;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(251 246 239 / .94);
+  box-shadow: 0 1px 6px rgb(43 33 28 / .15);
+  font-size: 20px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.friends:active { transform: scale(.95); }
+.poll-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: end center; background: rgb(43 33 28 / .45); }
+@media (min-width: 700px) { .poll-backdrop { place-items: center; } }
+.poll-dialog {
+  width: min(460px, 100%);
+  max-height: 88vh;
+  overflow: auto;
+  padding: 20px 18px calc(env(safe-area-inset-bottom) + 18px);
+  background: var(--bg);
+  border-radius: 22px 22px 0 0;
+  text-align: left;
+}
+@media (min-width: 700px) { .poll-dialog { border-radius: 22px; } }
+.poll-head { display: flex; justify-content: space-between; align-items: center; }
+.poll-head h2 { margin: 0; font: italic 900 1.8rem "Fraunces", Georgia, serif; }
+.poll-close { border: 0; background: none; font-size: 1.3rem; color: var(--muted); cursor: pointer; }
+.poll-section { margin: 16px 0 8px; font: 500 .78rem "Inter", system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+.poll-how { margin: 12px 0 6px; color: var(--muted); font-size: .95rem; }
+.poll-running, .poll-places { list-style: none; margin: 0; padding: 0; }
+.poll-running a { display: block; padding: 10px 12px; margin-bottom: 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink); font: 700 1rem "Fraunces", Georgia, serif; text-decoration: none; }
+.poll-places label { display: grid; grid-template-columns: auto 1fr; column-gap: 12px; align-items: center; padding: 10px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.poll-places input { width: 20px; height: 20px; accent-color: var(--accent); grid-row: span 2; }
+.poll-place-name { font: 700 1rem "Fraunces", Georgia, serif; }
+.poll-place-info { font-size: .8rem; color: var(--muted); }
+.poll-ttls { display: flex; gap: 8px; }
+.poll-ttls button { flex: 1; padding: 10px 0; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--muted); font: 500 .9rem "Inter", system-ui, sans-serif; cursor: pointer; }
+.poll-ttls button.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.poll-error { color: var(--accent); text-align: center; }
+.poll-create { width: 100%; margin-top: 16px; padding: 14px; border: 0; border-radius: 999px; background: var(--accent); color: #fff; font: 700 1.05rem "Fraunces", Georgia, serif; cursor: pointer; }
+.poll-create:disabled { opacity: .4; cursor: default; }

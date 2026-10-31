@@ -25,6 +25,9 @@ const config: ExpoConfig = {
       // Nécessaire pour que les traductions de languages/*.json (permission, nom) soient utilisées.
       CFBundleAllowMixedLocalizations: true,
     },
+    // Les liens de vote (groubl.com/v/<id>) ouvrent l'app si elle est installée (Universal Links) ; le site
+    // déclare l'app dans public/.well-known/apple-app-site-association.
+    associatedDomains: ["applinks:www.groubl.com", "applinks:groubl.com"],
     // Le widget lit le dernier verdict dans les UserDefaults de ce groupe (recopié sur la cible du widget).
     entitlements: WITH_APP_GROUP ? { "com.apple.security.application-groups": [APP_GROUP] } : {},
   },
@@ -58,6 +61,8 @@ const config: ExpoConfig = {
       },
     ],
     "expo-font",
+    // « Un copain a voté » : notifications push (via le service d'Expo), à la création d'un sondage.
+    "expo-notifications",
     // Cibles natives de targets/ : le widget (SwiftUI) et le raccourci Siri « J'ai faim » (targets/widget/_shared).
     "@bacons/apple-targets",
     // Phrases Siri du raccourci en fr / en / es (languages/app-shortcuts.json).

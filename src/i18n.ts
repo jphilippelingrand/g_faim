@@ -74,6 +74,7 @@ const fr = {
   ladyFast: "VITE VITE !",
   you: "Toi",
   privacy: "Confidentialité",
+  friends: "Faire voter les copains",
   language: "Langue",
 };
 
@@ -117,6 +118,7 @@ const en: Dict = {
   ladyFast: "QUICK QUICK!",
   you: "You",
   privacy: "Privacy",
+  friends: "Let friends vote",
   language: "Language",
 };
 
@@ -158,6 +160,7 @@ const es: Dict = {
   ladyFast: "¡RÁPIDO!",
   you: "Tú",
   privacy: "Privacidad",
+  friends: "Que voten los amigos",
   language: "Idioma",
 };
 

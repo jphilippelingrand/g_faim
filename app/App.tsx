@@ -11,9 +11,12 @@ import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-cont
 import { SearchingLady } from "./src/components/SearchingLady";
 import { SwipeDeck } from "./src/components/SwipeDeck";
 import { PlaceList } from "./src/components/PlaceList";
+import { PollSheet } from "./src/components/PollSheet";
 import { RestaurantMap } from "./src/components/RestaurantMap";
 import { updateWidget } from "./src/lib/widget";
 import { askMapsApp, getMapsApp, openDirections, setMapsApp } from "./src/lib/mapsApp";
+import { joinPoll, pollIdFrom, type MyPoll } from "./src/lib/polls";
+import { onPollNotification } from "./src/lib/notifications";
 import {
   distanceMeters,
   formatClosingTime,
@@ -73,6 +76,11 @@ function Main() {
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>(savedViewMode);
+  const [pollOpen, setPollOpen] = useState(false);
+  // Change à chaque ouverture : la feuille repart de zéro (le resto affiché coché).
+  const [pollKey, setPollKey] = useState(0);
+  // Un lien de vote ouvert dans l'app (groubl.com/v/<id>) : la feuille s'ouvre directement sur lui.
+  const [pollFromLink, setPollFromLink] = useState<MyPoll | null>(null);
   // Incrémenté quand la carte doit se recadrer sur toi + la carte du dessus.
   const [fitKey, setFitKey] = useState(0);
   const [phase, setPhase] = useState<Phase>("locating");
@@ -148,6 +156,16 @@ function Main() {
   useEffect(() => {
     const apply = (url: string | null | undefined) => {
       if (!url) return;
+      if (pollIdFrom(url)) {
+        joinPoll(url)
+          .then((poll) => {
+            setPollFromLink(poll);
+            setPollKey((k) => k + 1);
+            setPollOpen(true);
+          })
+          .catch(console.error);
+        return;
+      }
       const params = Object.fromEntries(
         (url.split("?")[1] ?? "").split("&").filter(Boolean).map((kv) => kv.split("=").map(decodeURIComponent)),
       );
@@ -166,7 +184,12 @@ function Main() {
       if (typeof arg === "string") apply(`gfaim://?${arg}`);
     }
     const sub = Linking.addEventListener("url", ({ url }) => apply(url));
-    return () => sub.remove();
+    // « Un copain a voté » : la notification touchée ouvre le sondage, comme son lien.
+    const stopNotifications = onPollNotification(apply);
+    return () => {
+      sub.remove();
+      stopNotifications();
+    };
   }, []);
 
   // Dès l'ouverture : on récupère la position.
@@ -313,20 +336,50 @@ function Main() {
       {/* La dame en grand, seulement pendant la première recherche ou quand rien n'est ouvert. */}
       <SearchingLady visible={(busy && !top.length) || empty} mode="top" top={topBarHeight} bottom={wide ? 0 : panelHeight} />
 
-      {/* Cartes à glisser ou liste : le choix reste d'une fois sur l'autre. */}
-      <View style={[styles.modeSwitch, { top: insets.top + 10 }]} accessibilityRole="tablist" accessibilityLabel={t("viewMode")}>
-        {(["cards", "list"] as const).map((mode) => (
+      <View style={[styles.topRight, { top: insets.top + 10 }]}>
+        {/* « On mange où ? » : un vote entre copains sur les restos cochés, et ses sondages en cours. */}
+        {home && (
           <Pressable
-            key={mode}
-            style={[styles.modeOption, viewMode === mode && styles.modeOptionOn]}
-            onPress={() => changeViewMode(mode)}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: viewMode === mode }}
+            style={({ pressed }) => [styles.pollButton, pressed && styles.pressed]}
+            onPress={() => {
+              Haptics.selectionAsync();
+              setPollFromLink(null);
+              setPollKey((k) => k + 1);
+              setPollOpen(true);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t("poll")}
           >
-            <Text style={[styles.modeText, viewMode === mode && styles.modeTextOn]}>{t(mode === "cards" ? "modeCards" : "modeList")}</Text>
+            <Text style={styles.modeIcon}>🧑‍🤝‍🧑</Text>
           </Pressable>
-        ))}
+        )}
+        {/* Cartes à glisser ou liste : le choix reste d'une fois sur l'autre. */}
+        <View style={styles.modeSwitch} accessibilityRole="tablist" accessibilityLabel={t("viewMode")}>
+          {(["cards", "list"] as const).map((mode) => (
+            <Pressable
+              key={mode}
+              style={[styles.modeOption, viewMode === mode && styles.modeOptionOn]}
+              onPress={() => changeViewMode(mode)}
+              accessibilityRole="tab"
+              accessibilityLabel={t(mode === "cards" ? "modeCards" : "modeList")}
+              accessibilityState={{ selected: viewMode === mode }}
+            >
+              <Text style={[styles.modeIcon, mode === "list" && styles.modeIconLines]}>{mode === "cards" ? "❤️" : "☰"}</Text>
+            </Pressable>
+          ))}
+        </View>
       </View>
+
+      {/* Même sans position (lien de vote ouvert à froid) : on peut voter, pas encore en lancer un. */}
+      <PollSheet
+        key={pollKey}
+        visible={pollOpen}
+        places={home ? top : []}
+        home={home ?? { latitude: 0, longitude: 0 }}
+        preselected={top[current]?.id}
+        initialPoll={pollFromLink}
+        onClose={() => setPollOpen(false)}
+      />
 
       {/* Le logo repart de zéro autour de soi. */}
       <Pressable
@@ -406,7 +459,7 @@ function Main() {
             <>
               {"  ·  "}
               <Text style={styles.footerLink} onPress={changeMapsApp} accessibilityRole="button">
-                {t("mapsWith", { app: mapsApp === "google" ? "Google Maps" : mapsApp === "apple" ? "Plans" : "…" })}
+                {t("mapsWith", { app: mapsApp === "google" ? "Google Maps" : mapsApp === "apple" ? t("appleMaps") : "…" })}
               </Text>
             </>
           )}
@@ -450,9 +503,20 @@ const styles = StyleSheet.create({
   brandIcon: { width: 34, height: 34, borderRadius: 17 },
   brandText: { fontFamily: fonts.title, fontSize: 19, color: colors.ink },
   pressed: { transform: [{ scale: 0.95 }] },
+  topRight: { position: "absolute", right: 12, flexDirection: "row", alignItems: "center", gap: 8 },
+  pollButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(251, 246, 239, 0.94)",
+    shadowColor: colors.ink,
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 1 },
+  },
   modeSwitch: {
-    position: "absolute",
-    right: 12,
     flexDirection: "row",
     padding: 3,
     borderRadius: 999,
@@ -462,10 +526,11 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 1 },
   },
-  modeOption: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },
-  modeOptionOn: { backgroundColor: colors.accent },
-  modeText: { fontFamily: fonts.medium, fontSize: 14, color: colors.muted },
-  modeTextOn: { color: "#fff" },
+  modeOption: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
+  modeOptionOn: { backgroundColor: colors.accentSoft },
+  modeIcon: { fontSize: 18 },
+  // ☰ est un caractère, pas un emoji : on lui donne la couleur et la taille de l'emoji voisin.
+  modeIconLines: { fontSize: 20, lineHeight: 24, color: colors.ink },
   listArea: { flex: 1 },
   panel: {
     position: "absolute",

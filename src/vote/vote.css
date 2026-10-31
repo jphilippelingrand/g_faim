@@ -1,0 +1,70 @@
+:root {
+  --bg: #fbf6ef;
+  --card: #ffffff;
+  --ink: #2b211c;
+  --muted: #8a7b70;
+  --accent: #e2583e;
+  --accent-soft: #fde3da;
+  --line: #eadfd3;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: Inter, system-ui, sans-serif; }
+button { font: inherit; cursor: pointer; }
+
+.vote { max-width: 440px; margin: 0 auto; padding: 18px 16px 48px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+.vote-brand { align-self: flex-start; display: flex; align-items: center; gap: 8px; font: 700 19px Fraunces, serif; color: var(--ink); text-decoration: none; }
+.vote-brand img { border-radius: 50%; }
+.vote-title { font: italic 900 40px/1.05 Fraunces, serif; letter-spacing: -0.02em; margin: 26px 0 8px; }
+.vote-sub { color: var(--muted); font-size: 15px; line-height: 1.45; margin: 0 0 18px; }
+.vote-notice { color: var(--accent); font-size: 15px; line-height: 1.45; margin: 0 0 18px; }
+.vote-step { font-size: 13px; color: var(--muted); margin: 0 0 10px; }
+
+.vote-card {
+  position: relative; width: 100%; min-height: 190px; padding: 26px 18px 22px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--card); border: 2px solid var(--accent); border-radius: 20px;
+  box-shadow: 0 6px 18px rgba(226, 88, 62, 0.14);
+  touch-action: pan-y; user-select: none; cursor: grab;
+}
+.vote-cuisine { margin: 0; font-size: 14px; color: var(--muted); }
+.vote-name { font: 700 27px/1.15 Fraunces, serif; margin: 8px 0 0; }
+.vote-address { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+.vote-stamp {
+  position: absolute; top: 16px; padding: 0 10px; border: 3px solid currentColor; border-radius: 8px;
+  background: var(--card); font: 700 24px Fraunces, serif; letter-spacing: 0.04em; pointer-events: none;
+}
+.vote-stamp-nope { right: 18px; color: var(--muted); transform: rotate(12deg); }
+.vote-stamp-yum { left: 18px; color: var(--accent); transform: rotate(-12deg); }
+
+.vote-actions { display: flex; gap: 64px; margin-top: 18px; }
+.vote-round {
+  width: 62px; height: 62px; border-radius: 50%; border: 1px solid var(--line); background: var(--card);
+  font-size: 24px; color: var(--muted); box-shadow: 0 3px 10px rgba(43, 33, 28, 0.12);
+}
+.vote-round:active { transform: scale(0.92); }
+.vote-heart { background: var(--accent); border-color: var(--accent); width: 70px; height: 70px; font-size: 28px; }
+
+.vote-results { width: 100%; display: flex; flex-direction: column; gap: 12px; text-align: left; }
+.vote-kicker { margin: 0; font: italic 700 18px Fraunces, serif; text-align: center; }
+.vote-row { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; }
+.vote-row-top { border: 2px solid var(--accent); }
+.vote-row-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.vote-row-name { font: 700 17px Fraunces, serif; }
+.vote-row-hearts { font-size: 14px; white-space: nowrap; }
+.vote-bar { height: 8px; margin-top: 8px; background: var(--accent-soft); border-radius: 99px; overflow: hidden; }
+.vote-bar div { height: 100%; background: var(--accent); border-radius: 99px; transition: width 0.4s ease; }
+.vote-button {
+  display: inline-block; margin-top: 12px; padding: 11px 22px; border-radius: 99px;
+  background: var(--accent); color: #fff; font: 700 16px Fraunces, serif; text-decoration: none;
+}
+.vote-link { margin: 6px auto 0; background: none; border: 0; color: var(--muted); text-decoration: underline; font-size: 14px; }
+
+.vote-spinner { width: 28px; height: 28px; margin-top: 40px; border: 3px solid var(--accent-soft); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Celui qui a lancé le vote depuis ce navigateur : copier le lien, supprimer. */
+.vote-owner { width: 100%; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; margin: 0 0 14px; font-size: 13px; color: var(--muted); }
+.vote-chip { border: 1px solid var(--line); background: var(--card); border-radius: 99px; padding: 7px 12px; font-size: 13px; color: var(--ink); }
+.vote-chip-danger { color: var(--accent); }
+.vote-button-ghost { background: var(--card); color: var(--ink); border: 1px solid var(--line); margin: 4px auto 0; cursor: pointer; }

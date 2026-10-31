@@ -1,8 +1,8 @@
 import * as Haptics from "expo-haptics";
 import { useEffect } from "react";
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Platform, Pressable, Settings, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
+import Animated, { Easing, interpolate, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { PlaceCard } from "./PlaceCard";
 import { distanceMeters, type LatLng, type Restaurant } from "../lib/places";
@@ -28,6 +28,19 @@ const THRESHOLD = 90;
 const FLY_MS = 240;
 // Quand il reste si peu de cartes, on charge la suite.
 const PREFETCH = 3;
+
+// Tant qu'on n'a jamais glissé une carte (retenu par l'iPhone) : sans geste pendant HINT_AFTER_MS, la carte
+// du dessus esquisse un aller-retour, NAN puis MIAM, et recommence toutes les HINT_EVERY_MS.
+const LEARNED_KEY = "swipeLearned";
+const HINT_AFTER_MS = 3500;
+const HINT_EVERY_MS = 7000;
+const HINT_SHIFT = 70;
+let learned = Platform.OS !== "ios" || Settings.get(LEARNED_KEY) === true;
+function markLearned() {
+  if (learned) return;
+  learned = true;
+  if (Platform.OS === "ios") Settings.set({ [LEARNED_KEY]: true });
+}
 
 /**
  * Le paquet de cartes, façon Tinder (comme src/components/SwipeDeck.tsx du site) : à gauche, « nan »,
@@ -74,12 +87,30 @@ function Deck({ place, next, home, onNext, onMapsApp }: DeckProps) {
     x.set(0);
   }, [place.id, x]);
 
+  // Le petit aller-retour, si on ne touche à rien ; un doigt posé sur la carte l'arrête (pour cette carte).
+  const touched = useSharedValue(false);
+  useEffect(() => {
+    if (learned) return;
+    touched.set(false);
+    const ease = { duration: 380, easing: Easing.inOut(Easing.quad) };
+    let timer: ReturnType<typeof setTimeout>;
+    const wiggle = () => {
+      if (touched.get() || learned) return;
+      x.set(withSequence(withTiming(-HINT_SHIFT, ease), withTiming(HINT_SHIFT, { ...ease, duration: 620 }), withTiming(0, ease)));
+      timer = setTimeout(wiggle, HINT_EVERY_MS);
+    };
+    timer = setTimeout(wiggle, HINT_AFTER_MS);
+    return () => clearTimeout(timer);
+  }, [place.id, x, touched]);
+
   const go = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     openPlace(place).then((app) => app && onMapsApp(app));
   };
 
   function fly(direction: "left" | "right") {
+    touched.set(true);
+    markLearned();
     Haptics.selectionAsync();
     if (direction === "right") {
       go();
@@ -100,6 +131,9 @@ function Deck({ place, next, home, onNext, onMapsApp }: DeckProps) {
 
   const pan = Gesture.Pan()
     .activeOffsetX([-12, 12])
+    .onBegin(() => {
+      touched.set(true);
+    })
     .onUpdate((e) => {
       x.set(e.translationX);
     })
@@ -177,7 +211,7 @@ const styles = StyleSheet.create({
   },
   stampNope: { color: colors.muted, borderColor: colors.muted, transform: [{ rotate: "12deg" }] },
   stampYum: { color: colors.accent, borderColor: colors.accent, transform: [{ rotate: "-12deg" }] },
-  actions: { flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 18, marginTop: 14 },
+  actions: { flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 64, marginTop: 14 },
   round: {
     width: 60,
     height: 60,
