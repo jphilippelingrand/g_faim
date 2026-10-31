@@ -88,6 +88,24 @@
     "caption": "C'est un match. 🌮 It's a match.\n\nSur mobile, Groubl est maintenant un paquet de cartes : à gauche la suivante, à droite l'itinéraire. Toujours les plus proches qui sont ouverts.\nOn mobile, swipe left for the next one, right to go. The closest places, open now.\n\n#mtlfood #montréal #taco #groubl\ngroubl.com (lien en bio / link in bio)"
   },
   {
+    "id": "vote",
+    "at": "2026-11-01T17:30:00-05:00",
+    "images": [
+      "social/c3-vote1.png",
+      "social/c3-vote2.png",
+      "social/c3-vote3.png",
+      "social/c3-vote4.png"
+    ],
+    "caption": "« On mange où ? » 🗳️ Where should we eat?\n\nNouveau sur Groubl : coche 2 à 5 restos ouverts autour de toi, envoie le lien, tes copains swipent ❤️ ou ✕. Pas besoin de l’app. Le plus de ❤️ gagne : fin du débat, on y va.\nNew: pick 2–5 open places nearby, send the link, your friends swipe. No app needed. Most ❤️ wins.\n\n👉 groubl.com, bouton 🧑‍🤝‍🧑 (lien en bio / link in bio)\n📱 L’app iPhone arrive : écris « BÊTA » en DM pour la tester avant tout le monde. DM us “BETA” to try it first.\n\n#mtlfood #montréal #restomtl #groubl"
+  },
+  {
+    "id": "story-vote",
+    "story": true,
+    "at": "2026-11-01T18:00:00-05:00",
+    "image": "social/story-vote.png",
+    "caption": ""
+  },
+  {
     "id": "diner",
     "at": "2026-11-02T11:00:00-05:00",
     "image": "social/f3-diner.png",
