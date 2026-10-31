@@ -58,6 +58,13 @@
     "caption": ""
   },
   {
+    "id": "story-oups",
+    "story": true,
+    "at": "2026-10-31T14:45:00-04:00",
+    "image": "social/story-oups.png",
+    "caption": ""
+  },
+  {
     "id": "reel-fr",
     "at": "2026-10-31T22:30:00-04:00",
     "video": "social/c2-reel-fr.mp4",

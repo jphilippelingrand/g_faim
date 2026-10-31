@@ -6,8 +6,8 @@
  *   node --env-file=.env social/publish.mjs --dry-run  (montre ce qui partirait maintenant)
  *
  * Lancé toutes les 15 minutes par .github/workflows/instagram.yml. Sans état à garder : un post est
- * considéré publié si une publication récente du compte a la même légende. Une story n'a pas de
- * légende : elle n'est publiée qu'à la main (hors CI), et marquée "published" dans la file ensuite.
+ * considéré publié si une publication récente du compte a la même légende ; une story (sans légende),
+ * si une story en ligne date d'après son heure. Les stories ne partent pas en CI, seulement du Mac.
  * Les images doivent être en ligne (public/social/, déployées par Vercel) avant l'heure du post.
  * Un post est une image ("image"), un carrousel ("images", 2 à 10) ou un reel ("video" MP4, "cover" en option).
  * Une image seule peut identifier des comptes : "tags": [{ "username": "bar.darling", "x": 0.6, "y": 0.4 }]
@@ -32,7 +32,14 @@ const now = Date.now();
 
 const account = await me();
 const { data: recent = [] } = await ig(`${account.user_id}/media`, { params: { fields: "caption,timestamp", limit: "50" } });
-const published = (post) => Boolean(post.published) || recent.some((m) => sameCaption(m.caption, post.caption));
+// Une story n'a pas de légende : elle est publiée si une story en ligne (elles durent 24 h, comme MAX_LATE_HOURS)
+// date d'après son heure. Sans ça, le robot du Mac, qui ne peut pas marquer la file, la republiait à chaque passage.
+const { data: stories = [] } = await ig(`${account.user_id}/stories`, { params: { fields: "timestamp", limit: "100" } });
+const published = (post) =>
+  Boolean(post.published) ||
+  (post.story
+    ? stories.some((s) => Date.parse(s.timestamp) >= Date.parse(post.at))
+    : recent.some((m) => sameCaption(m.caption, post.caption)));
 
 if (mode === "--list") {
   for (const post of queue) {
