@@ -4,3 +4,6 @@ dist
 .env.local
 .DS_Store
 /data/
+
+# Registre local des publications Instagram (garde-fou anti-doublons, voir social/publish.mjs)
+social/.published.json

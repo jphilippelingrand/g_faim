@@ -13,11 +13,20 @@
  * Une image seule peut identifier des comptes : "tags": [{ "username": "bar.darling", "x": 0.6, "y": 0.4 }]
  * (position relative dans l'image, de 0 à 1). L'API ne le permet pas pour les stories.
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { ig, me, sameCaption, SITE } from "./instagram.mjs";
 
 // Un post en retard de plus que ça n'est plus publié (CI arrêtée longtemps, file mal datée…).
 const MAX_LATE_HOURS = 24;
+
+// Garde-fous contre les doublons (41 stories republiées le 31 octobre, puis une story publiée deux fois) :
+// - le registre : tout ce qui part d'ici (robot du Mac, publication à la main) y est noté, et n'en repart jamais ;
+// - le plafond : jamais plus de stories que ça, comptées sur le compte lui-même. Au-delà, on refuse et on échoue
+//   (le robot du Mac envoie alors une notification « a calé »).
+const LEDGER = new URL("./.published.json", import.meta.url);
+const MAX_STORIES_PER_HOUR = 2;
+const MAX_STORIES_PER_DAY = 6;
+const ledger = existsSync(LEDGER) ? JSON.parse(readFileSync(LEDGER, "utf8")) : {};
 
 // En CI avant que le secret soit posé : on s'arrête sans échec (pas d'e-mail d'erreur tous les quarts d'heure).
 if (process.env.CI && !process.env.META_IG_TOKEN) {
@@ -37,6 +46,7 @@ const { data: recent = [] } = await ig(`${account.user_id}/media`, { params: { f
 const { data: stories = [] } = await ig(`${account.user_id}/stories`, { params: { fields: "timestamp", limit: "100" } });
 const published = (post) =>
   Boolean(post.published) ||
+  Boolean(ledger[post.id]) ||
   (post.story
     ? stories.some((s) => Date.parse(s.timestamp) >= Date.parse(post.at))
     : recent.some((m) => sameCaption(m.caption, post.caption)));
@@ -73,6 +83,20 @@ async function waitReady(post, containerId, video = false) {
     if (status_code === "FINISHED") return;
     if (status_code === "ERROR" || i === (video ? 60 : 20)) throw new Error(`${post.id} : Instagram n'a pas pu préparer le média (${status_code}).`);
     await new Promise((r) => setTimeout(r, video ? 5000 : 3000));
+  }
+}
+
+// Le plafond de stories, avant toute publication : celles déjà en ligne, plus celles qui partiraient maintenant.
+const storiesSince = (hours) => stories.filter((s) => now - Date.parse(s.timestamp) < hours * 3_600_000).length;
+const dueStories = due.filter((post) => post.story).length;
+if (dueStories && mode !== "--dry-run") {
+  const lastHour = storiesSince(1) + dueStories;
+  const lastDay = storiesSince(24) + dueStories;
+  if (lastHour > MAX_STORIES_PER_HOUR || lastDay > MAX_STORIES_PER_DAY) {
+    throw new Error(
+      `Instagram : garde-fou, ${dueStories} story(s) à publier refusée(s) (${lastHour} sur 1 h, ${lastDay} sur 24 h ; ` +
+        `max ${MAX_STORIES_PER_HOUR} et ${MAX_STORIES_PER_DAY}). À vérifier à la main.`,
+    );
   }
 }
 
@@ -116,5 +140,8 @@ for (const post of due) {
       await new Promise((r) => setTimeout(r, 10_000));
     }
   }
+  // Noté tout de suite, avant le post suivant : même si la suite plante, celui-ci ne repartira pas.
+  ledger[post.id] = id;
+  writeFileSync(LEDGER, JSON.stringify(ledger, null, 2) + "\n");
   console.log(`Publié : ${post.id} → ${id}`);
 }
