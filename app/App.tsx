@@ -10,6 +10,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { SearchingLady } from "./src/components/SearchingLady";
 import { SwipeDeck } from "./src/components/SwipeDeck";
+import { PlaceList } from "./src/components/PlaceList";
 import { RestaurantMap } from "./src/components/RestaurantMap";
 import { updateWidget } from "./src/lib/widget";
 import { askMapsApp, getMapsApp, openDirections, setMapsApp } from "./src/lib/mapsApp";
@@ -18,10 +19,12 @@ import {
   formatClosingTime,
   nearestOpen,
   nearestOpenInView,
+  PAGE,
   travelTime,
   type Area,
   type LatLng,
   type Restaurant,
+  type Search,
 } from "./src/lib/places";
 import { colors, fonts } from "./src/theme";
 import { lang, t } from "./src/i18n";
@@ -30,6 +33,11 @@ SplashScreen.preventAutoHideAsync();
 
 type Phase = "locating" | "searching" | "done" | "error";
 
+/** Le paquet de cartes à glisser, ou la liste qu'on fait défiler ; choix retenu par l'iPhone. */
+type ViewMode = "cards" | "list";
+const VIEW_MODE_KEY = "viewMode";
+const savedViewMode = (): ViewMode => (Platform.OS === "ios" && Settings.get(VIEW_MODE_KEY) === "list" ? "list" : "cards");
+
 // Hauteur du bandeau du haut, sous l'encoche.
 const TOP_BAR = 52;
 // iPhone Duo déplié (ou tout écran large) : le paquet de cartes passe dans un panneau à gauche, la carte à droite.
@@ -37,6 +45,8 @@ const WIDE_FROM = 600;
 const SIDE_PANEL = 380;
 const MARGIN = 16;
 const SITE = "https://www.groubl.com";
+// En mode liste, le panneau du bas prend cette part de l'écran ; la carte reste visible au-dessus.
+const LIST_SHARE = 0.55;
 
 async function getPosition(): Promise<LatLng> {
   const { status } = await Location.requestForegroundPermissionsAsync();
@@ -48,6 +58,7 @@ async function getPosition(): Promise<LatLng> {
 /**
  * L'écran : carte plein écran et, en bas, le paquet de cartes (comme le site) : le resto le plus proche
  * d'abord ; on glisse à gauche pour le suivant, à droite pour y aller. La carte suit la carte du dessus.
+ * Ou, au choix, la liste. Dans les deux cas, sans fin : la suite se charge, toujours un peu plus loin.
  */
 function Main() {
   const [fontsLoaded, fontError] = useFonts({ Fraunces_700Bold, Fraunces_900Black_Italic, Inter_400Regular, Inter_500Medium });
@@ -59,6 +70,9 @@ function Main() {
   const [top, setTop] = useState<Restaurant[]>([]);
   const [area, setArea] = useState<Area | null>(null);
   const [current, setCurrent] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>(savedViewMode);
   // Incrémenté quand la carte doit se recadrer sur toi + la carte du dessus.
   const [fitKey, setFitKey] = useState(0);
   const [phase, setPhase] = useState<Phase>("locating");
@@ -69,7 +83,7 @@ function Main() {
   // Hauteur du panneau du bas : la carte se cadre au-dessus.
   const [panelHeight, setPanelHeight] = useState(260);
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const wide = width >= WIDE_FROM;
 
   // Tant que la première recherche autour de soi n'est pas faite, les mouvements de la carte ne comptent pas.
@@ -79,18 +93,23 @@ function Main() {
   // Lien gfaim://?card=2 : carte à montrer dès les résultats (captures App Store, le simulateur ne sait pas glisser).
   const startCard = useRef(0);
 
-  // Seule la dernière recherche lancée a le droit d'afficher ses résultats.
+  // Seule la dernière recherche lancée a le droit d'afficher ses résultats (et sa suite).
   const requestId = useRef(0);
-  const run = useCallback(async (search: () => Promise<{ list: Restaurant[]; area: Area }>, refit: boolean) => {
+  // La recherche en cours, pour en demander la suite : même point de départ, plus de restos.
+  const lastSearch = useRef<((count: number) => Promise<Search>) | null>(null);
+  const run = useCallback(async (search: (count: number) => Promise<Search>, refit: boolean) => {
     const id = ++requestId.current;
+    lastSearch.current = search;
     setPhase("searching");
     setError(null);
+    setLoadingMore(false);
     try {
-      const { list, area } = await search();
+      const { list, area, hasMore } = await search(PAGE);
       if (id !== requestId.current) return;
       searched.current = true;
       setTop(list);
       setArea(area);
+      setHasMore(hasMore);
       setCurrent(refit ? Math.min(startCard.current, Math.max(list.length - 1, 0)) : 0);
       // Le widget montre le dernier verdict trouvé autour de soi (pas quand on explore la carte ailleurs).
       if (refit) {
@@ -166,20 +185,52 @@ function Main() {
     };
   }, []);
 
-  // Position connue : les 5 restos ouverts les plus proches (on élargit depuis 500 m), la carte cadrée sur toi et le premier.
+  // Position connue : les restos ouverts les plus proches (on élargit depuis 500 m), la carte cadrée sur toi et le premier.
   useEffect(() => {
     if (!home) return;
     searched.current = false;
-    run(() => nearestOpen(home), true);
+    run((count) => nearestOpen(home, count), true);
   }, [home, run]);
 
-  // La carte bouge (déplacement ou zoom) : les 5 plus proches du centre, dans la zone visible, sans la recadrer.
+  // La carte bouge (déplacement ou zoom) : les plus proches du centre, à partir de la zone visible, sans la recadrer.
   const onViewportChange = useCallback(
     (view: Area) => {
-      if (searched.current) run(() => nearestOpenInView(view), false);
+      if (searched.current) run((count) => nearestOpenInView(view, count), false);
     },
     [run],
   );
+
+  // La suite : on refait la recherche avec une page de plus. Ceux déjà vus gardent leur place (et leur numéro),
+  // les nouveaux s'ajoutent derrière.
+  const loadMore = useCallback(async () => {
+    const search = lastSearch.current;
+    if (!search) return;
+    const id = requestId.current;
+    setLoadingMore(true);
+    try {
+      const shown = top;
+      const { list, area, hasMore } = await search(shown.length + PAGE);
+      if (id !== requestId.current) return;
+      const seen = new Set(shown.map((r) => r.id));
+      const added = list.filter((r) => !seen.has(r.id));
+      setTop([...shown, ...added]);
+      setArea(area);
+      setHasMore(hasMore && added.length > 0);
+    } catch (err) {
+      // Réseau coupé : on s'arrête là plutôt que de réessayer en boucle (le logo relance une recherche).
+      console.error(err);
+      if (id === requestId.current) setHasMore(false);
+    } finally {
+      if (id === requestId.current) setLoadingMore(false);
+    }
+  }, [top]);
+
+  const changeViewMode = (mode: ViewMode) => {
+    if (mode === viewMode) return;
+    Haptics.selectionAsync();
+    setViewMode(mode);
+    if (Platform.OS === "ios") Settings.set({ [VIEW_MODE_KEY]: mode });
+  };
 
   // Le logo repart de zéro : on reprend la position GPS (on a pu bouger) et on recherche autour de soi.
   const restart = useCallback(() => {
@@ -262,6 +313,21 @@ function Main() {
       {/* La dame en grand, seulement pendant la première recherche ou quand rien n'est ouvert. */}
       <SearchingLady visible={(busy && !top.length) || empty} mode="top" top={topBarHeight} bottom={wide ? 0 : panelHeight} />
 
+      {/* Cartes à glisser ou liste : le choix reste d'une fois sur l'autre. */}
+      <View style={[styles.modeSwitch, { top: insets.top + 10 }]} accessibilityRole="tablist" accessibilityLabel={t("viewMode")}>
+        {(["cards", "list"] as const).map((mode) => (
+          <Pressable
+            key={mode}
+            style={[styles.modeOption, viewMode === mode && styles.modeOptionOn]}
+            onPress={() => changeViewMode(mode)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: viewMode === mode }}
+          >
+            <Text style={[styles.modeText, viewMode === mode && styles.modeTextOn]}>{t(mode === "cards" ? "modeCards" : "modeList")}</Text>
+          </Pressable>
+        ))}
+      </View>
+
       {/* Le logo repart de zéro autour de soi. */}
       <Pressable
         style={({ pressed }) => [styles.brand, { top: insets.top + 8 }, pressed && styles.pressed]}
@@ -277,7 +343,7 @@ function Main() {
         style={
           wide
             ? [styles.panel, styles.sidePanel, { top: topBarHeight + MARGIN, bottom: insets.bottom + MARGIN, left: insets.left + MARGIN }]
-            : [styles.panel, { paddingBottom: insets.bottom + 8 }]
+            : [styles.panel, { paddingBottom: insets.bottom + 8 }, viewMode === "list" && top.length > 0 && { height: Math.round(height * LIST_SHARE) }]
         }
         onLayout={(e) => setPanelHeight(e.nativeEvent.layout.height)}
       >
@@ -301,8 +367,30 @@ function Main() {
         )}
 
         {home && top.length > 0 && (
-          <View style={busy && styles.stale}>
-            <SwipeDeck places={top} home={home} current={current} onChange={show} onMapsApp={setMapsAppState} />
+          <View style={[busy && styles.stale, viewMode === "list" && styles.listArea]}>
+            {viewMode === "cards" ? (
+              <SwipeDeck
+                places={top}
+                home={home}
+                current={current}
+                onChange={show}
+                onMapsApp={setMapsAppState}
+                hasMore={hasMore}
+                loadingMore={loadingMore}
+                onNeedMore={loadMore}
+              />
+            ) : (
+              <PlaceList
+                places={top}
+                home={home}
+                current={current}
+                onChange={show}
+                onMapsApp={setMapsAppState}
+                hasMore={hasMore}
+                loadingMore={loadingMore}
+                onNeedMore={loadMore}
+              />
+            )}
           </View>
         )}
 
@@ -362,6 +450,23 @@ const styles = StyleSheet.create({
   brandIcon: { width: 34, height: 34, borderRadius: 17 },
   brandText: { fontFamily: fonts.title, fontSize: 19, color: colors.ink },
   pressed: { transform: [{ scale: 0.95 }] },
+  modeSwitch: {
+    position: "absolute",
+    right: 12,
+    flexDirection: "row",
+    padding: 3,
+    borderRadius: 999,
+    backgroundColor: "rgba(251, 246, 239, 0.94)",
+    shadowColor: colors.ink,
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 1 },
+  },
+  modeOption: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },
+  modeOptionOn: { backgroundColor: colors.accent },
+  modeText: { fontFamily: fonts.medium, fontSize: 14, color: colors.muted },
+  modeTextOn: { color: "#fff" },
+  listArea: { flex: 1 },
   panel: {
     position: "absolute",
     left: 0,

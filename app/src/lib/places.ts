@@ -20,8 +20,9 @@ export type Restaurant = {
   location: LatLng;
 };
 
-export const TOP_N = 5;
-// On élargit jusqu'à trouver TOP_N restos ouverts : 500 m, 1 km, 2 km… 32 km au pire.
+/** Restos chargés à la fois : la suite arrive quand on approche de la fin (cartes ou liste). */
+export const PAGE = 20;
+// On élargit jusqu'à trouver assez de restos ouverts : 500 m, 1 km, 2 km… 32 km au pire.
 const RADII = [500, 1000, 2000, 4000, 8000, 16_000, 32_000];
 const MAX_RADIUS = RADII[RADII.length - 1];
 // À partir de ce rayon, plutôt que d'aller plus loin, on complète avec les restos proches aux horaires inconnus.
@@ -146,21 +147,25 @@ function openOnArrival(r: Restaurant, meters: number): boolean | undefined {
 const byDistance = (center: LatLng) => (a: Restaurant, b: Restaurant) =>
   distanceMeters(center, a.location) - distanceMeters(center, b.location);
 
+/** Une recherche : les restos dans l'ordre, la zone parcourue, et s'il en reste plus loin (jusqu'à MAX_RADIUS). */
+export type Search = { list: Restaurant[]; area: Area; hasMore: boolean };
+
 /**
- * Les TOP_N restos ouverts les plus proches, en élargissant le rayon jusqu'à les trouver. Passé
+ * Les `count` restos ouverts les plus proches, en élargissant le rayon jusqu'à les trouver. Passé
  * FILL_UNKNOWN_FROM, on complète avec les plus proches aux horaires inconnus plutôt que d'aller plus loin.
  * Les restos sûrement ouverts passent toujours devant.
  */
-export function nearestOpen(center: LatLng): Promise<{ list: Restaurant[]; area: Area }> {
-  return nearestWithin(center, RADII);
+export function nearestOpen(center: LatLng, count = PAGE): Promise<Search> {
+  return nearestWithin(center, RADII, count);
 }
 
-/** Pareil, mais dans le cercle visible de la carte seulement (plafonné : au-delà, trop de fichiers à charger). */
-export function nearestOpenInView(view: Area): Promise<{ list: Restaurant[]; area: Area }> {
-  return nearestWithin(view.center, [Math.min(view.radius, MAX_RADIUS)]);
+/** Pareil, en partant du cercle visible de la carte ; la suite déborde au-delà (plafonné, trop de fichiers sinon). */
+export function nearestOpenInView(view: Area, count = PAGE): Promise<Search> {
+  const radius = Math.min(view.radius, MAX_RADIUS);
+  return nearestWithin(view.center, [radius, ...RADII.filter((r) => r > radius)], count);
 }
 
-async function nearestWithin(center: LatLng, radii: number[]): Promise<{ list: Restaurant[]; area: Area }> {
+async function nearestWithin(center: LatLng, radii: number[], count: number): Promise<Search> {
   let area: Area = { center, radius: radii[0] };
   let list: Restaurant[] = [];
   for (const radius of radii) {
@@ -170,13 +175,13 @@ async function nearestWithin(center: LatLng, radii: number[]): Promise<{ list: R
       .sort(byDistance(center))
       .map((r) => ({ ...r, open: openOnArrival(r, distanceMeters(center, r.location)) }));
     const open = withoutDuplicates(inside.filter((r) => r.open === true));
-    list = open.slice(0, TOP_N);
-    if (list.length < TOP_N && radius >= FILL_UNKNOWN_FROM) {
-      list = withoutDuplicates([...list, ...inside.filter((r) => r.open === undefined)]).slice(0, TOP_N);
+    list = open.slice(0, count);
+    if (list.length < count && radius >= FILL_UNKNOWN_FROM) {
+      list = withoutDuplicates([...list, ...inside.filter((r) => r.open === undefined)]).slice(0, count);
     }
-    if (list.length >= TOP_N) break;
+    if (list.length >= count) break;
   }
-  return { list, area };
+  return { list, area, hasMore: list.length >= count };
 }
 
 // Grosso modo : 4,8 km/h à pied, en voiture 24 km/h en ville plus 3 min pour se garer ; les rues font

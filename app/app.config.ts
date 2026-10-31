@@ -13,7 +13,7 @@ const config: ExpoConfig = {
   scheme: "gfaim",
   // Vient du tag git avec le workflow EAS (« v1.0.2 » → 1.0.2) ; sinon (build lancé à la main), cette valeur.
   // Le numéro de build est géré par EAS.
-  version: process.env.APP_VERSION?.replace(/^v/, "") || "1.0.1",
+  version: process.env.APP_VERSION?.replace(/^v/, "") || "1.1.0",
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "light",

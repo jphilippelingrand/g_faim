@@ -1,8 +1,8 @@
 import { useEffect, useRef } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import MapView, { Circle, Marker, type Region } from "react-native-maps";
 import type { Area, LatLng, Restaurant } from "../lib/places";
-import { colors, fonts } from "../theme";
+import { colors } from "../theme";
 
 // Plans (Apple) sur iOS : gratuit, sans clé. Les restos viennent d'OpenStreetMap.
 
@@ -34,19 +34,15 @@ export function RestaurantMap({ home, results, area, fitKey, selectedId, onSelec
   // Les changements de vue déclenchés par nos propres recadrages ne doivent pas relancer de recherche.
   const ignoreUntil = useRef(0);
 
-  // Recadrage sur toi + le resto de la carte du dessus, quand fitKey change (nouvelle recherche, carte glissée).
+  // Recadrage sur toi + le resto choisi, quand fitKey change (nouvelle recherche, carte glissée, ligne touchée).
   useEffect(() => {
     if (fitKey === 0 || !map.current) return;
     ignoreUntil.current = Date.now() + 1500;
     const place = results.find((r) => r.id === selectedId);
     if (!place) return;
-    // Le symétrique du resto par rapport à toi : le cadre reste centré sur toi.
-    const p = place.location;
-    map.current.fitToCoordinates([p, { latitude: 2 * home.latitude - p.latitude, longitude: 2 * home.longitude - p.longitude }], {
-      // mapPadding exclut déjà la barre du haut et le panneau : on n'ajoute qu'une marge pour les pastilles.
-      edgePadding: { top: 60, right: 50, bottom: 90, left: 50 },
-      animated: true,
-    });
+    // Le milieu entre toi et le resto, zoomé au plus près. mapPadding exclut déjà la barre du haut et le panneau :
+    // on n'ajoute que la marge des deux points.
+    map.current.fitToCoordinates([home, place.location], { edgePadding: { top: 40, right: 40, bottom: 40, left: 40 }, animated: true });
   }, [fitKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
@@ -85,9 +81,7 @@ export function RestaurantMap({ home, results, area, fitKey, selectedId, onSelec
               tracksViewChanges={false}
               zIndex={selected ? 100 : 50 - i}
             >
-              <View style={[styles.pin, selected && styles.pinSelected]}>
-                <Text style={styles.pinText}>{i + 1}</Text>
-              </View>
+              <View style={[styles.pin, selected && styles.pinSelected]} />
             </Marker>
           );
         })}
@@ -97,16 +91,14 @@ export function RestaurantMap({ home, results, area, fitKey, selectedId, onSelec
 }
 
 const styles = StyleSheet.create({
+  // Un point gris par resto ; celui de la carte du dessus (ou de la ligne touchée) passe au rouge, en plus gros.
   pin: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.accent,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.muted,
     borderWidth: 2.5,
     borderColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
   },
-  pinSelected: { opacity: 1, transform: [{ scale: 1.3 }] },
-  pinText: { color: "#fff", fontFamily: fonts.title, fontSize: 14 },
+  pinSelected: { width: 24, height: 24, borderRadius: 12, borderWidth: 3, backgroundColor: colors.accent },
 });
