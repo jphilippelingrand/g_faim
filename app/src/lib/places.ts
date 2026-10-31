@@ -215,12 +215,3 @@ export function formatClosingTime(closesIn: number, now = new Date()): string {
   }
   return at.toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" });
 }
-
-/** Lien à envoyer aux copains : le resto dans Plans, sans notre position de départ. */
-export function shareUrl(r: Restaurant): string {
-  // Avec l'adresse, Plans retrouve la fiche du commerce ; sinon, le nom autour de sa position.
-  const params = new URLSearchParams(
-    r.address ? { q: `${r.name}, ${r.address}` } : { q: r.name, ll: `${r.location.latitude},${r.location.longitude}` },
-  );
-  return `https://maps.apple.com/?${params}`;
-}

@@ -1,12 +1,11 @@
 import * as Haptics from "expo-haptics";
 import { useEffect } from "react";
-import { Pressable, Share, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
-import Svg, { Path } from "react-native-svg";
 import { scheduleOnRN } from "react-native-worklets";
 import { PlaceCard } from "./PlaceCard";
-import { distanceMeters, shareUrl, travelTime, type LatLng, type Restaurant } from "../lib/places";
+import { distanceMeters, type LatLng, type Restaurant } from "../lib/places";
 import { getMapsApp, openPlace, type MapsApp } from "../lib/mapsApp";
 import { colors, fonts } from "../theme";
 import { t } from "../i18n";
@@ -69,7 +68,6 @@ type DeckProps = {
 function Deck({ place, next, home, onNext, onMapsApp }: DeckProps) {
   const { width } = useWindowDimensions();
   const x = useSharedValue(0);
-  const trip = travelTime(distanceMeters(home, place.location));
 
   // Nouvelle carte du dessus : elle part du centre.
   useEffect(() => {
@@ -80,8 +78,6 @@ function Deck({ place, next, home, onNext, onMapsApp }: DeckProps) {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     openPlace(place).then((app) => app && onMapsApp(app));
   };
-  const share = () =>
-    Share.share({ message: `${t("shareText", { name: place.name, minutes: trip.minutes })} ${shareUrl(place)}` });
 
   function fly(direction: "left" | "right") {
     Haptics.selectionAsync();
@@ -147,11 +143,6 @@ function Deck({ place, next, home, onNext, onMapsApp }: DeckProps) {
         <Pressable style={({ pressed }) => [styles.round, pressed && styles.pressed]} onPress={() => fly("left")} accessibilityLabel={t("next")} accessibilityRole="button">
           <Text style={styles.cross}>✕</Text>
         </Pressable>
-        <Pressable style={({ pressed }) => [styles.round, styles.small, pressed && styles.pressed]} onPress={share} accessibilityLabel={t("share")} accessibilityRole="button">
-          <Svg viewBox="0 0 24 24" width={20} height={20}>
-            <Path d="M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6" fill="none" stroke={colors.ink} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-          </Svg>
-        </Pressable>
         <Pressable
           style={({ pressed }) => [styles.round, styles.heart, pressed && styles.pressed]}
           onPress={() => fly("right")}
@@ -201,7 +192,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
   },
-  small: { width: 46, height: 46, borderRadius: 23 },
   heart: { width: 68, height: 68, borderRadius: 34, backgroundColor: colors.accent, borderColor: colors.accent },
   pressed: { transform: [{ scale: 0.92 }] },
   cross: { fontSize: 24, color: colors.muted },
