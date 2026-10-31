@@ -62,14 +62,16 @@
     "story": true,
     "at": "2026-10-31T14:45:00-04:00",
     "image": "social/story-oups.png",
-    "caption": ""
+    "caption": "",
+    "published": "18120914305995025"
   },
   {
     "id": "story-beta",
     "story": true,
     "at": "2026-10-31T17:20:00-04:00",
     "image": "social/story-beta.png",
-    "caption": ""
+    "caption": "",
+    "published": "17894062587684138"
   },
   {
     "id": "reel-fr",
