@@ -65,6 +65,13 @@
     "caption": ""
   },
   {
+    "id": "story-beta",
+    "story": true,
+    "at": "2026-10-31T17:20:00-04:00",
+    "image": "social/story-beta.png",
+    "caption": ""
+  },
+  {
     "id": "reel-fr",
     "at": "2026-10-31T22:30:00-04:00",
     "video": "social/c2-reel-fr.mp4",
