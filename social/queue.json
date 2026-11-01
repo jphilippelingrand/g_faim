@@ -98,7 +98,7 @@
       "social/c3-vote3.png",
       "social/c3-vote4.png"
     ],
-    "caption": "« On mange où ? » 🗳️ Where should we eat?\n\nNouveau sur Groubl : coche 2 à 5 restos ouverts autour de toi, envoie le lien, tes copains swipent ❤️ ou ✕. Pas besoin de l’app. Le plus de ❤️ gagne : fin du débat, on y va.\nNew: pick 2–5 open places nearby, send the link, your friends swipe. No app needed. Most ❤️ wins.\n\n👉 groubl.com, bouton 🧑‍🤝‍🧑 (lien en bio / link in bio)\n📱 L’app iPhone arrive : écris « BÊTA » en DM pour la tester avant tout le monde. DM us “BETA” to try it first.\n\n#mtlfood #montréal #restomtl #groubl"
+    "caption": "« On mange où ? » 🗳️ Where should we eat?\n\nNouveau sur Groubl : coche 2 à 5 restos autour de toi (ouverts ou pas : c'est souvent pour ce soir), envoie le lien, tes copains swipent ❤️ ou ✕. Pas besoin de l’app. Le plus de ❤️ gagne : fin du débat, on y va.\nNew: pick 2–5 places nearby, send the link, your friends swipe. No app needed. Most ❤️ wins.\n\n👉 groubl.com, bouton 🧑‍🤝‍🧑 (lien en bio / link in bio)\n📱 L’app iPhone arrive : écris « BÊTA » en DM pour la tester avant tout le monde. DM us “BETA” to try it first.\n\n#mtlfood #montréal #restomtl #groubl"
   },
   {
     "id": "story-vote",
@@ -140,6 +140,13 @@
     "caption": "Le date au Darling s'est bien passé. Le deuxième aussi. 🍸🍟\n\nCelui de 1 h du mat', c'est Groubl qui l'arrange : les restos les plus proches encore ouverts, à deux pas.\n\nTague ton date (ou ta poutine) 👇\n\n#mtlfood #montréal #datenight #groubl\ngroubl.com (lien en bio)"
   },
   {
+    "id": "reel-vote-fr",
+    "at": "2026-11-06T17:00:00-05:00",
+    "video": "social/c3-reel-vote-fr.mp4",
+    "cover": "social/c3-reel-vote-fr-cover.png",
+    "caption": "Le groupe : 23 messages, toujours pas de resto. 🙃\n\nAvec Groubl, tu coches 2 à 5 restos autour de toi, tu envoies le lien, tes potes swipent ❤️ ou ✕. Pas besoin de l'app. Le plus de ❤️ gagne : fin du débat, on y va.\n\n👉 groubl.com, bouton 🧑‍🤝‍🧑 (lien en bio)\n📱 Bêta iPhone : écris « BÊTA » en DM.\n\nTague le pote qui répond toujours « comme vous voulez » 👇\n\n#mtlfood #montréal #restomtl #groubl"
+  },
+  {
     "id": "nuit",
     "at": "2026-11-06T22:30:00-05:00",
     "images": [
@@ -149,6 +156,13 @@
       "social/c2-nuit4.png"
     ],
     "caption": "Samedi, 3 h du mat'. On a compté qui est encore ouvert. 🌙\n\nLe centre-ville gagne (12), le Plateau suit (9). Le Mile End, lui, dort à poings fermés.\n\nSelon OpenStreetMap, et seulement les restos dont on connaît les horaires : en vrai, il y en a sûrement un peu plus. Ton spot de 3 h manque ? Dis-le-nous 👇\n\n#mtlfood #montréal #mtlnightlife #groubl\ngroubl.com (lien en bio)"
+  },
+  {
+    "id": "reel-vote-en",
+    "at": "2026-11-07T12:00:00-05:00",
+    "video": "social/c3-reel-vote-en.mp4",
+    "cover": "social/c3-reel-vote-en-cover.png",
+    "caption": "The group chat: 23 messages, still no restaurant. 🙃\n\nWith Groubl, pick 2–5 places nearby, send the link, your friends swipe ❤️ or ✕. No app needed. Most ❤️ wins: debate over, let's go.\n\n👉 groubl.com, 🧑‍🤝‍🧑 button (link in bio)\n📱 iPhone beta: DM us “BETA”.\n\nTag the friend who always says “whatever you want” 👇\n\n#mtlfood #montreal #mtlrestaurants #groubl"
   },
   {
     "id": "night",
