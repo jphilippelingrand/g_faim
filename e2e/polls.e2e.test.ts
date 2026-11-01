@@ -214,7 +214,8 @@ describe("Sondage lancé depuis le web", () => {
     // Les restos ouverts autour de Montréal (selon l'heure, d'autres que ceux du test d'API).
     await page.waitForSelector(".place", { timeout: 60_000 });
     await page.click(".friends");
-    await page.waitForSelector(".poll-places input");
+    // Les restos d'à côté, fermés compris, arrivent après ceux déjà affichés (5).
+    await page.waitForFunction(() => document.querySelectorAll(".poll-places input").length > 5);
     const boxes = await page.$$(".poll-places input");
     assert.ok(boxes.length >= 2, "au moins deux restos à proposer");
     // Le resto affiché est coché d'office : on en ajoute un.

@@ -194,7 +194,7 @@ export default function App() {
       <button type="button" className="friends" onClick={() => setPollOpen(true)} aria-label={t("friends")}>
         🧑‍🤝‍🧑
       </button>
-      {pollOpen && <PollDialog places={top} preselected={top[current]?.id} onClose={() => setPollOpen(false)} />}
+      {pollOpen && home && <PollDialog places={top} home={home} preselected={top[current]?.id} onClose={() => setPollOpen(false)} />}
 
       {/* La dame : en grand pendant la première recherche, quand rien n'est ouvert, ou sans position. */}
       {(firstSearch || empty || phase === "error") && (

@@ -184,6 +184,25 @@ async function nearestWithin(center: LatLng, radii: number[], count: number): Pr
   return { list, area, hasMore: list.length >= count };
 }
 
+/**
+ * Les `count` restos les plus proches, ouverts ou non : pour un vote entre copains, qui se prépare souvent
+ * pour plus tard (ce soir, samedi…). `open` dit s'ils le sont maintenant.
+ */
+export async function nearest(center: LatLng, count = PAGE): Promise<Search> {
+  let area: Area = { center, radius: RADII[0] };
+  let list: Restaurant[] = [];
+  for (const radius of RADII) {
+    area = { center, radius };
+    const inside = (await restaurantsAround(area))
+      .filter((r) => distanceMeters(center, r.location) <= radius)
+      .sort(byDistance(center))
+      .map((r) => ({ ...r, open: openOnArrival(r, distanceMeters(center, r.location)) }));
+    list = withoutDuplicates(inside).slice(0, count);
+    if (list.length >= count) break;
+  }
+  return { list, area, hasMore: list.length >= count };
+}
+
 // Grosso modo : 4,8 km/h à pied, en voiture 24 km/h en ville plus 3 min pour se garer ; les rues font
 // des détours, d'où un trajet 30 à 40 % plus long que la ligne droite.
 const WALK_METERS_PER_MIN = 80;

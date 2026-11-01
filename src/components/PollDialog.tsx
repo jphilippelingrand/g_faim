@@ -1,15 +1,20 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { lang } from "../i18n";
 import { cuisineLabel } from "../lib/osm";
-import type { Restaurant } from "../lib/places";
+import { distanceMeters, formatDistance, nearest, type LatLng, type Restaurant } from "../lib/places";
 import { createPoll, myPolls, POLL_MAX, POLL_MIN, POLL_TTLS, type PollTtl } from "../lib/polls";
 
 type Props = {
+  /** Les restos déjà trouvés (ouverts) : affichés le temps de charger ceux d'à côté, fermés compris. */
   places: Restaurant[];
+  home: LatLng;
   /** Le resto affiché : coché d'office. */
   preselected?: string;
   onClose: () => void;
 };
+
+// Restos proposés à la fois ; le bouton « Plus de restos » en ajoute autant.
+const PAGE = 20;
 
 const TEXT = {
   fr: {
@@ -21,6 +26,8 @@ const TEXT = {
     create: "Créer le vote ({n})",
     close: "Fermer",
     error: "Oups, quelque chose a coincé. Réessaie dans un instant.",
+    closedNow: "fermé en ce moment",
+    more: "Plus de restos",
   },
   en: {
     title: "Where should we eat?",
@@ -31,6 +38,8 @@ const TEXT = {
     create: "Create the vote ({n})",
     close: "Close",
     error: "Oops, something went wrong. Try again in a moment.",
+    closedNow: "closed right now",
+    more: "More places",
   },
   es: {
     title: "¿Dónde comemos?",
@@ -41,20 +50,42 @@ const TEXT = {
     create: "Crear la votación ({n})",
     close: "Cerrar",
     error: "Uy, algo ha fallado. Inténtalo de nuevo en un momento.",
+    closedNow: "cerrado ahora",
+    more: "Más sitios",
   },
 }[lang];
 
 /**
  * « On mange où ? » sur le site : ses votes en cours (vers leur page), et un nouveau : on coche 2 à 5 restos,
  * on choisit la durée, et on arrive sur la page du vote (lien à copier, résultats, suppression). Comme la
- * feuille 🧑‍🤝‍🧑 de l'app.
+ * feuille 🧑‍🤝‍🧑 de l'app. On vote souvent pour plus tard : la liste prend tous les restos autour, même fermés
+ * en ce moment (c'est indiqué).
  */
-export function PollDialog({ places, preselected, onClose }: Props) {
+export function PollDialog({ places, home, preselected, onClose }: Props) {
   const [picked, setPicked] = useState<string[]>(preselected ? [preselected] : []);
   const [ttl, setTtl] = useState<PollTtl>("1h");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const [running] = useState(myPolls);
+  const [choices, setChoices] = useState(places);
+  const [count, setCount] = useState(PAGE);
+  const [hasMore, setHasMore] = useState(false);
+
+  // Les restos autour, fermés compris. Le resto coché d'office reste en tête.
+  useEffect(() => {
+    let live = true;
+    nearest(home, count)
+      .then(({ list, hasMore }) => {
+        if (!live) return;
+        const kept = places.filter((r) => r.id === preselected);
+        setChoices([...kept, ...list.filter((r) => r.id !== preselected)]);
+        setHasMore(hasMore);
+      })
+      .catch(() => live && setHasMore(false));
+    return () => {
+      live = false;
+    };
+  }, [home, count, places, preselected]);
 
   const toggle = (id: string) =>
     setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length < POLL_MAX ? [...p, id] : p));
@@ -64,7 +95,7 @@ export function PollDialog({ places, preselected, onClose }: Props) {
     setError(false);
     try {
       // Dans l'ordre de la liste (du plus proche au plus loin), pas dans l'ordre des coches.
-      const chosen = places
+      const chosen = choices
         .filter((r) => picked.includes(r.id))
         .map((r) => ({ name: r.name, cuisine: r.cuisine, address: r.address, lat: r.location.lat, lng: r.location.lng }));
       const poll = await createPoll(chosen, ttl, lang);
@@ -100,7 +131,7 @@ export function PollDialog({ places, preselected, onClose }: Props) {
 
         <p className="poll-how">{TEXT.howTo.replace("{min}", String(POLL_MIN)).replace("{max}", String(POLL_MAX))}</p>
         <ul className="poll-places">
-          {places.map((r) => {
+          {choices.map((r) => {
             const cuisine = r.cuisine ? cuisineLabel(r.cuisine) : null;
             const on = picked.includes(r.id);
             return (
@@ -108,16 +139,21 @@ export function PollDialog({ places, preselected, onClose }: Props) {
                 <label className={on ? "on" : undefined}>
                   <input type="checkbox" checked={on} disabled={!on && picked.length >= POLL_MAX} onChange={() => toggle(r.id)} />
                   <span className="poll-place-name">{r.name}</span>
-                  {cuisine && (
-                    <span className="poll-place-info">
-                      {cuisine.emoji} {cuisine.label}
-                    </span>
-                  )}
+                  <span className="poll-place-info">
+                    {[cuisine && `${cuisine.emoji} ${cuisine.label}`, formatDistance(distanceMeters(home, r.location)), r.open === false && TEXT.closedNow]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
                 </label>
               </li>
             );
           })}
         </ul>
+        {hasMore && (
+          <button type="button" className="poll-more" onClick={() => setCount((c) => c + PAGE)}>
+            {TEXT.more}
+          </button>
+        )}
 
         <p className="poll-section">{TEXT.ttl}</p>
         <div className="poll-ttls" role="radiogroup" aria-label={TEXT.ttl}>

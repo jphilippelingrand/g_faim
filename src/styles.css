@@ -287,21 +287,19 @@ body {
 
 /* ============ Carte ============ */
 
+/* Un point gris par resto ; celui de la fiche affichée passe au rouge, en plus gros (comme dans l'app). */
 .pin {
-  width: 30px;
-  height: 30px;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
   border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
+  background: var(--muted);
   border: 2.5px solid #fff;
-  box-shadow: 0 2px 6px rgb(0 0 0 / .25);
-  font: 700 .9rem/25px "Fraunces", Georgia, serif;
-  text-align: center;
-  opacity: .55;
+  box-shadow: 0 1px 4px rgb(0 0 0 / .25);
   cursor: pointer;
-  transition: transform .2s, opacity .2s, background .2s;
+  transition: transform .2s, background .2s;
 }
-.pin.selected { opacity: 1; transform: scale(1.35); }
+.pin.selected { background: var(--accent); transform: scale(1.5); }
 
 .home-pin {
   width: 16px;
@@ -512,6 +510,7 @@ input:focus { border-color: var(--accent); }
 .poll-places input { width: 20px; height: 20px; accent-color: var(--accent); grid-row: span 2; }
 .poll-place-name { font: 700 1rem "Fraunces", Georgia, serif; }
 .poll-place-info { font-size: .8rem; color: var(--muted); }
+.poll-more { display: block; margin: 10px auto 0; padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--accent); font: 600 .9rem "Inter", system-ui, sans-serif; cursor: pointer; }
 .poll-ttls { display: flex; gap: 8px; }
 .poll-ttls button { flex: 1; padding: 10px 0; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--muted); font: 500 .9rem "Inter", system-ui, sans-serif; cursor: pointer; }
 .poll-ttls button.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }

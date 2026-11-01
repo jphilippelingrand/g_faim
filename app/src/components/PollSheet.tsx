@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, Modal, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cuisineLabel } from "../lib/osm";
-import { distanceMeters, formatDistance, type LatLng, type Restaurant } from "../lib/places";
+import { distanceMeters, formatDistance, nearest, PAGE, type LatLng, type Restaurant } from "../lib/places";
 import {
   createPoll,
   myPolls,
@@ -22,6 +22,7 @@ import { t } from "../i18n";
 
 type Props = {
   visible: boolean;
+  /** Les restos déjà trouvés (ouverts) : affichés le temps de charger ceux d'à côté, fermés compris. */
   places: Restaurant[];
   home: LatLng;
   /** Le resto affiché à l'ouverture : coché d'office (la feuille est remontée à chaque ouverture). */
@@ -36,7 +37,8 @@ const TTL_LABEL = { "1h": "pollTtlHour", "1d": "pollTtlDay", "1w": "pollTtlWeek"
 /**
  * Les copains : en haut, ses sondages en cours (le resto en tête, les votes ; un tap montre les résultats,
  * le lien à renvoyer, la suppression) ; en dessous, un nouveau : on coche 2 à 5 restos, on choisit combien de temps le vote reste
- * ouvert, et la feuille de partage d'iOS envoie le lien.
+ * ouvert, et la feuille de partage d'iOS envoie le lien. On vote souvent pour plus tard : la liste prend
+ * tous les restos autour, même fermés en ce moment (c'est indiqué).
  */
 export function PollSheet({ visible, places, home, preselected, initialPoll, onClose }: Props) {
   const insets = useSafeAreaInsets();
@@ -49,6 +51,33 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onC
   const [statuses, setStatuses] = useState<Record<string, Results>>({});
   // Le sondage dont on regarde les résultats.
   const [opened, setOpened] = useState<MyPoll | null>(initialPoll ?? null);
+  const [choices, setChoices] = useState<Restaurant[]>(places);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(false);
+
+  // Les restos autour, fermés compris. Le resto coché d'office reste en tête.
+  const fetchChoices = (count: number) =>
+    nearest(home, count)
+      .then((search) => {
+        const kept = places.filter((r) => r.id === preselected);
+        setChoices([...kept, ...search.list.filter((r) => r.id !== preselected)]);
+        setHasMore(search.hasMore);
+      })
+      .catch((err) => {
+        console.error(err);
+        setHasMore(false);
+      })
+      .finally(() => setLoading(false));
+  useEffect(() => {
+    if (visible && home.latitude) fetchChoices(PAGE);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+  // La suite quand on approche du bas de la liste.
+  const loadMore = () => {
+    if (loading || !hasMore) return;
+    setLoading(true);
+    fetchChoices(choices.length + PAGE);
+  };
 
   // Où en sont ses sondages : une lecture chacun à l'ouverture, et au retour des résultats.
   useEffect(() => {
@@ -75,7 +104,7 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onC
     setError(false);
     try {
       // Dans l'ordre de la liste (du plus proche au plus loin), pas dans l'ordre des coches.
-      const chosen = places.filter((r) => picked.includes(r.id));
+      const chosen = choices.filter((r) => picked.includes(r.id));
       const { url } = await createPoll(chosen, ttl);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       // Partager avant de fermer : iOS refuse d'ouvrir une feuille pendant qu'une autre se ferme.
@@ -145,8 +174,11 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onC
           <>
             <FlatList
               style={styles.list}
-              data={places}
+              data={choices}
               keyExtractor={(r) => r.id}
+              onEndReached={loadMore}
+              onEndReachedThreshold={0.5}
+              ListFooterComponent={loading ? <ActivityIndicator style={styles.more} color={colors.accent} /> : undefined}
               ListHeaderComponent={
                 <>
                   {runningSection}
@@ -157,7 +189,11 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onC
               renderItem={({ item }) => {
                 const on = picked.includes(item.id);
                 const cuisine = item.cuisine ? cuisineLabel(item.cuisine) : null;
-                const info = [cuisine && `${cuisine.emoji} ${cuisine.label}`, formatDistance(distanceMeters(home, item.location))]
+                const info = [
+                  cuisine && `${cuisine.emoji} ${cuisine.label}`,
+                  formatDistance(distanceMeters(home, item.location)),
+                  item.open === false && t("pollClosedNow"),
+                ]
                   .filter(Boolean)
                   .join(" · ");
                 return (
@@ -241,6 +277,7 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
   },
   arrow: { fontSize: 26, color: colors.muted },
+  more: { marginVertical: 14 },
   separator: { height: 1, backgroundColor: colors.line, marginLeft: 44 },
   row: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 11 },
   rowPressed: { opacity: 0.6 },

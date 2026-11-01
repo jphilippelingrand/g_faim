@@ -127,7 +127,7 @@ export function RestaurantMap({ home, results, area, fitKey, selectedId, insets,
   useEffect(() => {
     if (!map) return;
     const markers = [...results].reverse().map((r) => {
-      const { el, marker: m } = marker("pin", r.location, String(results.indexOf(r) + 1));
+      const { el, marker: m } = marker("pin", r.location);
       el.title = r.name;
       el.addEventListener("click", () => callbacks.current.onSelect(r.id));
       pins.current.set(r.id, el);
