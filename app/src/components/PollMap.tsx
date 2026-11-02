@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import MapView, { Marker, type Region } from "react-native-maps";
-import type { Area, LatLng, Restaurant } from "../lib/places";
+import { distanceMeters, type Area, type LatLng, type Restaurant } from "../lib/places";
 import { MapDot } from "./MapDot";
 import { colors } from "../theme";
 
@@ -19,12 +19,14 @@ type Props = {
   height?: number;
 };
 
-// Autour des points cadrés : la boîte qui les contient, agrandie de moitié (pour le point rouge et son halo),
-// et jamais plus serrée qu'un pâté de maisons.
-const MARGIN = 1.5;
+// Autour des points cadrés : la boîte qui les contient, doublée (les points restent loin des bords, halo
+// compris), et jamais plus serrée qu'un pâté de maisons.
+const MARGIN = 2;
 const MIN_DELTA = 0.003;
 // Au premier affichage : toi et les restos les plus proches de la liste.
 const FIRST_FRAME = 8;
+// Le resto déjà coché (celui qu'on regardait) entre dans le cadrage d'ouverture s'il n'est pas plus loin que ça.
+const NEAR_PICKED = 1000;
 // Un resto touché : la carte va dessus, à cette échelle (en degrés, un pâté de maisons ou deux).
 const FOCUS_DELTA = 0.005;
 
@@ -80,7 +82,8 @@ export function PollMap({ home, places, picked, focused, onSelect, onMove, heigh
   const placesKey = places.slice(0, FIRST_FRAME).map((r) => r.id).join();
   useEffect(() => {
     if (!ready || touched.current) return;
-    const points = (places.length ? places.slice(0, FIRST_FRAME) : picked).map((r) => r.location);
+    const near = picked.filter((r) => distanceMeters(home, r.location) <= NEAR_PICKED);
+    const points = (places.length ? [...places.slice(0, FIRST_FRAME), ...near] : picked).map((r) => r.location);
     if (points.length) fit(points);
   }, [ready, placesKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
