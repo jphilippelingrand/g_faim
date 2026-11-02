@@ -378,6 +378,7 @@ function Main() {
         home={home ?? { latitude: 0, longitude: 0 }}
         preselected={top[current]?.id}
         initialPoll={pollFromLink}
+        onMapsApp={setMapsAppState}
         onClose={() => setPollOpen(false)}
       />
 

@@ -19,7 +19,8 @@ const PAGE = 20;
 const TEXT = {
   fr: {
     title: "On mange où ?",
-    running: "Mes votes en cours",
+    running: "Mes votes",
+    over: "terminé",
     howTo: "Coche {min} à {max} restos : tes copains swipent, le groupe décide.",
     ttl: "Le vote reste ouvert",
     ttls: { "1h": "1 heure", "1d": "1 jour", "1w": "1 semaine" },
@@ -27,11 +28,13 @@ const TEXT = {
     close: "Fermer",
     error: "Oups, quelque chose a coincé. Réessaie dans un instant.",
     closedNow: "fermé en ce moment",
+    onlyOpen: "Ouverts seulement",
     more: "Plus de restos",
   },
   en: {
     title: "Where should we eat?",
-    running: "My running votes",
+    running: "My votes",
+    over: "over",
     howTo: "Pick {min} to {max} places: your friends swipe, the group decides.",
     ttl: "Voting stays open for",
     ttls: { "1h": "1 hour", "1d": "1 day", "1w": "1 week" },
@@ -39,11 +42,13 @@ const TEXT = {
     close: "Close",
     error: "Oops, something went wrong. Try again in a moment.",
     closedNow: "closed right now",
+    onlyOpen: "Open only",
     more: "More places",
   },
   es: {
     title: "¿Dónde comemos?",
-    running: "Mis votaciones en curso",
+    running: "Mis votaciones",
+    over: "terminada",
     howTo: "Marca de {min} a {max} sitios: tus amigos deslizan, el grupo decide.",
     ttl: "La votación queda abierta",
     ttls: { "1h": "1 hora", "1d": "1 día", "1w": "1 semana" },
@@ -51,6 +56,7 @@ const TEXT = {
     close: "Cerrar",
     error: "Uy, algo ha fallado. Inténtalo de nuevo en un momento.",
     closedNow: "cerrado ahora",
+    onlyOpen: "Solo abiertos",
     more: "Más sitios",
   },
 }[lang];
@@ -70,6 +76,9 @@ export function PollDialog({ places, home, preselected, onClose }: Props) {
   const [choices, setChoices] = useState(places);
   const [count, setCount] = useState(PAGE);
   const [hasMore, setHasMore] = useState(false);
+  const [onlyOpen, setOnlyOpen] = useState(false);
+  // « Ouverts seulement » : d'après leurs horaires, plus ceux déjà cochés (pour pouvoir les décocher).
+  const shown = onlyOpen ? choices.filter((r) => r.open === true || picked.includes(r.id)) : choices;
 
   // Les restos autour, fermés compris. Le resto coché d'office reste en tête.
   useEffect(() => {
@@ -123,6 +132,7 @@ export function PollDialog({ places, home, preselected, onClose }: Props) {
               {running.map((p) => (
                 <li key={p.id}>
                   <a href={`/v/${p.id}`}>{p.names.join(" · ")}</a>
+                  {p.expiresAt <= Date.now() && <span className="poll-over"> · {TEXT.over}</span>}
                 </li>
               ))}
             </ul>
@@ -130,8 +140,12 @@ export function PollDialog({ places, home, preselected, onClose }: Props) {
         )}
 
         <p className="poll-how">{TEXT.howTo.replace("{min}", String(POLL_MIN)).replace("{max}", String(POLL_MAX))}</p>
+        <label className="poll-filter">
+          <input type="checkbox" checked={onlyOpen} onChange={(e) => setOnlyOpen(e.target.checked)} />
+          {TEXT.onlyOpen}
+        </label>
         <ul className="poll-places">
-          {choices.map((r) => {
+          {shown.map((r) => {
             const cuisine = r.cuisine ? cuisineLabel(r.cuisine) : null;
             const on = picked.includes(r.id);
             return (

@@ -10,11 +10,22 @@ export const POLL_MAX = 5;
 
 /** Un resto proposé, tel que le serveur le garde et le renvoie. */
 export type PollPlace = { name: string; cuisine?: string; address?: string; lat: number; lng: number };
-/** Où en est un sondage : les restos, leurs ❤️, le nombre de votants, et son propre vote (null si pas encore). */
-export type PollLive = { places: PollPlace[]; hearts: number[]; voters: number; expiresAt: number; mine: boolean[] | null };
-/** "expired" : le sondage n'existe plus (expiré ou supprimé). */
+/**
+ * Où en est un sondage : les restos, leurs ❤️, le nombre de votants, et son propre vote (null si pas encore).
+ * `closed` : le vote est fini (après `expiresAt`) ; le résultat reste lisible jusqu'à `keepUntil`.
+ */
+export type PollLive = {
+  places: PollPlace[];
+  hearts: number[];
+  voters: number;
+  expiresAt: number;
+  keepUntil: number;
+  closed: boolean;
+  mine: boolean[] | null;
+};
+/** "expired" : le sondage n'existe plus (résultat plus gardé, ou supprimé). */
 export type PollResults = PollLive | "expired";
-export type CreatedPoll = { id: string; url: string; expiresAt: number; owner: string };
+export type CreatedPoll = { id: string; url: string; expiresAt: number; keepUntil: number; owner: string };
 
 async function call(url: string, init?: RequestInit): Promise<Response> {
   const res = await fetch(url, init);

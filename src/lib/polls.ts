@@ -10,8 +10,8 @@ export * from "../../app/src/lib/pollsApi";
 /** Même origine que la page : groubl.com en ligne, le serveur de dev en local. */
 export const API_BASE = "";
 
-/** Un sondage lancé depuis ce navigateur ; `owner` : la clé pour le supprimer. */
-export type MyPoll = { id: string; url: string; expiresAt: number; names: string[]; owner: string };
+/** Un sondage lancé depuis ce navigateur ; `owner` : la clé pour le supprimer. Résultat gardé jusqu'à `keepUntil`. */
+export type MyPoll = { id: string; url: string; expiresAt: number; keepUntil?: number; names: string[]; owner: string };
 
 const POLLS_KEY = "groubl:polls";
 const VOTER_KEY = "groubl:voter";
@@ -43,7 +43,7 @@ export function voterId(): string {
   return id;
 }
 
-/** Les sondages lancés d'ici et encore ouverts, le plus récent d'abord. */
+/** Les sondages lancés d'ici, en cours ou terminés depuis peu, le plus récent d'abord. */
 export function myPolls(): MyPoll[] {
   let saved: MyPoll[] = [];
   try {
@@ -51,9 +51,9 @@ export function myPolls(): MyPoll[] {
   } catch {
     /* abîmé : on repart de zéro */
   }
-  const open = saved.filter((p) => p.expiresAt > Date.now());
-  if (open.length !== saved.length) store(POLLS_KEY, JSON.stringify(open));
-  return open;
+  const kept = saved.filter((p) => (p.keepUntil ?? p.expiresAt) > Date.now());
+  if (kept.length !== saved.length) store(POLLS_KEY, JSON.stringify(kept));
+  return kept;
 }
 
 /** Le sondage, si on l'a lancé depuis ce navigateur (on peut alors le supprimer). */

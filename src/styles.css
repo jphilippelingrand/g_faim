@@ -299,7 +299,16 @@ body {
   cursor: pointer;
   transition: transform .2s, background .2s;
 }
-.pin.selected { background: var(--accent); transform: scale(1.5); }
+/* Le resto montré : plus gros, un petit rebond à l'arrivée, puis un halo qui respire doucement. */
+.pin.selected {
+  background: var(--accent); transform: scale(1.9); border-width: 2px;
+  animation: pin-pop .35s cubic-bezier(.3, 1.6, .5, 1), pin-halo 1.8s ease-out .35s infinite;
+}
+@keyframes pin-pop { from { transform: scale(1); } }
+@keyframes pin-halo {
+  from { box-shadow: 0 1px 4px rgb(0 0 0 / .25), 0 0 0 0 rgb(226 88 62 / .4); }
+  to { box-shadow: 0 1px 4px rgb(0 0 0 / .25), 0 0 0 9px rgb(226 88 62 / 0); }
+}
 
 .home-pin {
   width: 16px;
@@ -459,7 +468,7 @@ input:focus { border-color: var(--accent); }
 .legal button[aria-current="true"] { color: var(--ink); font-weight: 600; }
 
 @media (prefers-reduced-motion: reduce) {
-  .lady *, .lady svg, .home-pin { animation: none !important; }
+  .lady *, .lady svg, .home-pin, .pin.selected { animation: none !important; }
   .grr span { opacity: 1; }
 }
 
@@ -510,6 +519,9 @@ input:focus { border-color: var(--accent); }
 .poll-places input { width: 20px; height: 20px; accent-color: var(--accent); grid-row: span 2; }
 .poll-place-name { font: 700 1rem "Fraunces", Georgia, serif; }
 .poll-place-info { font-size: .8rem; color: var(--muted); }
+.poll-filter { display: flex; align-items: center; gap: 8px; margin: 4px 0 2px; font-size: .9rem; cursor: pointer; }
+.poll-filter input { width: 18px; height: 18px; accent-color: var(--accent); }
+.poll-over { color: var(--muted); font-size: .85rem; }
 .poll-more { display: block; margin: 10px auto 0; padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--accent); font: 600 .9rem "Inter", system-ui, sans-serif; cursor: pointer; }
 .poll-ttls { display: flex; gap: 8px; }
 .poll-ttls button { flex: 1; padding: 10px 0; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--muted); font: 500 .9rem "Inter", system-ui, sans-serif; cursor: pointer; }

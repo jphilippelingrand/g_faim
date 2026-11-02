@@ -46,6 +46,7 @@ button { font: inherit; cursor: pointer; }
 .vote-heart { background: var(--accent); border-color: var(--accent); width: 70px; height: 70px; font-size: 28px; }
 
 .vote-results { width: 100%; display: flex; flex-direction: column; gap: 12px; text-align: left; }
+.vote-final { margin: 0; padding: 14px 16px; border-radius: 16px; background: var(--accent); color: #fff; font: italic 900 24px/1.15 Fraunces, serif; text-align: center; }
 .vote-kicker { margin: 0; font: italic 700 18px Fraunces, serif; text-align: center; }
 .vote-row { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; }
 .vote-row-top { border: 2px solid var(--accent); }

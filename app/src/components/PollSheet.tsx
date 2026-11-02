@@ -1,9 +1,10 @@
 import * as Haptics from "expo-haptics";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, FlatList, Modal, Pressable, Share, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cuisineLabel } from "../lib/osm";
-import { distanceMeters, formatDistance, nearest, PAGE, type LatLng, type Restaurant } from "../lib/places";
+import { openPlace, type MapsApp } from "../lib/mapsApp";
+import { distanceMeters, formatDistance, nearest, PAGE, travelTime, type LatLng, type Restaurant } from "../lib/places";
 import {
   createPoll,
   myPolls,
@@ -16,6 +17,7 @@ import {
   type PollTtl,
   winner,
 } from "../lib/polls";
+import { PollMap } from "./PollMap";
 import { PollResults, timeLeft } from "./PollResults";
 import { colors, fonts } from "../theme";
 import { t } from "../i18n";
@@ -29,20 +31,29 @@ type Props = {
   preselected?: string;
   /** Un sondage à montrer tout de suite (lien de vote ouvert dans l'app). */
   initialPoll?: MyPoll | null;
+  /** L'appli de cartes choisie en ouvrant un resto (« Go »), comme depuis la liste. */
+  onMapsApp?: (app: MapsApp) => void;
   onClose: () => void;
 };
+
+/** Vote fini, d'après l'heure de fin retenue (en attendant la réponse du serveur). */
+const isOver = (poll: MyPoll) => poll.expiresAt <= Date.now();
 
 const TTL_LABEL = { "1h": "pollTtlHour", "1d": "pollTtlDay", "1w": "pollTtlWeek" } as const;
 
 /**
- * Les copains : en haut, ses sondages en cours (le resto en tête, les votes ; un tap montre les résultats,
- * le lien à renvoyer, la suppression) ; en dessous, un nouveau : on coche 2 à 5 restos, on choisit combien de temps le vote reste
+ * Les copains : en haut, ses votes (en cours, ou finis depuis peu avec l'élu ; un tap montre les résultats,
+ * le lien à renvoyer, la suppression) ; en dessous, un nouveau : la carte des restos autour (cochés en
+ * rouge), sa sélection, et la liste. On coche 2 à 5 restos, on choisit combien de temps le vote reste
  * ouvert, et la feuille de partage d'iOS envoie le lien. On vote souvent pour plus tard : la liste prend
- * tous les restos autour, même fermés en ce moment (c'est indiqué).
+ * tous les restos autour, même fermés en ce moment (c'est indiqué, et « Ouverts seulement » les cache).
+ * Comme en mode liste, toucher une ligne la montre sur la carte, « Go » ouvre sa fiche dans Plans.
  */
-export function PollSheet({ visible, places, home, preselected, initialPoll, onClose }: Props) {
+export function PollSheet({ visible, places, home, preselected, initialPoll, onMapsApp, onClose }: Props) {
   const insets = useSafeAreaInsets();
   const [picked, setPicked] = useState<string[]>(preselected ? [preselected] : []);
+  const [focused, setFocused] = useState<string | null>(null);
+  const [onlyOpen, setOnlyOpen] = useState(false);
   const [ttl, setTtl] = useState<PollTtl>("1h");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
@@ -54,6 +65,7 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onC
   const [choices, setChoices] = useState<Restaurant[]>(places);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
+  const list = useRef<FlatList<Restaurant>>(null);
 
   // Les restos autour, fermés compris. Le resto coché d'office reste en tête.
   const fetchChoices = (count: number) =>
@@ -99,6 +111,24 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onC
     setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length < POLL_MAX ? [...p, id] : p));
   };
 
+  // « Ouverts seulement » : les restos ouverts d'après leurs horaires, plus ceux déjà cochés (pour les décocher).
+  const shownChoices = onlyOpen ? choices.filter((r) => r.open === true || picked.includes(r.id)) : choices;
+
+  // Une ligne touchée : la carte la montre. Un point touché sur la carte : la liste va à sa ligne.
+  const focusRow = (id: string) => {
+    Haptics.selectionAsync();
+    setFocused(id);
+  };
+  const focusFromMap = (id: string) => {
+    focusRow(id);
+    const index = shownChoices.findIndex((r) => r.id === id);
+    if (index >= 0) list.current?.scrollToIndex({ index, viewPosition: 0.3, animated: true });
+  };
+  const go = (r: Restaurant) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    openPlace(r).then((app) => app && onMapsApp?.(app));
+  };
+
   async function create() {
     setBusy(true);
     setError(false);
@@ -120,42 +150,43 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onC
 
   const ready = picked.length >= POLL_MIN;
   const shown = running.filter((p) => statuses[p.url] !== "expired");
+  const pickedPlaces = picked.map((id) => choices.find((r) => r.id === id)).filter((r): r is Restaurant => !!r);
 
+  // Ses votes : une rangée de cartes qui défile de côté, pour laisser la place à la carte et à la liste.
   const runningSection = shown.length > 0 && (
-    <View style={styles.running}>
+    <>
       <Text style={styles.section}>{t("pollRunning")}</Text>
-      {shown.map((poll) => {
-        const status = statuses[poll.url];
-        const live = status && status !== "expired" ? status : null;
-        const leader = live && winner(live);
-        const votes = !live
-          ? "…"
-          : live.voters === 0
-            ? t("pollNoVotes")
-            : live.voters === 1
-              ? t("pollOneVote")
-              : t("pollVotes", { n: live.voters });
-        return (
-          <Pressable
-            key={poll.url}
-            style={({ pressed }) => [styles.poll, pressed && styles.rowPressed]}
-            onPress={() => setOpened(poll)}
-            accessibilityRole="button"
-          >
-            <View style={styles.middle}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.polls}>
+        {shown.map((poll) => {
+          const status = statuses[poll.url];
+          const live = status && status !== "expired" ? status : null;
+          const leader = live && winner(live);
+          const closed = live ? live.closed : isOver(poll);
+          const votes = !live
+            ? "…"
+            : live.voters === 0
+              ? t("pollNoVotes")
+              : live.voters === 1
+                ? t("pollOneVote")
+                : t("pollVotes", { n: live.voters });
+          return (
+            <Pressable
+              key={poll.url}
+              style={({ pressed }) => [styles.poll, closed && styles.pollClosed, pressed && styles.rowPressed]}
+              onPress={() => setOpened(poll)}
+              accessibilityRole="button"
+            >
               <Text style={styles.name} numberOfLines={1}>
                 {leader ? `🏆 ${leader.name}` : poll.names.join(" · ")}
               </Text>
-              <Text style={styles.info} numberOfLines={1}>
-                {votes} · {timeLeft(poll.expiresAt)}
+              <Text style={[styles.info, closed && styles.closedText]} numberOfLines={1}>
+                {closed ? `${t("pollClosed")} · ${votes}` : `${votes} · ${timeLeft(poll.expiresAt)}`}
               </Text>
-            </View>
-            <Text style={styles.arrow}>›</Text>
-          </Pressable>
-        );
-      })}
-      <Text style={styles.section}>{t("pollNew")}</Text>
-    </View>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+    </>
   );
 
   return (
@@ -172,47 +203,100 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onC
           <PollResults poll={opened} onBack={() => setOpened(null)} onGone={gone} />
         ) : (
           <>
+            {runningSection}
+            {shown.length > 0 && <Text style={styles.section}>{t("pollNew")}</Text>}
+
+            <PollMap home={home} places={shownChoices} picked={picked} focused={focused} onSelect={focusFromMap} />
+
+            {/* Sa sélection : un tap la retire. */}
+            {pickedPlaces.length ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.picks}>
+                <Text style={styles.picksLabel}>
+                  {t("pollPicked")} {pickedPlaces.length}/{POLL_MAX}
+                </Text>
+                {pickedPlaces.map((r) => (
+                  <Pressable
+                    key={r.id}
+                    style={({ pressed }) => [styles.pick, pressed && styles.rowPressed]}
+                    onPress={() => toggle(r.id)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`✕ ${r.name}`}
+                  >
+                    <Text style={styles.pickText} numberOfLines={1}>
+                      {r.name} ✕
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            ) : (
+              <Text style={styles.sub}>{t("pollPickHint", { max: POLL_MAX })}</Text>
+            )}
+
             <FlatList
+              ref={list}
               style={styles.list}
-              data={choices}
+              data={shownChoices}
               keyExtractor={(r) => r.id}
               onEndReached={loadMore}
               onEndReachedThreshold={0.5}
-              ListFooterComponent={loading ? <ActivityIndicator style={styles.more} color={colors.accent} /> : undefined}
+              onScrollToIndexFailed={({ index }) => list.current?.scrollToOffset({ offset: index * 62, animated: true })}
               ListHeaderComponent={
-                <>
-                  {runningSection}
-                  <Text style={styles.sub}>{t("pollHowTo", { min: POLL_MIN, max: POLL_MAX })}</Text>
-                </>
+                <Pressable
+                  style={styles.filter}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setOnlyOpen((v) => !v);
+                  }}
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: onlyOpen }}
+                >
+                  <View style={[styles.switch, onlyOpen && styles.switchOn]}>
+                    <View style={[styles.knob, onlyOpen && styles.knobOn]} />
+                  </View>
+                  <Text style={styles.filterText}>{t("pollOnlyOpen")}</Text>
+                </Pressable>
               }
+              ListFooterComponent={loading ? <ActivityIndicator style={styles.more} color={colors.accent} /> : undefined}
               ItemSeparatorComponent={() => <View style={styles.separator} />}
               renderItem={({ item }) => {
                 const on = picked.includes(item.id);
+                const distance = distanceMeters(home, item.location);
+                const trip = travelTime(distance);
                 const cuisine = item.cuisine ? cuisineLabel(item.cuisine) : null;
-                const info = [
-                  cuisine && `${cuisine.emoji} ${cuisine.label}`,
-                  formatDistance(distanceMeters(home, item.location)),
-                  item.open === false && t("pollClosedNow"),
-                ]
+                const info = [cuisine && `${cuisine.emoji} ${cuisine.label}`, formatDistance(distance), item.open === false && t("pollClosedNow")]
                   .filter(Boolean)
                   .join(" · ");
                 return (
-                  <Pressable
-                    style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-                    onPress={() => toggle(item.id)}
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: on, disabled: !on && picked.length >= POLL_MAX }}
-                  >
-                    <View style={[styles.check, on && styles.checkOn]}>{on && <Text style={styles.checkMark}>✓</Text>}</View>
-                    <View style={styles.middle}>
+                  <View style={[styles.row, item.id === focused && styles.rowFocused]}>
+                    <Pressable
+                      onPress={() => toggle(item.id)}
+                      hitSlop={10}
+                      accessibilityRole="checkbox"
+                      accessibilityLabel={item.name}
+                      accessibilityState={{ checked: on, disabled: !on && picked.length >= POLL_MAX }}
+                    >
+                      <View style={[styles.check, on && styles.checkOn]}>{on && <Text style={styles.checkMark}>✓</Text>}</View>
+                    </Pressable>
+                    <Pressable style={({ pressed }) => [styles.middle, pressed && styles.rowPressed]} onPress={() => focusRow(item.id)}>
                       <Text style={styles.name} numberOfLines={1}>
                         {item.name}
                       </Text>
                       <Text style={styles.info} numberOfLines={1}>
                         {info}
                       </Text>
-                    </View>
-                  </Pressable>
+                    </Pressable>
+                    <Pressable
+                      style={({ pressed }) => [styles.go, pressed && styles.goPressed]}
+                      onPress={() => go(item)}
+                      accessibilityRole="link"
+                      accessibilityLabel={t("seeInMaps", { name: item.name })}
+                    >
+                      <Text style={styles.goTime}>
+                        {trip.mode === "walk" ? "🚶" : "🚗"} {trip.minutes} min
+                      </Text>
+                      <Text style={styles.goText}>{t("go")}</Text>
+                    </Pressable>
+                  </View>
                 );
               }}
             />
@@ -250,36 +334,44 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onC
 
 const styles = StyleSheet.create({
   sheet: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 18, paddingTop: 20 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 2 },
   title: { fontFamily: fonts.grr, fontSize: 30, color: colors.ink },
   close: { fontSize: 22, color: colors.muted },
-  sub: { fontFamily: fonts.body, fontSize: 15, color: colors.muted, marginBottom: 6 },
-  list: { flex: 1 },
-  running: { marginTop: 6 },
+  sub: { fontFamily: fonts.body, fontSize: 14, color: colors.muted, marginTop: 10 },
+  list: { flex: 1, marginTop: 4 },
   section: {
     fontFamily: fonts.medium,
     fontSize: 13,
     letterSpacing: 0.6,
     color: colors.accent,
     textTransform: "uppercase",
-    marginTop: 12,
-    marginBottom: 8,
+    marginTop: 10,
+    marginBottom: 6,
   },
+  polls: { gap: 8 },
   poll: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
+    width: 220,
     padding: 12,
-    marginBottom: 8,
     borderRadius: 14,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.line,
   },
-  arrow: { fontSize: 26, color: colors.muted },
-  more: { marginVertical: 14 },
-  separator: { height: 1, backgroundColor: colors.line, marginLeft: 44 },
-  row: { flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 11 },
+  pollClosed: { backgroundColor: colors.bg },
+  closedText: { color: colors.accent, fontFamily: fonts.medium },
+  picks: { gap: 6, alignItems: "center", paddingTop: 10 },
+  picksLabel: { fontFamily: fonts.medium, fontSize: 13, color: colors.muted, marginRight: 2 },
+  pick: { backgroundColor: colors.accent, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, maxWidth: 200 },
+  pickText: { fontFamily: fonts.medium, fontSize: 13, color: "#fff" },
+  filter: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8 },
+  switch: { width: 40, height: 24, borderRadius: 12, backgroundColor: colors.line, padding: 2 },
+  switchOn: { backgroundColor: colors.accent },
+  knob: { width: 20, height: 20, borderRadius: 10, backgroundColor: "#fff" },
+  knobOn: { transform: [{ translateX: 16 }] },
+  filterText: { fontFamily: fonts.medium, fontSize: 14, color: colors.ink },
+  separator: { height: 1, backgroundColor: colors.line, marginLeft: 42 },
+  row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 9, paddingHorizontal: 4, borderRadius: 14 },
+  rowFocused: { backgroundColor: colors.accentSoft },
   rowPressed: { opacity: 0.6 },
   check: {
     width: 28,
@@ -296,7 +388,12 @@ const styles = StyleSheet.create({
   middle: { flex: 1 },
   name: { fontFamily: fonts.title, fontSize: 17, color: colors.ink },
   info: { fontFamily: fonts.body, fontSize: 12.5, color: colors.muted, marginTop: 3 },
-  label: { fontFamily: fonts.medium, fontSize: 14, color: colors.ink, marginTop: 14, marginBottom: 8 },
+  go: { alignItems: "center", backgroundColor: colors.accent, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, minWidth: 74 },
+  goPressed: { transform: [{ scale: 0.94 }] },
+  goTime: { fontFamily: fonts.medium, fontSize: 11.5, color: "#fff" },
+  goText: { fontFamily: fonts.title, fontSize: 15, color: "#fff" },
+  more: { marginVertical: 14 },
+  label: { fontFamily: fonts.medium, fontSize: 14, color: colors.ink, marginTop: 10, marginBottom: 8 },
   ttls: { flexDirection: "row", gap: 8 },
   ttl: {
     flex: 1,
@@ -311,7 +408,7 @@ const styles = StyleSheet.create({
   ttlText: { fontFamily: fonts.medium, fontSize: 14, color: colors.muted },
   ttlTextOn: { color: colors.accent },
   error: { fontFamily: fonts.body, fontSize: 14, color: colors.accent, textAlign: "center", marginTop: 12 },
-  create: { marginTop: 14, backgroundColor: colors.accent, borderRadius: 999, paddingVertical: 15, alignItems: "center" },
+  create: { marginTop: 12, backgroundColor: colors.accent, borderRadius: 999, paddingVertical: 15, alignItems: "center" },
   createOff: { opacity: 0.4 },
   createText: { fontFamily: fonts.title, fontSize: 17, color: "#fff" },
   pressed: { transform: [{ scale: 0.97 }] },

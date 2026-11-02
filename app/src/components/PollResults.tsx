@@ -46,7 +46,8 @@ const asRestaurant = (p: PollPlace) => ({
 /**
  * Un sondage dans l'app (rafraîchi tout seul) : son vote à soi (❤️ / ✕ par resto, qu'on peut changer), les
  * restos par nombre de ❤️ avec « Go » sur le premier, puis partager le résultat, renvoyer le lien, et
- * supprimer le vote (si on l'a lancé) ou l'oublier (si on l'a rejoint par un lien).
+ * supprimer le vote (si on l'a lancé) ou l'oublier (si on l'a rejoint par un lien). Vote fini : plus de vote
+ * possible, l'élu en grand (ou l'égalité), tant que le serveur garde le résultat.
  */
 export function PollResults({ poll, onBack, onGone }: Props) {
   const [results, setResults] = useState<Results | null>(null);
@@ -143,12 +144,28 @@ export function PollResults({ poll, onBack, onGone }: Props) {
       {live && (
         <ScrollView contentContainerStyle={styles.content}>
           <Text style={styles.sub}>
-            {votes} · {timeLeft(live.expiresAt)}
+            {votes} · {live.closed ? t("pollClosed") : timeLeft(live.expiresAt)}
           </Text>
 
-          {/* Son vote : un ❤️ ou un ✕ par resto, à envoyer (ou à changer). */}
-          <Text style={styles.section}>{t(live.mine ? "pollMyVote" : "pollYourTurn")}</Text>
-          {live.places.map((place, i) => {
+          {live.closed && (
+            <View style={styles.final}>
+              <Text style={styles.finalText}>{top ? `🏆 ${t("pollFinal", { name: top.name })}` : t("pollTie")}</Text>
+              {top && (
+                <Pressable
+                  style={({ pressed }) => [styles.finalGo, pressed && styles.pressed]}
+                  onPress={() => openPlace(asRestaurant(top))}
+                  accessibilityRole="link"
+                  accessibilityLabel={t("seeInMaps", { name: top.name })}
+                >
+                  <Text style={styles.finalGoText}>{t("go")}</Text>
+                </Pressable>
+              )}
+            </View>
+          )}
+
+          {/* Son vote : un ❤️ ou un ✕ par resto, à envoyer (ou à changer), tant que le vote est ouvert. */}
+          {!live.closed && <Text style={styles.section}>{t(live.mine ? "pollMyVote" : "pollYourTurn")}</Text>}
+          {!live.closed && live.places.map((place, i) => {
             const like = mine?.[i];
             const pick = (value: boolean) => {
               Haptics.selectionAsync();
@@ -183,7 +200,7 @@ export function PollResults({ poll, onBack, onGone }: Props) {
               </View>
             );
           })}
-          {draft && (
+          {draft && !live.closed && (
             <Pressable style={({ pressed }) => [styles.primary, pressed && styles.pressed]} onPress={sendVote} disabled={sending} accessibilityRole="button">
               {sending ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>{t(live.mine ? "pollChangeVote" : "pollSendVote")}</Text>}
             </Pressable>
@@ -263,6 +280,10 @@ const styles = StyleSheet.create({
   choiceNope: { backgroundColor: colors.line, borderColor: colors.muted },
   choiceYum: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
   choiceText: { fontSize: 18, color: colors.muted },
+  final: { backgroundColor: colors.accent, borderRadius: 18, padding: 16, alignItems: "center", gap: 12 },
+  finalText: { fontFamily: fonts.grr, fontSize: 24, color: "#fff", textAlign: "center" },
+  finalGo: { backgroundColor: "#fff", borderRadius: 999, paddingHorizontal: 22, paddingVertical: 10 },
+  finalGoText: { fontFamily: fonts.title, fontSize: 16, color: colors.accent },
   primary: { backgroundColor: colors.accent, borderRadius: 999, paddingVertical: 14, alignItems: "center" },
   primaryText: { fontFamily: fonts.title, fontSize: 16, color: "#fff" },
   row: { backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.line, padding: 14 },

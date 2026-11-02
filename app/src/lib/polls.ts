@@ -10,12 +10,17 @@ export type { PollLive, PollPlace, PollResults, PollTtl } from "./pollsApi";
 
 /**
  * Les sondages « On mange où ? » vus de l'app : ceux qu'on lance (avec la clé qui permet de les supprimer)
- * et ceux qu'on rejoint par un lien, retenus par l'iPhone tant qu'ils sont ouverts. On y vote aussi, sous un
+ * et ceux qu'on rejoint par un lien, retenus par l'iPhone tant que leur résultat se lit (le double de la durée du vote). On y vote aussi, sous un
  * identifiant anonyme propre à l'iPhone. Les appels eux-mêmes sont dans pollsApi.ts.
  */
 
-/** Un sondage suivi sur l'iPhone ; `owner` : la clé pour le supprimer, seulement si on l'a lancé. */
-export type MyPoll = { url: string; expiresAt: number; names: string[]; owner?: string };
+/**
+ * Un sondage suivi sur l'iPhone ; `owner` : la clé pour le supprimer, seulement si on l'a lancé. Vote fini à
+ * `expiresAt`, résultat gardé jusqu'à `keepUntil` (absent sur les sondages d'avant : rien après la fin).
+ */
+export type MyPoll = { url: string; expiresAt: number; keepUntil?: number; names: string[]; owner?: string };
+
+const keptUntil = (poll: MyPoll) => poll.keepUntil ?? poll.expiresAt;
 
 const KEY = "polls";
 const VOTER_KEY = "pollVoter";
@@ -45,7 +50,7 @@ function save(polls: MyPoll[]) {
   if (Platform.OS === "ios") Settings.set({ [KEY]: JSON.stringify(polls) });
 }
 
-/** Les sondages encore ouverts, le plus récent d'abord (les expirés sont oubliés au passage). */
+/** Les sondages en cours ou terminés depuis peu, le plus récent d'abord (les autres sont oubliés au passage). */
 export function myPolls(): MyPoll[] {
   if (Platform.OS !== "ios") return [];
   let saved: MyPoll[] = [];
@@ -54,9 +59,9 @@ export function myPolls(): MyPoll[] {
   } catch {
     /* préférence abîmée : on repart de zéro */
   }
-  const open = saved.filter((p) => p.expiresAt > Date.now());
-  if (open.length !== saved.length) save(open);
-  return open;
+  const kept = saved.filter((p) => keptUntil(p) > Date.now());
+  if (kept.length !== saved.length) save(kept);
+  return kept;
 }
 
 export async function createPoll(places: Restaurant[], ttl: PollTtl): Promise<MyPoll> {
@@ -69,8 +74,8 @@ export async function createPoll(places: Restaurant[], ttl: PollTtl): Promise<My
   }));
   // Pour être prévenu quand un copain vote (si on accepte les notifications).
   const push = await pushToken();
-  const { url, expiresAt, owner } = await apiCreatePoll(apiBase(), proposed, ttl, lang, { push, voter: voterId() });
-  const poll = { url, expiresAt, owner, names: places.map((r) => r.name) };
+  const { url, expiresAt, keepUntil, owner } = await apiCreatePoll(apiBase(), proposed, ttl, lang, { push, voter: voterId() });
+  const poll = { url, expiresAt, keepUntil, owner, names: places.map((r) => r.name) };
   save([poll, ...myPolls()]);
   return poll;
 }
@@ -86,7 +91,7 @@ export async function joinPoll(url: string): Promise<MyPoll | null> {
   if (known) return known;
   const results = await apiResults(apiBase(), id);
   if (results === "expired") return null;
-  const poll = { url, expiresAt: results.expiresAt, names: results.places.map((p) => p.name) };
+  const poll = { url, expiresAt: results.expiresAt, keepUntil: results.keepUntil, names: results.places.map((p) => p.name) };
   save([poll, ...myPolls()]);
   return poll;
 }

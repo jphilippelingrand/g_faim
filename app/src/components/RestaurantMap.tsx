@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { StyleSheet, View } from "react-native";
 import MapView, { Circle, Marker, type Region } from "react-native-maps";
 import type { Area, LatLng, Restaurant } from "../lib/places";
-import { colors } from "../theme";
+import { MapDot } from "./MapDot";
 
 // Plans (Apple) sur iOS : gratuit, sans clé. Les restos viennent d'OpenStreetMap.
 
@@ -78,10 +78,11 @@ export function RestaurantMap({ home, results, area, fitKey, selectedId, onSelec
               key={`${r.id}-${selected}`}
               coordinate={r.location}
               onPress={() => onSelect(r.id)}
-              tracksViewChanges={false}
+              // Seul le resto montré s'anime (MapDot) : lui seul est suivi.
+              tracksViewChanges={selected}
               zIndex={selected ? 100 : 50 - i}
             >
-              <View style={[styles.pin, selected && styles.pinSelected]} />
+              <MapDot state={selected ? "selected" : "idle"} />
             </Marker>
           );
         })}
@@ -89,16 +90,3 @@ export function RestaurantMap({ home, results, area, fitKey, selectedId, onSelec
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  // Un point gris par resto ; celui de la carte du dessus (ou de la ligne touchée) passe au rouge, en plus gros.
-  pin: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: colors.muted,
-    borderWidth: 2.5,
-    borderColor: "#fff",
-  },
-  pinSelected: { width: 24, height: 24, borderRadius: 12, borderWidth: 3, backgroundColor: colors.accent },
-});

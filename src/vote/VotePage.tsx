@@ -19,7 +19,8 @@ import {
 /**
  * La page d'un sondage « On mange où ? » (groubl.com/v/<id>) : on swipe chaque resto proposé, ❤️ ou ✕,
  * puis on voit où en est le groupe (rafraîchi tout seul), on peut changer d'avis et partager le résultat.
- * Celui qui l'a lancé depuis ce navigateur peut aussi copier le lien et supprimer le vote. Anonyme : un
+ * Celui qui l'a lancé depuis ce navigateur peut aussi copier le lien et supprimer le vote. Une fois le vote
+ * fini, le résultat reste affiché (figé, l'élu en grand) le temps que le serveur le garde. Anonyme : un
  * identifiant tiré au hasard par navigateur. Voir api/polls.ts.
  */
 
@@ -50,6 +51,9 @@ const TEXT = {
     shareResult: "Partager le résultat",
     won: "Le groupe a choisi {name} 🏆 On y va !",
     invite: "On mange où ? Swipe les restos, le groupe décide 🗳️",
+    closed: "Vote terminé",
+    final: "🏆 Le groupe a choisi {name}",
+    tie: "Égalité : à vous de trancher !",
   },
   en: {
     title: "Where should we eat?",
@@ -75,6 +79,9 @@ const TEXT = {
     shareResult: "Share the result",
     won: "The group picked {name} 🏆 Let's go!",
     invite: "Where should we eat? Swipe the places, the group decides 🗳️",
+    closed: "Voting is over",
+    final: "🏆 The group picked {name}",
+    tie: "It's a tie: your call!",
   },
   es: {
     title: "¿Dónde comemos?",
@@ -100,6 +107,9 @@ const TEXT = {
     shareResult: "Compartir el resultado",
     won: "El grupo eligió {name} 🏆 ¡Vamos!",
     invite: "¿Dónde comemos? Desliza los sitios, el grupo decide 🗳️",
+    closed: "Votación terminada",
+    final: "🏆 El grupo eligió {name}",
+    tie: "Empate: ¡decidid vosotros!",
   },
 }[lang];
 
@@ -230,7 +240,7 @@ export function VotePage() {
     }
   }
 
-  const voting = state.kind === "ready" && (!state.poll.mine || revoting);
+  const voting = state.kind === "ready" && !state.poll.closed && (!state.poll.mine || revoting);
 
   return (
     <main className="vote">
@@ -263,7 +273,9 @@ export function VotePage() {
               </button>
             </div>
           )}
-          <p className="vote-sub">{voting ? `${TEXT.howTo} · ${timeLeft(state.poll.expiresAt)}` : timeLeft(state.poll.expiresAt)}</p>
+          <p className="vote-sub">
+            {state.poll.closed ? TEXT.closed : voting ? `${TEXT.howTo} · ${timeLeft(state.poll.expiresAt)}` : timeLeft(state.poll.expiresAt)}
+          </p>
           {notice && (
             <p className="vote-notice" role="status">
               {notice}
@@ -359,8 +371,11 @@ function Standings({ poll, onRevote, onShare }: { poll: PollLive; onRevote: () =
   const top = winner(poll);
   return (
     <section className="vote-results">
+      {/* Vote fini : l'élu en grand (ou l'égalité), plus de « changer d'avis ». */}
+      {poll.closed && <p className="vote-final">{top ? TEXT.final.replace("{name}", top.name) : TEXT.tie}</p>}
       <p className="vote-kicker">
-        {top ? TEXT.verdict : TEXT.leading} · {poll.voters === 1 ? TEXT.votes.one : fill(TEXT.votes.many, poll.voters)}
+        {poll.closed ? "" : `${top ? TEXT.verdict : TEXT.leading} · `}
+        {poll.voters === 1 ? TEXT.votes.one : fill(TEXT.votes.many, poll.voters)}
       </p>
       {ranked.map(({ place, hearts }, i) => (
         <div key={`${place.name}-${i}`} className={`vote-row${i === 0 && hearts > 0 ? " vote-row-top" : ""}`}>
@@ -384,9 +399,11 @@ function Standings({ poll, onRevote, onShare }: { poll: PollLive; onRevote: () =
       <button type="button" className="vote-button vote-button-ghost" onClick={onShare}>
         🏆 {TEXT.shareResult}
       </button>
-      <button type="button" className="vote-link" onClick={onRevote}>
-        {TEXT.revote}
-      </button>
+      {!poll.closed && (
+        <button type="button" className="vote-link" onClick={onRevote}>
+          {TEXT.revote}
+        </button>
+      )}
     </section>
   );
 }

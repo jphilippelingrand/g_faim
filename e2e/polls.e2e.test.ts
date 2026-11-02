@@ -26,6 +26,7 @@ import {
   winner,
   type PollLive,
   type PollPlace,
+  type PollTtl,
 } from "../app/src/lib/pollsApi.ts";
 
 const CHROME = process.env.CHROME_PATH ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
@@ -332,6 +333,45 @@ describe("Notifications au créateur", () => {
       await apiVote(base, id, "copain", [true, true, true]);
     }
     assert.equal(pushes.length, 0);
+  });
+});
+
+describe("Vote terminé", () => {
+  // Durée de test du serveur de dev : 2 s de vote, résultat gardé 2 s de plus (le double, comme en vrai).
+  const TEST_TTL = "test" as PollTtl;
+  let id = "";
+  let url = "";
+
+  test("le résultat reste visible, figé, avec l'élu", async () => {
+    const created = await apiCreatePoll(base, PLACES, TEST_TTL, "fr");
+    ({ id, url } = created);
+    assert.ok(created.keepUntil - created.expiresAt >= 1900, "gardé aussi longtemps que le vote a duré");
+    await apiVote(base, id, "copain-1", [true, false, true]);
+    await apiVote(base, id, "copain-2", [true, false, false]);
+    await new Promise((r) => setTimeout(r, created.expiresAt - Date.now() + 200));
+
+    const results = live(await apiResults(base, id));
+    assert.equal(results.closed, true);
+    assert.equal(winner(results)?.name, "La Banquise");
+    // Plus de vote possible, ni nouveau ni changement d'avis.
+    await assert.rejects(apiVote(base, id, "copain-3", [false, true, false]), /410/);
+    await assert.rejects(apiVote(base, id, "copain-1", [false, true, false]), /410/);
+    assert.equal(live(await apiResults(base, id)).voters, 2);
+
+    // La page : l'élu en grand, pas de cartes à swiper, pas de « changer d'avis ».
+    const { context, page } = await friend();
+    await page.goto(url);
+    await page.waitForSelector(".vote-final");
+    assert.match(await page.$eval(".vote-final", (el) => el.textContent!), /La Banquise/);
+    assert.equal(await page.$(".vote-card"), null);
+    assert.equal(await page.$(".vote-link"), null);
+    await context.close();
+  });
+
+  test("puis il disparaît, une fois le double de la durée passé", async () => {
+    const { keepUntil } = live(await apiResults(base, id));
+    await new Promise((r) => setTimeout(r, keepUntil - Date.now() + 200));
+    assert.equal(await apiResults(base, id), "expired");
   });
 });
 

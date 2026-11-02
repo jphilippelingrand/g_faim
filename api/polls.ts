@@ -4,7 +4,7 @@
  * hasard par la page), qu'on peut refaire.
  *
  *   POST   /api/polls          { places, ttl: "1h" | "1d" | "1w", lang, push?, voter? }  → { id, url, expiresAt, owner }
- *   GET    /api/polls/<id>     → { places, expiresAt, voters, hearts }  (?voter=… : et `mine`, son vote)
+ *   GET    /api/polls/<id>     → { places, expiresAt, keepUntil, closed, voters, hearts }  (?voter=… : et `mine`, son vote)
  *   POST   /api/polls/<id>     { voter, likes: boolean[] }               → pareil que GET
  *   DELETE /api/polls/<id>     { owner }                                 → 204
  *
@@ -14,6 +14,8 @@
  * d'avis d'un copain (pas des siens : `voter` est son identifiant de votant).
  *
  * (vercel.json réécrit /api/polls/<id> en /api/polls?id=<id> : une seule fonction.)
+ * Fin du vote à `expiresAt` ; le résultat reste lisible (`closed`, plus de vote possible) aussi longtemps que le
+ * vote a duré, jusqu'à `keepUntil`, puis le sondage disparaît.
  * Stockage : Redis (REDIS_URL) ; chaque sondage expire tout seul.
  * Sans Redis configuré, hors Vercel (npm run dev), les sondages vivent en mémoire.
  */
@@ -21,13 +23,17 @@
 import { createClient, type RedisClientType } from "redis";
 
 const SITE = "https://www.groubl.com";
-const TTL = { "1h": 3600, "1d": 86_400, "1w": 604_800 } as const;
+// "test" (2 s) : seulement hors de Vercel, pour que les tests de bout en bout voient un vote finir.
+const TTL: Record<string, number> = { "1h": 3600, "1d": 86_400, "1w": 604_800, ...(process.env.VERCEL ? {} : { test: 2 }) };
 const MIN_PLACES = 2;
 const MAX_PLACES = 5;
 const MAX_VOTERS = 100;
 
 type Place = { name: string; cuisine?: string; address?: string; lat: number; lng: number };
-type Poll = { places: Place[]; lang: string; expiresAt: number; owner: string; push?: string; creator?: string };
+type Poll = { places: Place[]; lang: string; expiresAt: number; keepUntil?: number; owner: string; push?: string; creator?: string };
+
+/** Jusqu'à quand on garde le sondage (les plus anciens, d'avant `keepUntil`, disparaissaient à la fin du vote). */
+const keepUntil = (poll: Poll) => poll.keepUntil ?? poll.expiresAt;
 
 // ——— Stockage ———
 
@@ -55,13 +61,13 @@ const store = {
   async create(id: string, poll: Poll) {
     if (!REDIS_URL) return void memory.set(id, { poll, votes: new Map() });
     const db = await redis();
-    await db.set(`poll:${id}`, JSON.stringify(poll), { expiration: { type: "EXAT", value: Math.floor(poll.expiresAt / 1000) }, condition: "NX" });
+    await db.set(`poll:${id}`, JSON.stringify(poll), { expiration: { type: "EXAT", value: Math.floor(keepUntil(poll) / 1000) }, condition: "NX" });
   },
   /** Le sondage et tous les votes ; `mine` : celui de ce téléphone, s'il a voté. */
   async read(id: string, voter?: string): Promise<{ poll: Poll; votes: string[]; mine: string | null } | null> {
     if (!REDIS_URL) {
       const found = memory.get(id);
-      if (!found || found.poll.expiresAt < Date.now()) return null;
+      if (!found || keepUntil(found.poll) < Date.now()) return null;
       return { poll: found.poll, votes: [...found.votes.values()], mine: (voter && found.votes.get(voter)) || null };
     }
     const db = await redis();
@@ -86,7 +92,7 @@ const store = {
     const key = `poll:${id}:votes`;
     const [known, count] = await Promise.all([db.hExists(key, voter), db.hLen(key)]);
     if (!known && count >= MAX_VOTERS) return "full";
-    await db.multi().hSet(key, voter, likes).expireAt(key, Math.floor(poll.expiresAt / 1000)).exec();
+    await db.multi().hSet(key, voter, likes).expireAt(key, Math.floor(keepUntil(poll) / 1000)).exec();
     return known ? "changed" : "new";
   },
 };
@@ -163,6 +169,8 @@ function results(poll: Poll, votes: string[], mine: string | null) {
     places: poll.places,
     lang: poll.lang,
     expiresAt: poll.expiresAt,
+    keepUntil: keepUntil(poll),
+    closed: Date.now() >= poll.expiresAt,
     voters: votes.length,
     hearts,
     mine: mine ? [...mine].map((c) => c === "1") : null,
@@ -203,6 +211,8 @@ export async function POST(request: Request): Promise<Response> {
   if (id) {
     const found = await store.read(id);
     if (!found) return json({ error: "expired" }, 404);
+    // Vote terminé : le résultat se lit encore, mais il est figé.
+    if (Date.now() >= found.poll.expiresAt) return json({ error: "closed" }, 410);
     const voter = text(body.voter, 64);
     const likes = body.likes;
     if (!voter || !Array.isArray(likes) || likes.length !== found.poll.places.length || !likes.every((l) => typeof l === "boolean")) {
@@ -217,15 +227,16 @@ export async function POST(request: Request): Promise<Response> {
 
   // Un nouveau sondage.
   const places = parsePlaces(body.places);
-  const ttl = TTL[body.ttl as keyof typeof TTL];
+  const ttl = typeof body.ttl === "string" ? TTL[body.ttl] : undefined;
   if (!places || !ttl) return json({ error: "poll" }, 400);
   const lang = ["fr", "en", "es"].includes(body.lang as string) ? (body.lang as string) : "fr";
   // Jeton Expo (« ExponentPushToken[…] ») : le créateur sera prévenu des votes.
   const push = typeof body.push === "string" && /^Expo(nent)?PushToken\[[^\]]{1,200}\]$/.test(body.push) ? body.push : undefined;
-  const poll: Poll = { places, lang, expiresAt: Date.now() + ttl * 1000, owner: newId(24), push, creator: text(body.voter, 64) };
+  const now = Date.now();
+  const poll: Poll = { places, lang, expiresAt: now + ttl * 1000, keepUntil: now + 2 * ttl * 1000, owner: newId(24), push, creator: text(body.voter, 64) };
   const newPollId = newId();
   await store.create(newPollId, poll);
-  return json({ id: newPollId, url: `${origin(request)}/v/${newPollId}`, expiresAt: poll.expiresAt, owner: poll.owner }, 201);
+  return json({ id: newPollId, url: `${origin(request)}/v/${newPollId}`, expiresAt: poll.expiresAt, keepUntil: poll.keepUntil, owner: poll.owner }, 201);
 }
 
 export async function DELETE(request: Request): Promise<Response> {
