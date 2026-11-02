@@ -43,7 +43,9 @@ export function PollMap({ home, places, picked, focused, onSelect, onMove, heigh
   const [ready, setReady] = useState(false);
   // Nos recadrages ne comptent pas comme un déplacement.
   const ignoreUntil = useRef(0);
-  const framedOnce = useRef(false);
+  // Tant qu'on n'a touché à rien (carte, ligne, case), le cadrage d'ouverture suit la liste : celle de la vue
+  // principale d'abord, puis les restos d'à côté (fermés compris), souvent plus proches.
+  const touched = useRef(false);
   const pickedIds = picked.map((r) => r.id);
 
   const fit = (points: LatLng[]) => {
@@ -52,19 +54,20 @@ export function PollMap({ home, places, picked, focused, onSelect, onMove, heigh
     map.current.fitToCoordinates([home, ...points], { edgePadding: PADDING, animated: true });
   };
 
-  // Premier cadrage, dès que la carte est prête et qu'on a des restos : toi et les plus proches (ou les cochés).
+  // Cadrage d'ouverture, dès que la carte est prête et à chaque nouvelle liste : toi et les plus proches (sans
+  // la liste, comme dans un vote : ses restos).
+  const placesKey = places.slice(0, FIRST_FRAME).map((r) => r.id).join();
   useEffect(() => {
-    if (!ready || framedOnce.current) return;
+    if (!ready || touched.current) return;
     const points = (places.length ? places.slice(0, FIRST_FRAME) : picked).map((r) => r.location);
-    if (!points.length) return;
-    framedOnce.current = true;
-    fit([...points, ...picked.map((r) => r.location)]);
-  }, [ready, places.length, picked.length]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (points.length) fit(points);
+  }, [ready, placesKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Un resto touché : la carte va dessus, sans le cocher.
   useEffect(() => {
     const spot = [...picked, ...places].find((r) => r.id === focused);
     if (!ready || !spot || !map.current) return;
+    touched.current = true;
     ignoreUntil.current = Date.now() + 1500;
     map.current.animateToRegion({ ...spot.location, latitudeDelta: FOCUS_DELTA, longitudeDelta: FOCUS_DELTA }, 350);
   }, [focused]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -75,6 +78,7 @@ export function PollMap({ home, places, picked, focused, onSelect, onMove, heigh
   useEffect(() => {
     if (!ready || pickedKey === firstPicked.current) return;
     firstPicked.current = pickedKey;
+    touched.current = true;
     if (picked.length) fit(picked.map((r) => r.location));
   }, [pickedKey, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -98,6 +102,7 @@ export function PollMap({ home, places, picked, focused, onSelect, onMove, heigh
         }}
         onRegionChangeComplete={(region) => {
           if (Date.now() < ignoreUntil.current) return;
+          touched.current = true;
           onMove?.(viewportCircle(region));
         }}
       >
