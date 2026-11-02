@@ -4,7 +4,7 @@ import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, Share, Style
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cuisineLabel } from "../lib/osm";
 import { openPlace, type MapsApp } from "../lib/mapsApp";
-import { distanceMeters, formatDistance, nearest, PAGE, travelTime, type LatLng, type Restaurant } from "../lib/places";
+import { distanceMeters, formatDistance, nearest, PAGE, type LatLng, type Restaurant } from "../lib/places";
 import {
   createPoll,
   myPolls,
@@ -47,7 +47,7 @@ const TTL_LABEL = { "1h": "pollTtlHour", "1d": "pollTtlDay", "1w": "pollTtlWeek"
  * rouge), et la liste, ses restos cochés en tête. On coche 2 à 5 restos, on choisit combien de temps le vote reste
  * ouvert, et la feuille de partage d'iOS envoie le lien. On vote souvent pour plus tard : la liste prend
  * tous les restos autour, même fermés en ce moment (c'est indiqué).
- * Comme en mode liste, toucher une ligne la montre sur la carte, « Go » ouvre sa fiche dans Plans.
+ * Toucher une ligne la coche et la montre sur la carte ; un appui long ouvre sa fiche dans Plans.
  */
 export function PollSheet({ visible, places, home, preselected, initialPoll, onMapsApp, onClose }: Props) {
   const insets = useSafeAreaInsets();
@@ -120,6 +120,10 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onM
     focusRow(id);
     const index = ordered.findIndex((r) => r.id === id);
     if (index >= 0) list.current?.scrollToIndex({ index, viewPosition: 0.3, animated: true });
+  };
+  const pick = (id: string) => {
+    toggle(id);
+    setFocused(id);
   };
   const go = (r: Restaurant) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -207,7 +211,7 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onM
 
             <PollMap home={home} places={choices} picked={picked} focused={focused} onSelect={focusFromMap} />
 
-            {!picked.length && <Text style={styles.sub}>{t("pollPickHint", { max: POLL_MAX })}</Text>}
+            <Text style={styles.sub}>{t("pollPickHint", { max: POLL_MAX })}</Text>
 
             <FlatList
               ref={list}
@@ -222,42 +226,32 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onM
               renderItem={({ item }) => {
                 const on = picked.includes(item.id);
                 const distance = distanceMeters(home, item.location);
-                const trip = travelTime(distance);
                 const cuisine = item.cuisine ? cuisineLabel(item.cuisine) : null;
                 const info = [cuisine && `${cuisine.emoji} ${cuisine.label}`, formatDistance(distance), item.open === false && t("closedNow")]
                   .filter(Boolean)
                   .join(" · ");
                 return (
-                  <View style={[styles.row, item.id === focused && styles.rowFocused]}>
-                    <Pressable
-                      onPress={() => toggle(item.id)}
-                      hitSlop={10}
-                      accessibilityRole="checkbox"
-                      accessibilityLabel={item.name}
-                      accessibilityState={{ checked: on, disabled: !on && picked.length >= POLL_MAX }}
-                    >
-                      <View style={[styles.check, on && styles.checkOn]}>{on && <Text style={styles.checkMark}>✓</Text>}</View>
-                    </Pressable>
-                    <Pressable style={({ pressed }) => [styles.middle, pressed && styles.rowPressed]} onPress={() => focusRow(item.id)}>
+                  // Toute la ligne : un tap coche (et la carte la montre), un appui long ouvre sa fiche dans Plans.
+                  <Pressable
+                    style={({ pressed }) => [styles.row, item.id === focused && styles.rowFocused, pressed && styles.rowPressed]}
+                    onPress={() => pick(item.id)}
+                    onLongPress={() => go(item)}
+                    accessibilityRole="checkbox"
+                    accessibilityLabel={`${item.name}, ${info}`}
+                    accessibilityState={{ checked: on, disabled: !on && picked.length >= POLL_MAX }}
+                    accessibilityActions={[{ name: "longpress", label: t("seeInMaps", { name: item.name }) }]}
+                    onAccessibilityAction={() => go(item)}
+                  >
+                    <View style={[styles.check, on && styles.checkOn]}>{on && <Text style={styles.checkMark}>✓</Text>}</View>
+                    <View style={styles.middle}>
                       <Text style={styles.name} numberOfLines={1}>
                         {item.name}
                       </Text>
                       <Text style={styles.info} numberOfLines={1}>
                         {info}
                       </Text>
-                    </Pressable>
-                    <Pressable
-                      style={({ pressed }) => [styles.go, pressed && styles.goPressed]}
-                      onPress={() => go(item)}
-                      accessibilityRole="link"
-                      accessibilityLabel={t("seeInMaps", { name: item.name })}
-                    >
-                      <Text style={styles.goTime}>
-                        {trip.mode === "walk" ? "🚶" : "🚗"} {trip.minutes} min
-                      </Text>
-                      <Text style={styles.goText}>{t("go")}</Text>
-                    </Pressable>
-                  </View>
+                    </View>
+                  </Pressable>
                 );
               }}
             />
@@ -339,10 +333,6 @@ const styles = StyleSheet.create({
   middle: { flex: 1 },
   name: { fontFamily: fonts.title, fontSize: 17, color: colors.ink },
   info: { fontFamily: fonts.body, fontSize: 12.5, color: colors.muted, marginTop: 3 },
-  go: { alignItems: "center", backgroundColor: colors.accent, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, minWidth: 74 },
-  goPressed: { transform: [{ scale: 0.94 }] },
-  goTime: { fontFamily: fonts.medium, fontSize: 11.5, color: "#fff" },
-  goText: { fontFamily: fonts.title, fontSize: 15, color: "#fff" },
   more: { marginVertical: 14 },
   label: { fontFamily: fonts.medium, fontSize: 14, color: colors.ink, marginTop: 10, marginBottom: 8 },
   ttls: { flexDirection: "row", gap: 8 },
