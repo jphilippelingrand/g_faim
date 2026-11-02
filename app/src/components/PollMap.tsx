@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import MapView, { Marker, type Region } from "react-native-maps";
 import type { Area, LatLng, Restaurant } from "../lib/places";
@@ -11,7 +11,7 @@ type Props = {
   places: Restaurant[];
   /** Les restos cochés (ou ceux du vote) : en rouge, même s'ils ne sont plus dans la liste. */
   picked: Restaurant[];
-  /** Le resto touché dans la liste (ou sur la carte) : plus gros, et la carte le cadre avec toi. */
+  /** Le resto touché dans la liste (ou sur la carte) : plus gros, et la carte va dessus. */
   focused: string | null;
   onSelect: (id: string) => void;
   /** On a déplacé ou zoomé la carte soi-même (pas nos recadrages) : la zone visible. */
@@ -19,7 +19,11 @@ type Props = {
   height?: number;
 };
 
-const PADDING = { top: 30, right: 30, bottom: 30, left: 30 };
+const PADDING = { top: 36, right: 36, bottom: 36, left: 36 };
+// Au premier affichage : toi et les restos les plus proches de la liste.
+const FIRST_FRAME = 8;
+// Un resto touché : la carte va dessus, à cette échelle (en degrés, un pâté de maisons ou deux).
+const FOCUS_DELTA = 0.005;
 
 /** Plus grand cercle centré sur la carte qui tient dans la vue. */
 function viewportCircle(region: Region): Area {
@@ -29,23 +33,50 @@ function viewportCircle(region: Region): Area {
 }
 
 /**
- * La petite carte des votes : les restos proposés en gris, les cochés en rouge. Elle cadre le resto touché
- * avec toi, sinon toi et les cochés ; on peut la déplacer pour chercher ailleurs (onMove).
+ * La petite carte des votes : les restos proposés en gris, les cochés en rouge. Elle s'ouvre sur toi et les
+ * restos d'à côté ; un resto touché, elle va dessus ; la sélection change, elle cadre tous les cochés (et
+ * toi). On peut la déplacer pour chercher ailleurs (onMove).
  */
 export function PollMap({ home, places, picked, focused, onSelect, onMove, height = 190 }: Props) {
   const map = useRef<MapView>(null);
+  // La carte n'accepte un cadrage qu'une fois prête (avant, il était perdu : carte trop dézoomée).
+  const [ready, setReady] = useState(false);
   // Nos recadrages ne comptent pas comme un déplacement.
   const ignoreUntil = useRef(0);
+  const framedOnce = useRef(false);
   const pickedIds = picked.map((r) => r.id);
 
+  const fit = (points: LatLng[]) => {
+    if (!map.current) return;
+    ignoreUntil.current = Date.now() + 1500;
+    map.current.fitToCoordinates([home, ...points], { edgePadding: PADDING, animated: true });
+  };
+
+  // Premier cadrage, dès que la carte est prête et qu'on a des restos : toi et les plus proches (ou les cochés).
+  useEffect(() => {
+    if (!ready || framedOnce.current) return;
+    const points = (places.length ? places.slice(0, FIRST_FRAME) : picked).map((r) => r.location);
+    if (!points.length) return;
+    framedOnce.current = true;
+    fit([...points, ...picked.map((r) => r.location)]);
+  }, [ready, places.length, picked.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Un resto touché : la carte va dessus, sans le cocher.
   useEffect(() => {
     const spot = [...picked, ...places].find((r) => r.id === focused);
-    const points = spot ? [spot.location] : picked.map((r) => r.location);
-    if (!points.length) return;
+    if (!ready || !spot || !map.current) return;
     ignoreUntil.current = Date.now() + 1500;
-    map.current?.fitToCoordinates([home, ...points], { edgePadding: PADDING, animated: true });
-    // Recadrer seulement quand on touche un resto ou change la sélection, pas quand la liste se recharge.
-  }, [focused, pickedIds.join()]); // eslint-disable-line react-hooks/exhaustive-deps
+    map.current.animateToRegion({ ...spot.location, latitudeDelta: FOCUS_DELTA, longitudeDelta: FOCUS_DELTA }, 350);
+  }, [focused]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // La sélection change (coché, décoché) : on cadre tous les cochés, avec toi.
+  const pickedKey = pickedIds.join();
+  const firstPicked = useRef(pickedKey);
+  useEffect(() => {
+    if (!ready || pickedKey === firstPicked.current) return;
+    firstPicked.current = pickedKey;
+    if (picked.length) fit(picked.map((r) => r.location));
+  }, [pickedKey, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Les cochés d'abord (dessinés par-dessus), puis les autres restos proposés.
   const shown = [...picked, ...places.filter((r) => !pickedIds.includes(r.id))];
@@ -61,7 +92,10 @@ export function PollMap({ home, places, picked, focused, onSelect, onMove, heigh
         toolbarEnabled={false}
         rotateEnabled={false}
         pitchEnabled={false}
-        onMapReady={() => (ignoreUntil.current = Date.now() + 1500)}
+        onMapReady={() => {
+          ignoreUntil.current = Date.now() + 1500;
+          setReady(true);
+        }}
         onRegionChangeComplete={(region) => {
           if (Date.now() < ignoreUntil.current) return;
           onMove?.(viewportCircle(region));

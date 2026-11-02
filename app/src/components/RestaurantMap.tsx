@@ -51,8 +51,8 @@ export function RestaurantMap({ home, results, area, fitKey, selectedId, onSelec
     if (!place) return;
     ignoreUntil.current = Date.now() + 1500;
     // Le milieu entre toi et le resto, zoomé au plus près. mapPadding exclut déjà la barre du haut et le panneau :
-    // on n'ajoute que la marge des deux points.
-    map.current.fitToCoordinates([home, place.location], { edgePadding: { top: 40, right: 40, bottom: 40, left: 40 }, animated: true });
+    // on n'ajoute que la marge des deux points (assez pour le point rouge et son halo).
+    map.current.fitToCoordinates([home, place.location], { edgePadding: { top: 60, right: 70, bottom: 60, left: 70 }, animated: true });
   }, [fitKey, ready, insets.top, insets.bottom, insets.left]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (

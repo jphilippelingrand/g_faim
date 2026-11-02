@@ -19,8 +19,8 @@ export function OpenInMaps({ place, onMapsApp }: { place: Restaurant; onMapsApp?
         openPlace(place).then((app) => app && onMapsApp?.(app));
       }}
     >
-      <Svg width={16} height={16} viewBox="0 0 16 16">
-        <Path d="M5 11 11 5M6 4.5h5.5V10" fill="none" stroke={colors.accent} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+      <Svg width={18} height={18} viewBox="0 0 16 16">
+        <Path d="M4.5 11.5 11.5 4.5M5.5 4.5h6v6" fill="none" stroke={colors.accent} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
       </Svg>
     </IconButton>
   );

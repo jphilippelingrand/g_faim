@@ -103,9 +103,12 @@ export function PollResults({ poll, home, onMapsApp, onBack, onGone }: Props) {
     }
   }
 
-  // Le résultat et son lien, en un seul partage.
+  // Vote en cours : on invite (le lien pour voter) ; vote fini : on partage le résultat.
   const share = () =>
-    live && Share.share({ message: resultShareText(live, poll.url, { won: t("pollWon"), open: t("pollShareText") }) });
+    live &&
+    Share.share({
+      message: live.closed ? resultShareText(live, poll.url, { won: t("pollWon"), open: t("pollShareText") }) : `${t("pollShareText")} ${poll.url}`,
+    });
 
   const remove = () =>
     poll.owner
@@ -144,27 +147,25 @@ export function PollResults({ poll, home, onMapsApp, onBack, onGone }: Props) {
           <Text style={styles.backText}>‹ {t("pollBack")}</Text>
         </Pressable>
         {live && (
-          <IconButton label={t("pollShareResult")} onPress={share}>
+          <Pressable
+            style={({ pressed }) => [styles.share, pressed && styles.pressed]}
+            onPress={share}
+            accessibilityRole="button"
+          >
             <Svg width={16} height={16} viewBox="0 0 16 16">
-              <Path
-                d="M8 10V2M5 4.8 8 1.8l3 3M4.5 7H3.5v7h9V7h-1"
-                fill="none"
-                stroke={colors.accent}
-                strokeWidth={1.6}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
+              <Path d="M8 10V2M5 4.8 8 1.8l3 3M4.5 7H3.5v7h9V7h-1" fill="none" stroke="#fff" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>
-          </IconButton>
+            <Text style={styles.shareText}>{t(live.closed ? "pollShareResult" : "pollInvite")}</Text>
+          </Pressable>
         )}
         {results && (
           <IconButton label={t(poll.owner ? "pollDelete" : "pollForget")} onPress={remove} busy={deleting}>
-            <Svg width={16} height={16} viewBox="0 0 16 16">
+            <Svg width={18} height={18} viewBox="0 0 16 16">
               <Path
                 d="M2.5 4h11M6.5 4V2.5h3V4M4 4l.7 9.5h6.6L12 4M6.7 6.5v4.5M9.3 6.5v4.5"
                 fill="none"
                 stroke={colors.accent}
-                strokeWidth={1.5}
+                strokeWidth={1.7}
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
@@ -256,6 +257,9 @@ const styles = StyleSheet.create({
   // En haut, comme une barre d'outils iOS : retour à gauche, partager et poubelle à droite.
   bar: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
   back: { flex: 1 },
+  // Le bouton principal de la barre : inviter (vote en cours) ou partager le résultat (vote fini).
+  share: { flexDirection: "row", alignItems: "center", gap: 6, height: 38, paddingHorizontal: 14, borderRadius: 19, backgroundColor: colors.accent },
+  shareText: { fontFamily: fonts.title, fontSize: 15, color: "#fff" },
   backText: { fontFamily: fonts.medium, fontSize: 16, color: colors.accent },
   spinner: { marginTop: 40 },
   error: { fontFamily: fonts.body, fontSize: 14, color: colors.accent, textAlign: "center", marginVertical: 10 },

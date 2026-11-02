@@ -22,15 +22,7 @@ export function IconButton({ label, onPress, busy, children }: { label: string; 
 }
 
 const styles = StyleSheet.create({
-  button: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.card,
-  },
-  pressed: { backgroundColor: colors.accentSoft, transform: [{ scale: 0.94 }] },
+  // Rond pêche, icône rouge : les couleurs de la marque, assez gros pour le pouce.
+  button: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center", backgroundColor: colors.accentSoft },
+  pressed: { opacity: 0.7, transform: [{ scale: 0.92 }] },
 });

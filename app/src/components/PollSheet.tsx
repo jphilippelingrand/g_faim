@@ -49,7 +49,8 @@ const TTL_LABEL = { "1h": "pollTtlHour", "1d": "pollTtlDay", "1w": "pollTtlWeek"
  * visible (les cochés restent). On coche 2 à 5 restos, on choisit combien de temps le vote reste ouvert, et la
  * feuille de partage d'iOS envoie le lien. On vote souvent pour plus tard : la liste prend tous les restos
  * autour, même fermés en ce moment (c'est indiqué).
- * Toucher une ligne la coche et la montre sur la carte ; le bouton ↗ ouvre sa fiche dans Plans ou Google Maps.
+ * La case coche (la carte cadre alors tous les cochés) ; toucher la ligne montre le resto sur la carte, sans
+ * le cocher ; le bouton ↗ ouvre sa fiche dans Plans ou Google Maps.
  */
 export function PollSheet({ visible, places, home, preselected, initialPoll, onMapsApp, onClose }: Props) {
   const insets = useSafeAreaInsets();
@@ -123,9 +124,15 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onM
 
   const isPicked = (id: string) => picked.some((r) => r.id === id);
   // Toucher une ligne : cochée (ou décochée), et la carte la montre.
+  // La case : cochée ou décochée (la carte cadre alors tous les cochés).
   const pick = (r: Restaurant) => {
     Haptics.selectionAsync();
     setPicked((p) => (p.some((x) => x.id === r.id) ? p.filter((x) => x.id !== r.id) : p.length < POLL_MAX ? [...p, r] : p));
+    setFocused(null);
+  };
+  // La ligne : la carte va sur le resto, sans le cocher.
+  const show = (r: Restaurant) => {
+    Haptics.selectionAsync();
     setFocused(r.id);
   };
   // Un point touché sur la carte : la liste va à sa ligne.
@@ -227,15 +234,23 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onM
                   .join(" · ");
                 return (
                   <View style={[styles.row, item.id === focused && styles.rowFocused]}>
-                    {/* La ligne : un tap coche (et la carte la montre). Le bouton ↗ : sa fiche dans les cartes. */}
+                    {/* La case coche (et la carte cadre les cochés) ; la ligne montre le resto sur la carte ; ↗ sa fiche. */}
                     <Pressable
-                      style={({ pressed }) => [styles.rowMain, pressed && styles.rowPressed]}
+                      style={styles.checkHit}
                       onPress={() => pick(item)}
+                      hitSlop={6}
                       accessibilityRole="checkbox"
-                      accessibilityLabel={`${item.name}, ${info}`}
+                      accessibilityLabel={item.name}
                       accessibilityState={{ checked: on, disabled: !on && picked.length >= POLL_MAX }}
                     >
                       <View style={[styles.check, on && styles.checkOn]}>{on && <Text style={styles.checkMark}>✓</Text>}</View>
+                    </Pressable>
+                    <Pressable
+                      style={({ pressed }) => [styles.rowMain, pressed && styles.rowPressed]}
+                      onPress={() => show(item)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${item.name}, ${info}`}
+                    >
                       <View style={styles.middle}>
                         <Text style={styles.name} numberOfLines={1}>
                           {item.name}
@@ -315,7 +330,8 @@ const styles = StyleSheet.create({
   closedText: { color: colors.accent, fontFamily: fonts.medium },
   separator: { height: 1, backgroundColor: colors.line, marginLeft: 42 },
   row: { flexDirection: "row", alignItems: "center", gap: 10, paddingRight: 4, borderRadius: 14 },
-  rowMain: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 9, paddingLeft: 4 },
+  checkHit: { paddingVertical: 9, paddingLeft: 4, paddingRight: 2 },
+  rowMain: { flex: 1, paddingVertical: 9 },
   rowFocused: { backgroundColor: colors.accentSoft },
   rowPressed: { opacity: 0.6 },
   check: {
