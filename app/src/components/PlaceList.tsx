@@ -23,7 +23,7 @@ type Props = {
 const CLOSING_SOON = 60;
 
 /**
- * Le mode liste : tous les restos ouverts, du plus proche au plus loin, sans fin (la suite se charge en
+ * Le mode liste : les restos (ouverts seulement, ou tous selon le filtre « Ouverts »), du plus proche au plus loin, sans fin (la suite se charge en
  * descendant). Toucher une ligne la montre sur la carte ; « Go » ouvre sa fiche dans Plans ou Google Maps.
  */
 export function PlaceList({ places, home, current, onChange, onMapsApp, hasMore, loadingMore, onNeedMore }: Props) {
@@ -86,9 +86,16 @@ function Row({ r, home, selected, onPress, onMapsApp }: RowProps) {
   const distance = distanceMeters(home, r.location);
   const trip = travelTime(distance);
   const cuisine = r.cuisine ? cuisineLabel(r.cuisine) : null;
-  const closing =
-    r.closesIn === undefined ? null : r.closesIn === Infinity ? t("openAllDay") : t("until", { time: formatClosingTime(r.closesIn) });
-  const soon = r.closesIn !== undefined && r.closesIn < CLOSING_SOON;
+  // Fermé (filtre « Ouverts » coupé) : on le dit, plutôt qu'une heure de fermeture déjà passée.
+  const closed = r.open === false;
+  const closing = closed
+    ? t("closedNow")
+    : r.closesIn === undefined
+      ? null
+      : r.closesIn === Infinity
+        ? t("openAllDay")
+        : t("until", { time: formatClosingTime(r.closesIn) });
+  const soon = closed || (r.closesIn !== undefined && r.closesIn < CLOSING_SOON);
   const info = [cuisine && `${cuisine.emoji} ${cuisine.label}`, formatDistance(distance)].filter(Boolean).join(" · ");
 
   const go = () => {

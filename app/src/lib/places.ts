@@ -185,13 +185,23 @@ async function nearestWithin(center: LatLng, radii: number[], count: number): Pr
 }
 
 /**
- * Les `count` restos les plus proches, ouverts ou non : pour un vote entre copains, qui se prépare souvent
- * pour plus tard (ce soir, samedi…). `open` dit s'ils le sont maintenant.
+ * Les `count` restos les plus proches, ouverts ou non (le filtre « Ouverts » coupé, et le vote entre copains,
+ * qui se prépare souvent pour plus tard). `open` dit s'ils le sont maintenant.
  */
-export async function nearest(center: LatLng, count = PAGE): Promise<Search> {
-  let area: Area = { center, radius: RADII[0] };
+export function nearest(center: LatLng, count = PAGE): Promise<Search> {
+  return nearestAllWithin(center, RADII, count);
+}
+
+/** Pareil, en partant du cercle visible de la carte. */
+export function nearestInView(view: Area, count = PAGE): Promise<Search> {
+  const radius = Math.min(view.radius, MAX_RADIUS);
+  return nearestAllWithin(view.center, [radius, ...RADII.filter((r) => r > radius)], count);
+}
+
+async function nearestAllWithin(center: LatLng, radii: number[], count: number): Promise<Search> {
+  let area: Area = { center, radius: radii[0] };
   let list: Restaurant[] = [];
-  for (const radius of RADII) {
+  for (const radius of radii) {
     area = { center, radius };
     const inside = (await restaurantsAround(area))
       .filter((r) => distanceMeters(center, r.location) <= radius)

@@ -46,14 +46,13 @@ const TTL_LABEL = { "1h": "pollTtlHour", "1d": "pollTtlDay", "1w": "pollTtlWeek"
  * le lien à renvoyer, la suppression) ; en dessous, un nouveau : la carte des restos autour (cochés en
  * rouge), sa sélection, et la liste. On coche 2 à 5 restos, on choisit combien de temps le vote reste
  * ouvert, et la feuille de partage d'iOS envoie le lien. On vote souvent pour plus tard : la liste prend
- * tous les restos autour, même fermés en ce moment (c'est indiqué, et « Ouverts seulement » les cache).
+ * tous les restos autour, même fermés en ce moment (c'est indiqué).
  * Comme en mode liste, toucher une ligne la montre sur la carte, « Go » ouvre sa fiche dans Plans.
  */
 export function PollSheet({ visible, places, home, preselected, initialPoll, onMapsApp, onClose }: Props) {
   const insets = useSafeAreaInsets();
   const [picked, setPicked] = useState<string[]>(preselected ? [preselected] : []);
   const [focused, setFocused] = useState<string | null>(null);
-  const [onlyOpen, setOnlyOpen] = useState(false);
   const [ttl, setTtl] = useState<PollTtl>("1h");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
@@ -111,8 +110,6 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onM
     setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length < POLL_MAX ? [...p, id] : p));
   };
 
-  // « Ouverts seulement » : les restos ouverts d'après leurs horaires, plus ceux déjà cochés (pour les décocher).
-  const shownChoices = onlyOpen ? choices.filter((r) => r.open === true || picked.includes(r.id)) : choices;
 
   // Une ligne touchée : la carte la montre. Un point touché sur la carte : la liste va à sa ligne.
   const focusRow = (id: string) => {
@@ -121,7 +118,7 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onM
   };
   const focusFromMap = (id: string) => {
     focusRow(id);
-    const index = shownChoices.findIndex((r) => r.id === id);
+    const index = choices.findIndex((r) => r.id === id);
     if (index >= 0) list.current?.scrollToIndex({ index, viewPosition: 0.3, animated: true });
   };
   const go = (r: Restaurant) => {
@@ -206,7 +203,7 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onM
             {runningSection}
             {shown.length > 0 && <Text style={styles.section}>{t("pollNew")}</Text>}
 
-            <PollMap home={home} places={shownChoices} picked={picked} focused={focused} onSelect={focusFromMap} />
+            <PollMap home={home} places={choices} picked={picked} focused={focused} onSelect={focusFromMap} />
 
             {/* Sa sélection : un tap la retire. */}
             {pickedPlaces.length ? (
@@ -235,27 +232,11 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onM
             <FlatList
               ref={list}
               style={styles.list}
-              data={shownChoices}
+              data={choices}
               keyExtractor={(r) => r.id}
               onEndReached={loadMore}
               onEndReachedThreshold={0.5}
               onScrollToIndexFailed={({ index }) => list.current?.scrollToOffset({ offset: index * 62, animated: true })}
-              ListHeaderComponent={
-                <Pressable
-                  style={styles.filter}
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    setOnlyOpen((v) => !v);
-                  }}
-                  accessibilityRole="switch"
-                  accessibilityState={{ checked: onlyOpen }}
-                >
-                  <View style={[styles.switch, onlyOpen && styles.switchOn]}>
-                    <View style={[styles.knob, onlyOpen && styles.knobOn]} />
-                  </View>
-                  <Text style={styles.filterText}>{t("pollOnlyOpen")}</Text>
-                </Pressable>
-              }
               ListFooterComponent={loading ? <ActivityIndicator style={styles.more} color={colors.accent} /> : undefined}
               ItemSeparatorComponent={() => <View style={styles.separator} />}
               renderItem={({ item }) => {
@@ -263,7 +244,7 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onM
                 const distance = distanceMeters(home, item.location);
                 const trip = travelTime(distance);
                 const cuisine = item.cuisine ? cuisineLabel(item.cuisine) : null;
-                const info = [cuisine && `${cuisine.emoji} ${cuisine.label}`, formatDistance(distance), item.open === false && t("pollClosedNow")]
+                const info = [cuisine && `${cuisine.emoji} ${cuisine.label}`, formatDistance(distance), item.open === false && t("closedNow")]
                   .filter(Boolean)
                   .join(" · ");
                 return (
@@ -363,12 +344,6 @@ const styles = StyleSheet.create({
   picksLabel: { fontFamily: fonts.medium, fontSize: 13, color: colors.muted, marginRight: 2 },
   pick: { backgroundColor: colors.accent, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, maxWidth: 200 },
   pickText: { fontFamily: fonts.medium, fontSize: 13, color: "#fff" },
-  filter: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8 },
-  switch: { width: 40, height: 24, borderRadius: 12, backgroundColor: colors.line, padding: 2 },
-  switchOn: { backgroundColor: colors.accent },
-  knob: { width: 20, height: 20, borderRadius: 10, backgroundColor: "#fff" },
-  knobOn: { transform: [{ translateX: 16 }] },
-  filterText: { fontFamily: fonts.medium, fontSize: 14, color: colors.ink },
   separator: { height: 1, backgroundColor: colors.line, marginLeft: 42 },
   row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 9, paddingHorizontal: 4, borderRadius: 14 },
   rowFocused: { backgroundColor: colors.accentSoft },

@@ -519,8 +519,6 @@ input:focus { border-color: var(--accent); }
 .poll-places input { width: 20px; height: 20px; accent-color: var(--accent); grid-row: span 2; }
 .poll-place-name { font: 700 1rem "Fraunces", Georgia, serif; }
 .poll-place-info { font-size: .8rem; color: var(--muted); }
-.poll-filter { display: flex; align-items: center; gap: 8px; margin: 4px 0 2px; font-size: .9rem; cursor: pointer; }
-.poll-filter input { width: 18px; height: 18px; accent-color: var(--accent); }
 .poll-over { color: var(--muted); font-size: .85rem; }
 .poll-more { display: block; margin: 10px auto 0; padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--accent); font: 600 .9rem "Inter", system-ui, sans-serif; cursor: pointer; }
 .poll-ttls { display: flex; gap: 8px; }
