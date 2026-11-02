@@ -50,7 +50,7 @@ const asRestaurant = (p: PollPlace) => ({
 
 /**
  * Un sondage dans l'app (rafraîchi tout seul), condensé comme un sondage Facebook : la carte de ses restos
- * seulement, puis une ligne par resto, la barre de ses ❤️ en fond. Toucher une ligne met (ou retire) son ❤️
+ * seulement, puis le classement des restos (rang, nombre de ❤️). Toucher une ligne met (ou retire) son ❤️
  * et la montre sur la carte ; « Envoyer mon vote » enregistre. Le bouton ↗ ouvre sa fiche dans les cartes.
  * Ensuite : partager le résultat, renvoyer le lien, supprimer le vote (si on l'a lancé) ou l'oublier.
  * Vote fini : plus de vote possible, l'élu en grand (ou l'égalité), tant que le serveur garde le résultat.
@@ -123,7 +123,9 @@ export function PollResults({ poll, home, onMapsApp, onBack, onGone }: Props) {
     }
   }
 
-  const best = Math.max(1, ...(live?.hearts ?? [0]));
+  // L'ordre du classement (à égalité, l'ordre proposé) : il ne bouge pas pendant qu'on coche, seulement
+  // quand le résultat du serveur change.
+  const order = live ? live.places.map((_, i) => i).sort((a, b) => live.hearts[b] - live.hearts[a] || a - b) : [];
   // Les restos du vote, sous la forme qu'attendent la carte et l'ouverture dans Plans / Google Maps.
   const restos = live ? live.places.map(asRestaurant) : [];
   const top = live ? winner(live) : null;
@@ -163,10 +165,14 @@ export function PollResults({ poll, home, onMapsApp, onBack, onGone }: Props) {
 
           <PollMap home={home} places={[]} picked={restos} focused={focused} onSelect={setFocused} height={160} />
 
-          {/* Une ligne par resto, dans l'ordre proposé ; la barre de fond : ses ❤️ face au premier. */}
-          {live.places.map((place, i) => {
+          {/* Le classement : du plus aimé au moins aimé, son rang à gauche. À droite, comme un « j'aime » : le
+              nombre de ❤️, et le cœur plein si on a mis le sien. */}
+          {order.map((i) => {
+            const place = live.places[i];
             const r = restos[i];
             const hearts = live.hearts[i];
+            // Ex aequo : même rang. Pas de rang tant que personne n'a voté.
+            const rank = 1 + live.hearts.filter((h) => h > hearts).length;
             const like = mine?.[i] === true;
             const cuisine = place.cuisine ? cuisineLabel(place.cuisine) : null;
             const tap = () => {
@@ -179,19 +185,17 @@ export function PollResults({ poll, home, onMapsApp, onBack, onGone }: Props) {
               });
             };
             return (
-              <View key={r.id} style={[styles.option, top === place && styles.optionTop, focused === r.id && styles.optionFocused]}>
-                <View style={[styles.optionBar, { width: `${(hearts / best) * 100}%` }]} />
+              <View key={r.id} style={[styles.option, focused === r.id && styles.optionFocused]}>
                 <Pressable
                   style={({ pressed }) => [styles.optionMain, pressed && styles.rowPressed]}
                   onPress={tap}
                   accessibilityRole={live.closed ? "button" : "checkbox"}
                   accessibilityState={live.closed ? undefined : { checked: like }}
-                  accessibilityLabel={`${place.name}, ❤️ ${hearts}`}
+                  accessibilityLabel={`${live.voters ? `${rank}. ` : ""}${place.name}, ❤️ ${hearts}`}
                 >
-                  {!live.closed && <Text style={[styles.heart, !like && styles.heartOff]}>{like ? "❤️" : "♡"}</Text>}
+                  <Text style={[styles.rank, rank === 1 && hearts > 0 && styles.rankFirst]}>{live.voters ? rank : "·"}</Text>
                   <View style={styles.optionText}>
                     <Text style={styles.name} numberOfLines={1}>
-                      {top === place ? "🏆 " : ""}
                       {place.name}
                     </Text>
                     {cuisine && (
@@ -200,7 +204,9 @@ export function PollResults({ poll, home, onMapsApp, onBack, onGone }: Props) {
                       </Text>
                     )}
                   </View>
-                  <Text style={styles.hearts}>{hearts}</Text>
+                  <Text style={[styles.likes, like && styles.likesOn]}>
+                    {like ? "❤️" : "♡"} {hearts}
+                  </Text>
                 </Pressable>
                 <OpenInMaps place={r} onMapsApp={onMapsApp} />
               </View>
@@ -237,14 +243,13 @@ const styles = StyleSheet.create({
   content: { paddingBottom: 24, gap: 8 },
   sub: { fontFamily: fonts.body, fontSize: 15, color: colors.muted, marginBottom: 4 },
   option: { flexDirection: "row", alignItems: "center", gap: 8, paddingRight: 8, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.card, overflow: "hidden" },
-  optionTop: { borderWidth: 2, borderColor: colors.accent },
   optionFocused: { borderColor: colors.accent },
-  // La barre du résultat, en fond de la ligne (comme un sondage Facebook).
-  optionBar: { position: "absolute", left: 0, top: 0, bottom: 0, backgroundColor: colors.accentSoft },
   optionMain: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, paddingLeft: 12 },
   optionText: { flex: 1 },
-  heart: { fontSize: 18, width: 22, textAlign: "center" },
-  heartOff: { color: colors.muted },
+  rank: { width: 22, fontFamily: fonts.title, fontSize: 20, color: colors.muted, textAlign: "center" },
+  rankFirst: { color: colors.accent },
+  likes: { fontFamily: fonts.medium, fontSize: 15, color: colors.muted },
+  likesOn: { color: colors.accent },
   rowPressed: { opacity: 0.6 },
   hint: { fontFamily: fonts.body, fontSize: 13, color: colors.muted, textAlign: "center" },
   final: { backgroundColor: colors.accent, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 14, alignItems: "center" },
@@ -252,7 +257,6 @@ const styles = StyleSheet.create({
   primary: { backgroundColor: colors.accent, borderRadius: 999, paddingVertical: 14, alignItems: "center" },
   primaryText: { fontFamily: fonts.title, fontSize: 16, color: "#fff" },
   name: { flex: 1, fontFamily: fonts.title, fontSize: 18, color: colors.ink },
-  hearts: { fontFamily: fonts.medium, fontSize: 15, color: colors.ink },
   info: { fontFamily: fonts.body, fontSize: 13, color: colors.muted, marginTop: 3 },
   secondary: {
     borderRadius: 999,
