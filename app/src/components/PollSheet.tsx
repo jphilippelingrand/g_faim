@@ -44,7 +44,7 @@ const TTL_LABEL = { "1h": "pollTtlHour", "1d": "pollTtlDay", "1w": "pollTtlWeek"
 /**
  * Les copains : en haut, ses votes (en cours, ou finis depuis peu avec l'élu ; un tap montre les résultats,
  * le lien à renvoyer, la suppression) ; en dessous, un nouveau : la carte des restos autour (cochés en
- * rouge), sa sélection, et la liste. On coche 2 à 5 restos, on choisit combien de temps le vote reste
+ * rouge), et la liste, ses restos cochés en tête. On coche 2 à 5 restos, on choisit combien de temps le vote reste
  * ouvert, et la feuille de partage d'iOS envoie le lien. On vote souvent pour plus tard : la liste prend
  * tous les restos autour, même fermés en ce moment (c'est indiqué).
  * Comme en mode liste, toucher une ligne la montre sur la carte, « Go » ouvre sa fiche dans Plans.
@@ -118,7 +118,7 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onM
   };
   const focusFromMap = (id: string) => {
     focusRow(id);
-    const index = choices.findIndex((r) => r.id === id);
+    const index = ordered.findIndex((r) => r.id === id);
     if (index >= 0) list.current?.scrollToIndex({ index, viewPosition: 0.3, animated: true });
   };
   const go = (r: Restaurant) => {
@@ -147,7 +147,9 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onM
 
   const ready = picked.length >= POLL_MIN;
   const shown = running.filter((p) => statuses[p.url] !== "expired");
+  // Les restos cochés remontent en tête de liste (dans l'ordre où on les a cochés), les autres suivent.
   const pickedPlaces = picked.map((id) => choices.find((r) => r.id === id)).filter((r): r is Restaurant => !!r);
+  const ordered = [...pickedPlaces, ...choices.filter((r) => !picked.includes(r.id))];
 
   // Ses votes : une rangée de cartes qui défile de côté, pour laisser la place à la carte et à la liste.
   const runningSection = shown.length > 0 && (
@@ -205,34 +207,12 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onM
 
             <PollMap home={home} places={choices} picked={picked} focused={focused} onSelect={focusFromMap} />
 
-            {/* Sa sélection : un tap la retire. */}
-            {pickedPlaces.length ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.picks}>
-                <Text style={styles.picksLabel}>
-                  {t("pollPicked")} {pickedPlaces.length}/{POLL_MAX}
-                </Text>
-                {pickedPlaces.map((r) => (
-                  <Pressable
-                    key={r.id}
-                    style={({ pressed }) => [styles.pick, pressed && styles.rowPressed]}
-                    onPress={() => toggle(r.id)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`✕ ${r.name}`}
-                  >
-                    <Text style={styles.pickText} numberOfLines={1}>
-                      {r.name} ✕
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            ) : (
-              <Text style={styles.sub}>{t("pollPickHint", { max: POLL_MAX })}</Text>
-            )}
+            {!picked.length && <Text style={styles.sub}>{t("pollPickHint", { max: POLL_MAX })}</Text>}
 
             <FlatList
               ref={list}
               style={styles.list}
-              data={choices}
+              data={ordered}
               keyExtractor={(r) => r.id}
               onEndReached={loadMore}
               onEndReachedThreshold={0.5}
@@ -340,10 +320,6 @@ const styles = StyleSheet.create({
   },
   pollClosed: { backgroundColor: colors.bg },
   closedText: { color: colors.accent, fontFamily: fonts.medium },
-  picks: { gap: 6, alignItems: "center", paddingTop: 10 },
-  picksLabel: { fontFamily: fonts.medium, fontSize: 13, color: colors.muted, marginRight: 2 },
-  pick: { backgroundColor: colors.accent, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, maxWidth: 200 },
-  pickText: { fontFamily: fonts.medium, fontSize: 13, color: "#fff" },
   separator: { height: 1, backgroundColor: colors.line, marginLeft: 42 },
   row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 9, paddingHorizontal: 4, borderRadius: 14 },
   rowFocused: { backgroundColor: colors.accentSoft },
