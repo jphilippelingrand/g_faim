@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import MapView, { Circle, Marker, type Region } from "react-native-maps";
 import type { Area, LatLng, Restaurant } from "../lib/places";
@@ -34,16 +34,26 @@ export function RestaurantMap({ home, results, area, fitKey, selectedId, onSelec
   // Les changements de vue déclenchés par nos propres recadrages ne doivent pas relancer de recherche.
   const ignoreUntil = useRef(0);
 
-  // Recadrage sur toi + le resto choisi, quand fitKey change (nouvelle recherche, carte glissée, ligne touchée).
+  // La carte n'accepte un recadrage qu'une fois prête : avant, il était perdu (au lancement surtout).
+  const [ready, setReady] = useState(false);
+  // L'utilisateur a bougé la carte depuis le dernier recadrage : on ne la reprend plus d'office.
+  const userMoved = useRef(false);
+
+  // Recadrage sur toi + le resto choisi, quand fitKey change (nouvelle recherche, carte glissée, ligne touchée),
+  // quand la carte devient prête, et quand le panneau du bas change de hauteur (mesuré après le premier
+  // affichage, ou passage cartes ↔ liste) tant qu'on n'a pas bougé la carte soi-même.
   useEffect(() => {
-    if (fitKey === 0 || !map.current) return;
-    ignoreUntil.current = Date.now() + 1500;
+    userMoved.current = false;
+  }, [fitKey]);
+  useEffect(() => {
+    if (fitKey === 0 || !ready || !map.current || userMoved.current) return;
     const place = results.find((r) => r.id === selectedId);
     if (!place) return;
+    ignoreUntil.current = Date.now() + 1500;
     // Le milieu entre toi et le resto, zoomé au plus près. mapPadding exclut déjà la barre du haut et le panneau :
     // on n'ajoute que la marge des deux points.
     map.current.fitToCoordinates([home, place.location], { edgePadding: { top: 40, right: 40, bottom: 40, left: 40 }, animated: true });
-  }, [fitKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fitKey, ready, insets.top, insets.bottom, insets.left]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <View style={StyleSheet.absoluteFill}>
@@ -56,8 +66,10 @@ export function RestaurantMap({ home, results, area, fitKey, selectedId, onSelec
         showsUserLocation
         showsPointsOfInterests={false}
         toolbarEnabled={false}
+        onMapReady={() => setReady(true)}
         onRegionChangeComplete={(region) => {
-          if (Date.now() < ignoreUntil.current) return;
+          if (Date.now() < ignoreUntil.current || !ready) return;
+          userMoved.current = true;
           onViewportChange(viewportCircle(region));
         }}
       >

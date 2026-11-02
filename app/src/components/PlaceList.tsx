@@ -1,9 +1,9 @@
-import * as Haptics from "expo-haptics";
 import { useEffect, useRef } from "react";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { cuisineLabel } from "../lib/osm";
-import { openPlace, type MapsApp } from "../lib/mapsApp";
-import { distanceMeters, formatClosingTime, formatDistance, travelTime, type LatLng, type Restaurant } from "../lib/places";
+import type { MapsApp } from "../lib/mapsApp";
+import { OpenInMaps } from "./OpenInMaps";
+import { distanceMeters, formatClosingTime, travelTime, type LatLng, type Restaurant } from "../lib/places";
 import { colors, fonts } from "../theme";
 import { t } from "../i18n";
 
@@ -24,7 +24,7 @@ const CLOSING_SOON = 60;
 
 /**
  * Le mode liste : les restos (ouverts seulement, ou tous selon le filtre « Ouverts »), du plus proche au plus loin, sans fin (la suite se charge en
- * descendant). Toucher une ligne la montre sur la carte ; « Go » ouvre sa fiche dans Plans ou Google Maps.
+ * descendant). Toucher une ligne la montre sur la carte ; le bouton ↗ ouvre sa fiche dans Plans ou Google Maps.
  */
 export function PlaceList({ places, home, current, onChange, onMapsApp, hasMore, loadingMore, onNeedMore }: Props) {
   const list = useRef<FlatList<Restaurant>>(null);
@@ -96,12 +96,10 @@ function Row({ r, home, selected, onPress, onMapsApp }: RowProps) {
         ? t("openAllDay")
         : t("until", { time: formatClosingTime(r.closesIn) });
   const soon = closed || (r.closesIn !== undefined && r.closesIn < CLOSING_SOON);
-  const info = [cuisine && `${cuisine.emoji} ${cuisine.label}`, formatDistance(distance)].filter(Boolean).join(" · ");
-
-  const go = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    openPlace(r).then((app) => app && onMapsApp(app));
-  };
+  // Le temps pour y aller plutôt que la distance : c'est ce qui compte quand on a faim.
+  const info = [cuisine && `${cuisine.emoji} ${cuisine.label}`, `${trip.mode === "walk" ? "🚶" : "🚗"} ${trip.minutes} min`]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <Pressable style={({ pressed }) => [styles.row, selected && styles.rowSelected, pressed && styles.rowPressed]} onPress={onPress}>
@@ -120,17 +118,7 @@ function Row({ r, home, selected, onPress, onMapsApp }: RowProps) {
           )}
         </Text>
       </View>
-      <Pressable
-        style={({ pressed }) => [styles.go, pressed && styles.goPressed]}
-        onPress={go}
-        accessibilityRole="link"
-        accessibilityLabel={t("seeInMaps", { name: r.name })}
-      >
-        <Text style={styles.goTime}>
-          {trip.mode === "walk" ? "🚶" : "🚗"} {trip.minutes} min
-        </Text>
-        <Text style={styles.goText}>{t("go")}</Text>
-      </Pressable>
+      <OpenInMaps place={r} onMapsApp={onMapsApp} />
     </Pressable>
   );
 }
@@ -147,10 +135,6 @@ const styles = StyleSheet.create({
   name: { fontFamily: fonts.title, fontSize: 17, color: colors.ink },
   info: { fontFamily: fonts.body, fontSize: 12.5, color: colors.muted, marginTop: 3 },
   soon: { color: colors.accent, fontFamily: fonts.medium },
-  go: { alignItems: "center", backgroundColor: colors.accent, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6, minWidth: 74 },
-  goPressed: { transform: [{ scale: 0.94 }] },
-  goTime: { fontFamily: fonts.medium, fontSize: 11.5, color: "#fff" },
-  goText: { fontFamily: fonts.title, fontSize: 15, color: "#fff" },
   footer: { paddingVertical: 18, alignItems: "center" },
   footerText: { fontFamily: fonts.body, fontSize: 13, color: colors.muted },
 });

@@ -2,12 +2,12 @@ import * as Haptics from "expo-haptics";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import { cuisineLabel } from "../lib/osm";
-import { openPlace } from "../lib/mapsApp";
+import type { MapsApp } from "../lib/mapsApp";
+import type { LatLng } from "../lib/places";
 import {
   deletePoll,
   forgetPoll,
   pollResults,
-  ranking,
   resultShareText,
   votePoll,
   winner,
@@ -15,11 +15,16 @@ import {
   type PollPlace,
   type PollResults as Results,
 } from "../lib/polls";
+import { OpenInMaps } from "./OpenInMaps";
+import { PollMap } from "./PollMap";
 import { colors, fonts } from "../theme";
 import { t } from "../i18n";
 
 type Props = {
   poll: MyPoll;
+  home: LatLng;
+  /** L'appli de cartes choisie en ouvrant un resto (bouton ↗). */
+  onMapsApp?: (app: MapsApp) => void;
   onBack: () => void;
   /** Supprimé, oublié ou trouvé expiré : la feuille l'enlève de « En cours ». */
   onGone: (poll: MyPoll) => void;
@@ -44,18 +49,20 @@ const asRestaurant = (p: PollPlace) => ({
 });
 
 /**
- * Un sondage dans l'app (rafraîchi tout seul) : son vote à soi (❤️ / ✕ par resto, qu'on peut changer), les
- * restos par nombre de ❤️ avec « Go » sur le premier, puis partager le résultat, renvoyer le lien, et
- * supprimer le vote (si on l'a lancé) ou l'oublier (si on l'a rejoint par un lien). Vote fini : plus de vote
- * possible, l'élu en grand (ou l'égalité), tant que le serveur garde le résultat.
+ * Un sondage dans l'app (rafraîchi tout seul), condensé comme un sondage Facebook : la carte de ses restos
+ * seulement, puis une ligne par resto, la barre de ses ❤️ en fond. Toucher une ligne met (ou retire) son ❤️
+ * et la montre sur la carte ; « Envoyer mon vote » enregistre. Le bouton ↗ ouvre sa fiche dans les cartes.
+ * Ensuite : partager le résultat, renvoyer le lien, supprimer le vote (si on l'a lancé) ou l'oublier.
+ * Vote fini : plus de vote possible, l'élu en grand (ou l'égalité), tant que le serveur garde le résultat.
  */
-export function PollResults({ poll, onBack, onGone }: Props) {
+export function PollResults({ poll, home, onMapsApp, onBack, onGone }: Props) {
   const [results, setResults] = useState<Results | null>(null);
   const [error, setError] = useState(false);
   const [deleting, setDeleting] = useState(false);
   // Son vote en cours d'édition (null : on montre celui enregistré, ou on n'a pas encore voté).
   const [draft, setDraft] = useState<boolean[] | null>(null);
   const [sending, setSending] = useState(false);
+  const [focused, setFocused] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -116,8 +123,9 @@ export function PollResults({ poll, onBack, onGone }: Props) {
     }
   }
 
-  const ranked = live ? ranking(live) : [];
-  const best = Math.max(1, ranked[0]?.hearts ?? 0);
+  const best = Math.max(1, ...(live?.hearts ?? [0]));
+  // Les restos du vote, sous la forme qu'attendent la carte et l'ouverture dans Plans / Google Maps.
+  const restos = live ? live.places.map(asRestaurant) : [];
   const top = live ? winner(live) : null;
   const votes = live ? (live.voters === 0 ? t("pollNoVotes") : live.voters === 1 ? t("pollOneVote") : t("pollVotes", { n: live.voters })) : "";
   // Ce qu'on affiche pour son vote : le brouillon, sinon le vote enregistré.
@@ -150,53 +158,51 @@ export function PollResults({ poll, onBack, onGone }: Props) {
           {live.closed && (
             <View style={styles.final}>
               <Text style={styles.finalText}>{top ? `🏆 ${t("pollFinal", { name: top.name })}` : t("pollTie")}</Text>
-              {top && (
-                <Pressable
-                  style={({ pressed }) => [styles.finalGo, pressed && styles.pressed]}
-                  onPress={() => openPlace(asRestaurant(top))}
-                  accessibilityRole="link"
-                  accessibilityLabel={t("seeInMaps", { name: top.name })}
-                >
-                  <Text style={styles.finalGoText}>{t("go")}</Text>
-                </Pressable>
-              )}
             </View>
           )}
 
-          {/* Son vote : un ❤️ ou un ✕ par resto, à envoyer (ou à changer), tant que le vote est ouvert. */}
-          {!live.closed && <Text style={styles.section}>{t(live.mine ? "pollMyVote" : "pollYourTurn")}</Text>}
-          {!live.closed && live.places.map((place, i) => {
-            const like = mine?.[i];
-            const pick = (value: boolean) => {
+          <PollMap home={home} places={[]} picked={restos} focused={focused} onSelect={setFocused} height={160} />
+
+          {/* Une ligne par resto, dans l'ordre proposé ; la barre de fond : ses ❤️ face au premier. */}
+          {live.places.map((place, i) => {
+            const r = restos[i];
+            const hearts = live.hearts[i];
+            const like = mine?.[i] === true;
+            const cuisine = place.cuisine ? cuisineLabel(place.cuisine) : null;
+            const tap = () => {
               Haptics.selectionAsync();
+              setFocused(r.id);
+              if (live.closed) return;
               setDraft((d) => {
                 const next = d ?? live.mine ?? live.places.map(() => false);
-                return next.map((v, j) => (j === i ? value : v));
+                return next.map((v, j) => (j === i ? !v : v));
               });
             };
             return (
-              <View key={`vote-${i}`} style={styles.voteRow}>
-                <Text style={styles.voteName} numberOfLines={1}>
-                  {place.name}
-                </Text>
+              <View key={r.id} style={[styles.option, top === place && styles.optionTop, focused === r.id && styles.optionFocused]}>
+                <View style={[styles.optionBar, { width: `${(hearts / best) * 100}%` }]} />
                 <Pressable
-                  style={[styles.choice, like === false && mine && styles.choiceNope]}
-                  onPress={() => pick(false)}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: like === false && !!mine }}
-                  accessibilityLabel={`${t("nope")} ${place.name}`}
+                  style={({ pressed }) => [styles.optionMain, pressed && styles.rowPressed]}
+                  onPress={tap}
+                  accessibilityRole={live.closed ? "button" : "checkbox"}
+                  accessibilityState={live.closed ? undefined : { checked: like }}
+                  accessibilityLabel={`${place.name}, ❤️ ${hearts}`}
                 >
-                  <Text style={styles.choiceText}>✕</Text>
+                  {!live.closed && <Text style={[styles.heart, !like && styles.heartOff]}>{like ? "❤️" : "♡"}</Text>}
+                  <View style={styles.optionText}>
+                    <Text style={styles.name} numberOfLines={1}>
+                      {top === place ? "🏆 " : ""}
+                      {place.name}
+                    </Text>
+                    {cuisine && (
+                      <Text style={styles.info} numberOfLines={1}>
+                        {cuisine.emoji} {cuisine.label}
+                      </Text>
+                    )}
+                  </View>
+                  <Text style={styles.hearts}>{hearts}</Text>
                 </Pressable>
-                <Pressable
-                  style={[styles.choice, like === true && styles.choiceYum]}
-                  onPress={() => pick(true)}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: like === true }}
-                  accessibilityLabel={`${t("yum")} ${place.name}`}
-                >
-                  <Text style={styles.choiceText}>❤️</Text>
-                </Pressable>
+                <OpenInMaps place={r} onMapsApp={onMapsApp} />
               </View>
             );
           })}
@@ -205,41 +211,7 @@ export function PollResults({ poll, onBack, onGone }: Props) {
               {sending ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>{t(live.mine ? "pollChangeVote" : "pollSendVote")}</Text>}
             </Pressable>
           )}
-
-          <Text style={styles.section}>{t("pollStandings")}</Text>
-          {ranked.map(({ place, hearts }, i) => {
-            const first = i === 0 && hearts > 0;
-            const cuisine = place.cuisine ? cuisineLabel(place.cuisine) : null;
-            return (
-              <View key={`${place.name}-${i}`} style={[styles.row, first && styles.rowTop]}>
-                <View style={styles.rowHead}>
-                  <Text style={styles.name} numberOfLines={1}>
-                    {top === place ? "🏆 " : ""}
-                    {place.name}
-                  </Text>
-                  <Text style={styles.hearts}>❤️ {hearts}</Text>
-                </View>
-                {cuisine && (
-                  <Text style={styles.info}>
-                    {cuisine.emoji} {cuisine.label}
-                  </Text>
-                )}
-                <View style={styles.bar}>
-                  <View style={[styles.barFill, { width: `${(hearts / best) * 100}%` }]} />
-                </View>
-                {first && (
-                  <Pressable
-                    style={({ pressed }) => [styles.go, pressed && styles.pressed]}
-                    onPress={() => openPlace(asRestaurant(place))}
-                    accessibilityRole="link"
-                    accessibilityLabel={t("seeInMaps", { name: place.name })}
-                  >
-                    <Text style={styles.goText}>{t("go")}</Text>
-                  </Pressable>
-                )}
-              </View>
-            );
-          })}
+          {!draft && !live.closed && !live.mine && <Text style={styles.hint}>{t("pollTapToVote")}</Text>}
 
           <Pressable style={({ pressed }) => [styles.secondary, pressed && styles.pressed]} onPress={shareResult} accessibilityRole="button">
             <Text style={styles.secondaryText}>🏆 {t("pollShareResult")}</Text>
@@ -262,40 +234,26 @@ const styles = StyleSheet.create({
   backText: { fontFamily: fonts.medium, fontSize: 16, color: colors.accent },
   spinner: { marginTop: 40 },
   error: { fontFamily: fonts.body, fontSize: 14, color: colors.accent, textAlign: "center", marginVertical: 10 },
-  content: { paddingBottom: 24, gap: 10 },
+  content: { paddingBottom: 24, gap: 8 },
   sub: { fontFamily: fonts.body, fontSize: 15, color: colors.muted, marginBottom: 4 },
-  section: { fontFamily: fonts.medium, fontSize: 13, letterSpacing: 0.6, color: colors.accent, textTransform: "uppercase", marginTop: 8 },
-  voteRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  voteName: { flex: 1, fontFamily: fonts.title, fontSize: 16, color: colors.ink },
-  choice: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: colors.line,
-    backgroundColor: colors.card,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  choiceNope: { backgroundColor: colors.line, borderColor: colors.muted },
-  choiceYum: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
-  choiceText: { fontSize: 18, color: colors.muted },
-  final: { backgroundColor: colors.accent, borderRadius: 18, padding: 16, alignItems: "center", gap: 12 },
-  finalText: { fontFamily: fonts.grr, fontSize: 24, color: "#fff", textAlign: "center" },
-  finalGo: { backgroundColor: "#fff", borderRadius: 999, paddingHorizontal: 22, paddingVertical: 10 },
-  finalGoText: { fontFamily: fonts.title, fontSize: 16, color: colors.accent },
+  option: { flexDirection: "row", alignItems: "center", gap: 8, paddingRight: 8, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.card, overflow: "hidden" },
+  optionTop: { borderWidth: 2, borderColor: colors.accent },
+  optionFocused: { borderColor: colors.accent },
+  // La barre du résultat, en fond de la ligne (comme un sondage Facebook).
+  optionBar: { position: "absolute", left: 0, top: 0, bottom: 0, backgroundColor: colors.accentSoft },
+  optionMain: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, paddingLeft: 12 },
+  optionText: { flex: 1 },
+  heart: { fontSize: 18, width: 22, textAlign: "center" },
+  heartOff: { color: colors.muted },
+  rowPressed: { opacity: 0.6 },
+  hint: { fontFamily: fonts.body, fontSize: 13, color: colors.muted, textAlign: "center" },
+  final: { backgroundColor: colors.accent, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 14, alignItems: "center" },
+  finalText: { fontFamily: fonts.grr, fontSize: 21, color: "#fff", textAlign: "center" },
   primary: { backgroundColor: colors.accent, borderRadius: 999, paddingVertical: 14, alignItems: "center" },
   primaryText: { fontFamily: fonts.title, fontSize: 16, color: "#fff" },
-  row: { backgroundColor: colors.card, borderRadius: 16, borderWidth: 1, borderColor: colors.line, padding: 14 },
-  rowTop: { borderWidth: 2, borderColor: colors.accent },
-  rowHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 },
   name: { flex: 1, fontFamily: fonts.title, fontSize: 18, color: colors.ink },
   hearts: { fontFamily: fonts.medium, fontSize: 15, color: colors.ink },
   info: { fontFamily: fonts.body, fontSize: 13, color: colors.muted, marginTop: 3 },
-  bar: { height: 8, borderRadius: 99, backgroundColor: colors.accentSoft, marginTop: 10, overflow: "hidden" },
-  barFill: { height: "100%", borderRadius: 99, backgroundColor: colors.accent },
-  go: { marginTop: 12, alignSelf: "flex-start", backgroundColor: colors.accent, borderRadius: 999, paddingHorizontal: 18, paddingVertical: 10 },
-  goText: { fontFamily: fonts.title, fontSize: 15, color: "#fff" },
   secondary: {
     borderRadius: 999,
     borderWidth: 1,
