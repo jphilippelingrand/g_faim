@@ -4,7 +4,7 @@ import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, Share, Style
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cuisineLabel } from "../lib/osm";
 import type { MapsApp } from "../lib/mapsApp";
-import { distanceMeters, formatDistance, nearest, nearestInView, PAGE, type Area, type LatLng, type Restaurant, type Search } from "../lib/places";
+import { distanceMeters, formatDistance, inView, nearest, PAGE, type Box, type LatLng, type Restaurant } from "../lib/places";
 import {
   createPoll,
   myPolls,
@@ -45,8 +45,8 @@ const TTL_LABEL = { "1h": "pollTtlHour", "1d": "pollTtlDay", "1w": "pollTtlWeek"
 /**
  * Les copains : en haut, ses votes (en cours, ou finis depuis peu avec l'élu ; un tap montre les résultats,
  * le lien à renvoyer, la suppression) ; en dessous, un nouveau : la carte des restos autour (cochés en
- * rouge), et la liste, ses restos cochés en tête. Déplacer la carte recharge la liste autour de la zone
- * visible (les cochés restent). On coche 2 à 5 restos, on choisit combien de temps le vote reste ouvert, et la
+ * rouge), et la liste, ses restos cochés en tête : tous les restos de la zone visible de la carte, la liste
+ * suit quand on la déplace (les cochés restent). On coche 2 à 5 restos, on choisit combien de temps le vote reste ouvert, et la
  * feuille de partage d'iOS envoie le lien. On vote souvent pour plus tard : la liste prend tous les restos
  * autour, même fermés en ce moment (c'est indiqué).
  * La case coche (la carte cadre alors tous les cochés) ; toucher la ligne montre le resto sur la carte, sans
@@ -66,49 +66,26 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onM
   // Le sondage dont on regarde les résultats.
   const [opened, setOpened] = useState<MyPoll | null>(initialPoll ?? null);
   const [choices, setChoices] = useState<Restaurant[]>(places);
-  const [hasMore, setHasMore] = useState(true);
-  const [loading, setLoading] = useState(false);
   const list = useRef<FlatList<Restaurant>>(null);
-  // La recherche en cours (autour de soi, ou de la zone de la carte), pour en demander la suite ; seule la
-  // dernière lancée a le droit d'afficher ses résultats.
-  const search = useRef<(count: number) => Promise<Search>>((count) => nearest(home, count));
+  // Seule la dernière recherche lancée a le droit d'afficher ses résultats.
   const requestId = useRef(0);
 
-  // Les restos autour, fermés compris.
-  const fetchChoices = (count: number) => {
+  const load = (find: () => Promise<Restaurant[]>) => {
     const id = ++requestId.current;
-    return search
-      .current(count)
-      .then((found) => {
-        if (id !== requestId.current) return;
-        setChoices(found.list);
-        setHasMore(found.hasMore);
-      })
-      .catch((err) => {
-        console.error(err);
-        if (id === requestId.current) setHasMore(false);
-      })
-      .finally(() => id === requestId.current && setLoading(false));
+    find()
+      .then((found) => id === requestId.current && setChoices(found))
+      .catch(console.error);
   };
-  // À l'ouverture, ou dès que la position est connue (feuille ouverte par un lien avant elle) : autour de soi.
+  // À l'ouverture, ou dès que la position est connue (feuille ouverte par un lien avant elle) : les plus
+  // proches, de quoi cadrer la carte. Ensuite, c'est la carte qui décide (onView).
   useEffect(() => {
     if (!visible || !home.latitude) return;
-    search.current = (count) => nearest(home, count);
-    fetchChoices(PAGE);
+    load(() => nearest(home, PAGE).then((found) => found.list));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, home.latitude, home.longitude]);
-  // La suite quand on approche du bas de la liste.
-  const loadMore = () => {
-    if (loading || !hasMore) return;
-    setLoading(true);
-    fetchChoices(choices.length + PAGE);
-  };
-  // La carte déplacée : les restos les plus proches de la zone visible, la liste repart du haut.
-  const searchHere = (view: Area) => {
-    search.current = (count) => nearestInView(view, count);
-    setLoading(true);
-    fetchChoices(PAGE).then(() => list.current?.scrollToOffset({ offset: 0, animated: false }));
-  };
+  // La carte s'est arrêtée : tous les restos de la zone visible, du plus proche au plus loin de soi. La carte
+  // et la liste montrent ainsi la même chose.
+  const showView = (box: Box) => load(() => inView(box, home));
 
   // Où en sont ses sondages : une lecture chacun à l'ouverture, et au retour des résultats.
   useEffect(() => {
@@ -214,7 +191,7 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onM
           <>
             {runningSection}
 
-            <PollMap home={home} places={choices} picked={picked} focused={focused} onSelect={focusFromMap} onMove={searchHere} />
+            <PollMap home={home} places={choices} picked={picked} focused={focused} onSelect={focusFromMap} onView={showView} />
 
             <Text style={styles.sub}>{t("pollPickHint", { max: POLL_MAX })}</Text>
 
@@ -223,10 +200,8 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onM
               style={styles.list}
               data={ordered}
               keyExtractor={(r) => r.id}
-              onEndReached={loadMore}
-              onEndReachedThreshold={0.5}
               onScrollToIndexFailed={({ index }) => list.current?.scrollToOffset({ offset: index * 62, animated: true })}
-              ListFooterComponent={loading ? <ActivityIndicator style={styles.more} color={colors.accent} /> : undefined}
+              ListFooterComponent={!choices.length ? <ActivityIndicator style={styles.more} color={colors.accent} /> : undefined}
               ItemSeparatorComponent={() => <View style={styles.separator} />}
               renderItem={({ item }) => {
                 const on = isPicked(item.id);

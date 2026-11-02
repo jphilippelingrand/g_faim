@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import MapView, { Marker, type Region } from "react-native-maps";
-import { distanceMeters, type Area, type LatLng, type Restaurant } from "../lib/places";
+import { distanceMeters, type Box, type LatLng, type Restaurant } from "../lib/places";
 import { MapDot } from "./MapDot";
 import { colors } from "../theme";
 
@@ -14,8 +14,8 @@ type Props = {
   /** Le resto touché dans la liste (ou sur la carte) : plus gros, et la carte va dessus. */
   focused: string | null;
   onSelect: (id: string) => void;
-  /** On a déplacé ou zoomé la carte soi-même (pas nos recadrages) : la zone visible. */
-  onMove?: (view: Area) => void;
+  /** La carte s'est arrêtée (cadrage, ou déplacée au doigt) : la zone visible, pour y charger les restos. */
+  onView?: (box: Box) => void;
   height?: number;
 };
 
@@ -46,23 +46,16 @@ function regionAround(points: LatLng[]): Region {
   };
 }
 
-/** Plus grand cercle centré sur la carte qui tient dans la vue. */
-function viewportCircle(region: Region): Area {
-  const latMeters = (region.latitudeDelta / 2) * 111_320;
-  const lngMeters = (region.longitudeDelta / 2) * 111_320 * Math.cos((region.latitude * Math.PI) / 180);
-  return { center: { latitude: region.latitude, longitude: region.longitude }, radius: Math.round(Math.min(latMeters, lngMeters)) };
-}
-
 /**
  * La petite carte des votes : les restos proposés en gris, les cochés en rouge. Elle s'ouvre sur toi et les
  * restos d'à côté ; un resto touché, elle va dessus ; la sélection change, elle cadre tous les cochés (et
- * toi). On peut la déplacer pour chercher ailleurs (onMove).
+ * toi). Chaque fois qu'elle s'arrête, elle donne sa zone visible (onView) : on y charge tous les restos.
  */
-export function PollMap({ home, places, picked, focused, onSelect, onMove, height = 190 }: Props) {
+export function PollMap({ home, places, picked, focused, onSelect, onView, height = 190 }: Props) {
   const map = useRef<MapView>(null);
   // La carte n'accepte un cadrage qu'une fois prête (avant, il était perdu : carte trop dézoomée).
   const [ready, setReady] = useState(false);
-  // Un doigt sur la carte depuis notre dernier cadrage : seul ce déplacement-là compte comme « chercher ici ».
+  // Un doigt sur la carte depuis notre dernier cadrage : seul ce déplacement-là arrête le cadrage d'ouverture.
   // (La carte annonce aussi des déplacements toute seule : à l'ouverture, avant même d'être prête, et pendant
   // nos cadrages.)
   const finger = useRef(false);
@@ -122,9 +115,9 @@ export function PollMap({ home, places, picked, focused, onSelect, onMove, heigh
         pitchEnabled={false}
         onMapReady={() => setReady(true)}
         onRegionChangeComplete={(region) => {
-          if (!finger.current) return;
-          touched.current = true;
-          onMove?.(viewportCircle(region));
+          if (!ready) return;
+          if (finger.current) touched.current = true;
+          onView?.(region);
         }}
       >
         {shown.map((r, i) => {

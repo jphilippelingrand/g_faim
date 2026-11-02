@@ -213,6 +213,30 @@ async function nearestAllWithin(center: LatLng, radii: number[], count: number):
   return { list, area, hasMore: list.length >= count };
 }
 
+/** Un rectangle de carte (comme une région de react-native-maps). */
+export type Box = { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number };
+
+// Au-delà, la carte est trop dézoomée pour qu'on montre tout : les plus proches seulement.
+const MAX_IN_VIEW = 150;
+
+/**
+ * Tous les restos dans le rectangle visible de la carte, ouverts ou non, du plus proche de `from` au plus loin
+ * (au plus MAX_IN_VIEW ; la zone est plafonnée à MAX_RADIUS, trop de fichiers sinon). Pour que la carte et la
+ * liste montrent la même chose : aucun coin de carte vide alors qu'il y a des restos.
+ */
+export async function inView(box: Box, from: LatLng): Promise<Restaurant[]> {
+  const center = { latitude: box.latitude, longitude: box.longitude };
+  const corner = { latitude: box.latitude + box.latitudeDelta / 2, longitude: box.longitude + box.longitudeDelta / 2 };
+  const radius = Math.min(distanceMeters(center, corner), MAX_RADIUS);
+  const inside = (r: Restaurant) =>
+    Math.abs(r.location.latitude - box.latitude) <= box.latitudeDelta / 2 && Math.abs(r.location.longitude - box.longitude) <= box.longitudeDelta / 2;
+  const list = (await restaurantsAround({ center, radius }))
+    .filter(inside)
+    .sort(byDistance(from))
+    .map((r) => ({ ...r, open: openOnArrival(r, distanceMeters(from, r.location)) }));
+  return withoutDuplicates(list).slice(0, MAX_IN_VIEW);
+}
+
 // Grosso modo : 4,8 km/h à pied, en voiture 24 km/h en ville plus 3 min pour se garer ; les rues font
 // des détours, d'où un trajet 30 à 40 % plus long que la ligne droite.
 const WALK_METERS_PER_MIN = 80;
