@@ -1,6 +1,7 @@
 import * as Haptics from "expo-haptics";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Alert, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
+import Svg, { Path } from "react-native-svg";
 import { cuisineLabel } from "../lib/osm";
 import type { MapsApp } from "../lib/mapsApp";
 import type { LatLng } from "../lib/places";
@@ -15,6 +16,7 @@ import {
   type PollPlace,
   type PollResults as Results,
 } from "../lib/polls";
+import { IconButton } from "./IconButton";
 import { OpenInMaps } from "./OpenInMaps";
 import { PollMap } from "./PollMap";
 import { colors, fonts } from "../theme";
@@ -49,19 +51,20 @@ const asRestaurant = (p: PollPlace) => ({
 });
 
 /**
- * Un sondage dans l'app (rafraîchi tout seul), condensé comme un sondage Facebook : la carte de ses restos
- * seulement, puis le classement des restos (rang, nombre de ❤️). Toucher une ligne met (ou retire) son ❤️
- * et la montre sur la carte ; « Envoyer mon vote » enregistre. Le bouton ↗ ouvre sa fiche dans les cartes.
- * Ensuite : partager le résultat, renvoyer le lien, supprimer le vote (si on l'a lancé) ou l'oublier.
+ * Un sondage dans l'app (rafraîchi tout seul) : en haut, partager le résultat et la poubelle (supprimer le
+ * vote si on l'a lancé, sinon l'oublier) ; la carte de ses restos seulement, puis le classement (rang,
+ * nombre de ❤️). Toucher un resto met (ou retire) son ❤️ tout de suite : le classement se met à jour sans
+ * attendre le serveur, puis avec sa réponse. Le bouton ↗ ouvre sa fiche dans les cartes.
  * Vote fini : plus de vote possible, l'élu en grand (ou l'égalité), tant que le serveur garde le résultat.
  */
 export function PollResults({ poll, home, onMapsApp, onBack, onGone }: Props) {
   const [results, setResults] = useState<Results | null>(null);
   const [error, setError] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  // Son vote en cours d'édition (null : on montre celui enregistré, ou on n'a pas encore voté).
-  const [draft, setDraft] = useState<boolean[] | null>(null);
-  const [sending, setSending] = useState(false);
+  // Son vote tel qu'on vient de le toucher, en attendant la réponse du serveur (null : celui enregistré).
+  const [local, setLocal] = useState<boolean[] | null>(null);
+  // Seule la réponse du dernier vote envoyé compte (on peut toucher plusieurs restos de suite).
+  const voteId = useRef(0);
   const [focused, setFocused] = useState<string | null>(null);
 
   useEffect(() => {
@@ -85,24 +88,24 @@ export function PollResults({ poll, home, onMapsApp, onBack, onGone }: Props) {
 
   const live = results && results !== "expired" ? results : null;
 
-  async function sendVote() {
-    if (!live || !draft) return;
-    setSending(true);
+  async function vote(likes: boolean[]) {
+    const id = ++voteId.current;
+    setLocal(likes);
     try {
-      setResults(await votePoll(poll, draft));
-      setDraft(null);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      const after = await votePoll(poll, likes);
+      if (id !== voteId.current) return;
+      setResults(after);
+      setLocal(null);
     } catch {
+      if (id !== voteId.current) return;
+      setLocal(null);
       setError(true);
-    } finally {
-      setSending(false);
     }
   }
 
-  const shareResult = () =>
+  // Le résultat et son lien, en un seul partage.
+  const share = () =>
     live && Share.share({ message: resultShareText(live, poll.url, { won: t("pollWon"), open: t("pollShareText") }) });
-  // Juste le lien, sans texte autour (sur iOS, `url` : l'aperçu du lien s'affiche dans Messages).
-  const shareLink = () => Share.share(Platform.OS === "ios" ? { url: poll.url } : { message: poll.url });
 
   const remove = () =>
     poll.owner
@@ -123,21 +126,52 @@ export function PollResults({ poll, home, onMapsApp, onBack, onGone }: Props) {
     }
   }
 
-  // L'ordre du classement (à égalité, l'ordre proposé) : il ne bouge pas pendant qu'on coche, seulement
-  // quand le résultat du serveur change.
-  const order = live ? live.places.map((_, i) => i).sort((a, b) => live.hearts[b] - live.hearts[a] || a - b) : [];
+  // Son vote : celui qu'on vient de toucher, sinon l'enregistré ; et les ❤️ qui en tiennent compte tout de suite.
+  const mine = local ?? live?.mine ?? null;
+  const hearts = live ? live.hearts.map((h, i) => h + (local ? Number(local[i]) - Number(live.mine?.[i] ?? false) : 0)) : [];
+  const voters = live ? live.voters + (local && !live.mine ? 1 : 0) : 0;
+  // L'ordre du classement (à égalité, l'ordre proposé).
+  const order = live ? live.places.map((_, i) => i).sort((a, b) => hearts[b] - hearts[a] || a - b) : [];
   // Les restos du vote, sous la forme qu'attendent la carte et l'ouverture dans Plans / Google Maps.
   const restos = live ? live.places.map(asRestaurant) : [];
   const top = live ? winner(live) : null;
-  const votes = live ? (live.voters === 0 ? t("pollNoVotes") : live.voters === 1 ? t("pollOneVote") : t("pollVotes", { n: live.voters })) : "";
-  // Ce qu'on affiche pour son vote : le brouillon, sinon le vote enregistré.
-  const mine = draft ?? live?.mine ?? null;
+  const votes = voters === 0 ? t("pollNoVotes") : voters === 1 ? t("pollOneVote") : t("pollVotes", { n: voters });
 
   return (
     <View style={styles.screen}>
-      <Pressable onPress={onBack} hitSlop={12} accessibilityRole="button" style={styles.back}>
-        <Text style={styles.backText}>‹ {t("pollBack")}</Text>
-      </Pressable>
+      <View style={styles.bar}>
+        <Pressable onPress={onBack} hitSlop={12} accessibilityRole="button" style={styles.back}>
+          <Text style={styles.backText}>‹ {t("pollBack")}</Text>
+        </Pressable>
+        {live && (
+          <IconButton label={t("pollShareResult")} onPress={share}>
+            <Svg width={16} height={16} viewBox="0 0 16 16">
+              <Path
+                d="M8 10V2M5 4.8 8 1.8l3 3M4.5 7H3.5v7h9V7h-1"
+                fill="none"
+                stroke={colors.accent}
+                strokeWidth={1.6}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </Svg>
+          </IconButton>
+        )}
+        {results && (
+          <IconButton label={t(poll.owner ? "pollDelete" : "pollForget")} onPress={remove} busy={deleting}>
+            <Svg width={16} height={16} viewBox="0 0 16 16">
+              <Path
+                d="M2.5 4h11M6.5 4V2.5h3V4M4 4l.7 9.5h6.6L12 4M6.7 6.5v4.5M9.3 6.5v4.5"
+                fill="none"
+                stroke={colors.accent}
+                strokeWidth={1.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </Svg>
+          </IconButton>
+        )}
+      </View>
 
       {!results && !error && <ActivityIndicator color={colors.accent} style={styles.spinner} />}
       {error && <Text style={styles.error}>{t("oops")}</Text>}
@@ -170,19 +204,17 @@ export function PollResults({ poll, home, onMapsApp, onBack, onGone }: Props) {
           {order.map((i) => {
             const place = live.places[i];
             const r = restos[i];
-            const hearts = live.hearts[i];
+            const count = hearts[i];
             // Ex aequo : même rang. Pas de rang tant que personne n'a voté.
-            const rank = 1 + live.hearts.filter((h) => h > hearts).length;
+            const rank = 1 + hearts.filter((h) => h > count).length;
             const like = mine?.[i] === true;
             const cuisine = place.cuisine ? cuisineLabel(place.cuisine) : null;
             const tap = () => {
               Haptics.selectionAsync();
               setFocused(r.id);
               if (live.closed) return;
-              setDraft((d) => {
-                const next = d ?? live.mine ?? live.places.map(() => false);
-                return next.map((v, j) => (j === i ? !v : v));
-              });
+              const before = mine ?? live.places.map(() => false);
+              vote(before.map((v, j) => (j === i ? !v : v)));
             };
             return (
               <View key={r.id} style={[styles.option, focused === r.id && styles.optionFocused]}>
@@ -191,9 +223,9 @@ export function PollResults({ poll, home, onMapsApp, onBack, onGone }: Props) {
                   onPress={tap}
                   accessibilityRole={live.closed ? "button" : "checkbox"}
                   accessibilityState={live.closed ? undefined : { checked: like }}
-                  accessibilityLabel={`${live.voters ? `${rank}. ` : ""}${place.name}, ❤️ ${hearts}`}
+                  accessibilityLabel={`${voters ? `${rank}. ` : ""}${place.name}, ❤️ ${count}`}
                 >
-                  <Text style={[styles.rank, rank === 1 && hearts > 0 && styles.rankFirst]}>{live.voters ? rank : "·"}</Text>
+                  <Text style={[styles.rank, rank === 1 && count > 0 && styles.rankFirst]}>{voters ? rank : "·"}</Text>
                   <View style={styles.optionText}>
                     <Text style={styles.name} numberOfLines={1}>
                       {place.name}
@@ -205,29 +237,14 @@ export function PollResults({ poll, home, onMapsApp, onBack, onGone }: Props) {
                     )}
                   </View>
                   <Text style={[styles.likes, like && styles.likesOn]}>
-                    {like ? "❤️" : "♡"} {hearts}
+                    {like ? "❤️" : "♡"} {count}
                   </Text>
                 </Pressable>
                 <OpenInMaps place={r} onMapsApp={onMapsApp} />
               </View>
             );
           })}
-          {draft && !live.closed && (
-            <Pressable style={({ pressed }) => [styles.primary, pressed && styles.pressed]} onPress={sendVote} disabled={sending} accessibilityRole="button">
-              {sending ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>{t(live.mine ? "pollChangeVote" : "pollSendVote")}</Text>}
-            </Pressable>
-          )}
-          {!draft && !live.closed && !live.mine && <Text style={styles.hint}>{t("pollTapToVote")}</Text>}
-
-          <Pressable style={({ pressed }) => [styles.secondary, pressed && styles.pressed]} onPress={shareResult} accessibilityRole="button">
-            <Text style={styles.secondaryText}>🏆 {t("pollShareResult")}</Text>
-          </Pressable>
-          <Pressable onPress={shareLink} accessibilityRole="link" accessibilityLabel={t("pollResend")} hitSlop={8}>
-            <Text style={styles.link}>🔗 {poll.url.replace(/^https?:\/\//, "")}</Text>
-          </Pressable>
-          <Pressable style={({ pressed }) => [styles.delete, pressed && styles.pressed]} onPress={remove} disabled={deleting} accessibilityRole="button">
-            {deleting ? <ActivityIndicator color={colors.accent} /> : <Text style={styles.deleteText}>{t(poll.owner ? "pollDelete" : "pollForget")}</Text>}
-          </Pressable>
+          {!live.closed && !mine && <Text style={styles.hint}>{t("pollTapToVote")}</Text>}
         </ScrollView>
       )}
     </View>
@@ -236,7 +253,9 @@ export function PollResults({ poll, home, onMapsApp, onBack, onGone }: Props) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  back: { alignSelf: "flex-start", marginBottom: 6 },
+  // En haut, comme une barre d'outils iOS : retour à gauche, partager et poubelle à droite.
+  bar: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
+  back: { flex: 1 },
   backText: { fontFamily: fonts.medium, fontSize: 16, color: colors.accent },
   spinner: { marginTop: 40 },
   error: { fontFamily: fonts.body, fontSize: 14, color: colors.accent, textAlign: "center", marginVertical: 10 },
@@ -254,8 +273,6 @@ const styles = StyleSheet.create({
   hint: { fontFamily: fonts.body, fontSize: 13, color: colors.muted, textAlign: "center" },
   final: { backgroundColor: colors.accent, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 14, alignItems: "center" },
   finalText: { fontFamily: fonts.grr, fontSize: 21, color: "#fff", textAlign: "center" },
-  primary: { backgroundColor: colors.accent, borderRadius: 999, paddingVertical: 14, alignItems: "center" },
-  primaryText: { fontFamily: fonts.title, fontSize: 16, color: "#fff" },
   name: { flex: 1, fontFamily: fonts.title, fontSize: 18, color: colors.ink },
   info: { fontFamily: fonts.body, fontSize: 13, color: colors.muted, marginTop: 3 },
   secondary: {
@@ -267,8 +284,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   secondaryText: { fontFamily: fonts.title, fontSize: 16, color: colors.ink },
-  link: { fontFamily: fonts.medium, fontSize: 15, color: colors.accent, textAlign: "center", textDecorationLine: "underline", paddingVertical: 6 },
-  delete: { paddingVertical: 14, alignItems: "center" },
-  deleteText: { fontFamily: fonts.medium, fontSize: 15, color: colors.accent },
   pressed: { transform: [{ scale: 0.97 }] },
 });
