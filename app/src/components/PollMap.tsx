@@ -19,11 +19,30 @@ type Props = {
   height?: number;
 };
 
-const PADDING = { top: 36, right: 36, bottom: 36, left: 36 };
+// Autour des points cadrés : la boîte qui les contient, agrandie de moitié (pour le point rouge et son halo),
+// et jamais plus serrée qu'un pâté de maisons.
+const MARGIN = 1.5;
+const MIN_DELTA = 0.003;
 // Au premier affichage : toi et les restos les plus proches de la liste.
 const FIRST_FRAME = 8;
 // Un resto touché : la carte va dessus, à cette échelle (en degrés, un pâté de maisons ou deux).
 const FOCUS_DELTA = 0.005;
+
+/**
+ * La région qui montre tous ces points. Calculée ici plutôt que par fitToCoordinates : celui-ci dépend de la
+ * taille de la carte au moment de l'appel, encore fausse pendant que la feuille glisse (carte trop dézoomée).
+ */
+function regionAround(points: LatLng[]): Region {
+  const lats = points.map((p) => p.latitude);
+  const lngs = points.map((p) => p.longitude);
+  const [minLat, maxLat, minLng, maxLng] = [Math.min(...lats), Math.max(...lats), Math.min(...lngs), Math.max(...lngs)];
+  return {
+    latitude: (minLat + maxLat) / 2,
+    longitude: (minLng + maxLng) / 2,
+    latitudeDelta: Math.max((maxLat - minLat) * MARGIN, MIN_DELTA),
+    longitudeDelta: Math.max((maxLng - minLng) * MARGIN, MIN_DELTA),
+  };
+}
 
 /** Plus grand cercle centré sur la carte qui tient dans la vue. */
 function viewportCircle(region: Region): Area {
@@ -41,8 +60,10 @@ export function PollMap({ home, places, picked, focused, onSelect, onMove, heigh
   const map = useRef<MapView>(null);
   // La carte n'accepte un cadrage qu'une fois prête (avant, il était perdu : carte trop dézoomée).
   const [ready, setReady] = useState(false);
-  // Nos recadrages ne comptent pas comme un déplacement.
-  const ignoreUntil = useRef(0);
+  // Un doigt sur la carte depuis notre dernier cadrage : seul ce déplacement-là compte comme « chercher ici ».
+  // (La carte annonce aussi des déplacements toute seule : à l'ouverture, avant même d'être prête, et pendant
+  // nos cadrages.)
+  const finger = useRef(false);
   // Tant qu'on n'a touché à rien (carte, ligne, case), le cadrage d'ouverture suit la liste : celle de la vue
   // principale d'abord, puis les restos d'à côté (fermés compris), souvent plus proches.
   const touched = useRef(false);
@@ -50,8 +71,8 @@ export function PollMap({ home, places, picked, focused, onSelect, onMove, heigh
 
   const fit = (points: LatLng[]) => {
     if (!map.current) return;
-    ignoreUntil.current = Date.now() + 1500;
-    map.current.fitToCoordinates([home, ...points], { edgePadding: PADDING, animated: true });
+    finger.current = false;
+    map.current.animateToRegion(regionAround([home, ...points]), 350);
   };
 
   // Cadrage d'ouverture, dès que la carte est prête et à chaque nouvelle liste : toi et les plus proches (sans
@@ -68,7 +89,7 @@ export function PollMap({ home, places, picked, focused, onSelect, onMove, heigh
     const spot = [...picked, ...places].find((r) => r.id === focused);
     if (!ready || !spot || !map.current) return;
     touched.current = true;
-    ignoreUntil.current = Date.now() + 1500;
+    finger.current = false;
     map.current.animateToRegion({ ...spot.location, latitudeDelta: FOCUS_DELTA, longitudeDelta: FOCUS_DELTA }, 350);
   }, [focused]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -86,7 +107,7 @@ export function PollMap({ home, places, picked, focused, onSelect, onMove, heigh
   const shown = [...picked, ...places.filter((r) => !pickedIds.includes(r.id))];
 
   return (
-    <View style={[styles.box, { height }]}>
+    <View style={[styles.box, { height }]} onTouchStart={() => (finger.current = true)}>
       <MapView
         ref={map}
         style={StyleSheet.absoluteFill}
@@ -96,12 +117,9 @@ export function PollMap({ home, places, picked, focused, onSelect, onMove, heigh
         toolbarEnabled={false}
         rotateEnabled={false}
         pitchEnabled={false}
-        onMapReady={() => {
-          ignoreUntil.current = Date.now() + 1500;
-          setReady(true);
-        }}
+        onMapReady={() => setReady(true)}
         onRegionChangeComplete={(region) => {
-          if (Date.now() < ignoreUntil.current) return;
+          if (!finger.current) return;
           touched.current = true;
           onMove?.(viewportCircle(region));
         }}

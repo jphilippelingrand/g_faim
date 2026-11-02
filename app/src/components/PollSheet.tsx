@@ -90,10 +90,13 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onM
       })
       .finally(() => id === requestId.current && setLoading(false));
   };
+  // À l'ouverture, ou dès que la position est connue (feuille ouverte par un lien avant elle) : autour de soi.
   useEffect(() => {
-    if (visible && home.latitude) fetchChoices(PAGE);
+    if (!visible || !home.latitude) return;
+    search.current = (count) => nearest(home, count);
+    fetchChoices(PAGE);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
+  }, [visible, home.latitude, home.longitude]);
   // La suite quand on approche du bas de la liste.
   const loadMore = () => {
     if (loading || !hasMore) return;

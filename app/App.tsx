@@ -203,6 +203,12 @@ function Main() {
         (url.split("?")[1] ?? "").split("&").filter(Boolean).map((kv) => kv.split("=").map(decodeURIComponent)),
       );
       if (params.card !== undefined) startCard.current = Number(params.card) || 0;
+      // gfaim://?vote=1 : la feuille « On mange où ? » ouverte d'office (captures, essais sur le simulateur).
+      if (params.vote === "1") {
+        setPollFromLink(null);
+        setPollKey((k) => k + 1);
+        setPollOpen(true);
+      }
       if (params.faim === "1") {
         // L'app tournait peut-être déjà : on reprend la position pour relancer la recherche autour de soi.
         goToFirst.current = true;
