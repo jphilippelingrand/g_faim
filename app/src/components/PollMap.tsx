@@ -48,7 +48,7 @@ function regionAround(points: LatLng[]): Region {
 
 /**
  * La petite carte des votes : les restos proposés en gris, les cochés en rouge. Elle s'ouvre sur toi et les
- * restos d'à côté ; un resto touché, elle va dessus ; la sélection change, elle cadre tous les cochés (et
+ * restos d'à côté ; un resto touché, elle va dessus ; la sélection change, elle cadre tous les cochés (sans
  * toi). Chaque fois qu'elle s'arrête, elle donne sa zone visible (onView) : on y charge tous les restos.
  */
 export function PollMap({ home, places, picked, focused, onSelect, onView, height = 190 }: Props) {
@@ -64,10 +64,11 @@ export function PollMap({ home, places, picked, focused, onSelect, onView, heigh
   const touched = useRef(false);
   const pickedIds = picked.map((r) => r.id);
 
-  const fit = (points: LatLng[]) => {
+  /** Cadre ces points ; avec `withHome`, toi aussi. */
+  const fit = (points: LatLng[], withHome = true) => {
     if (!map.current) return;
     finger.current = false;
-    map.current.animateToRegion(regionAround([home, ...points]), 350);
+    map.current.animateToRegion(regionAround(withHome ? [home, ...points] : points), 350);
   };
 
   // Cadrage d'ouverture, dès que la carte est prête et à chaque nouvelle liste : toi et les plus proches (sans
@@ -89,14 +90,15 @@ export function PollMap({ home, places, picked, focused, onSelect, onView, heigh
     map.current.animateToRegion({ ...spot.location, latitudeDelta: FOCUS_DELTA, longitudeDelta: FOCUS_DELTA }, 350);
   }, [focused]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // La sélection change (coché, décoché) : on cadre tous les cochés, avec toi.
+  // La sélection change (coché, décoché) : on cadre les cochés seulement, autour de leur centre (sans toi : on
+  // vote souvent pour un resto ailleurs). Un seul coché : la carte va dessus, comme un resto touché.
   const pickedKey = pickedIds.join();
   const firstPicked = useRef(pickedKey);
   useEffect(() => {
     if (!ready || pickedKey === firstPicked.current) return;
     firstPicked.current = pickedKey;
     touched.current = true;
-    if (picked.length) fit(picked.map((r) => r.location));
+    if (picked.length) fit(picked.map((r) => r.location), false);
   }, [pickedKey, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Les cochés d'abord (dessinés par-dessus), puis les autres restos proposés.
