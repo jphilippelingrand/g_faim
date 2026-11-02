@@ -56,11 +56,38 @@ const SITE = "https://www.groubl.com";
 // En mode liste, le panneau du bas prend cette part de l'écran ; la carte reste visible au-dessus.
 const LIST_SHARE = 0.55;
 
+// Une position de moins de 2 min (une autre app, ou la nôtre) suffit : réponse immédiate.
+const FRESH_MS = 2 * 60_000;
+// Au-delà, on ne bloque plus l'écran : on prend la dernière connue s'il y en a une.
+const FIX_TIMEOUT_MS = 10_000;
+
+/**
+ * Où on est. iOS répond parfois « position indisponible » juste après le lancement (pas encore de fix GPS,
+ * à l'intérieur, téléphone tout juste déverrouillé) : on réessaie une fois en précision réduite, et on se
+ * rabat sur la dernière position connue (jusqu'à 30 min) plutôt que d'afficher une erreur.
+ */
 async function getPosition(): Promise<LatLng> {
   const { status } = await Location.requestForegroundPermissionsAsync();
   if (status !== "granted") throw new Error(t("geolocationDenied"));
-  const { coords } = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-  return { latitude: coords.latitude, longitude: coords.longitude };
+  const asLatLng = ({ coords }: Location.LocationObject) => ({ latitude: coords.latitude, longitude: coords.longitude });
+  const last = await Location.getLastKnownPositionAsync({ maxAge: 30 * 60_000 }).catch(() => null);
+  if (last && Date.now() - last.timestamp < FRESH_MS) return asLatLng(last);
+  const fix = (accuracy: Location.Accuracy) =>
+    Promise.race([
+      Location.getCurrentPositionAsync({ accuracy }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), FIX_TIMEOUT_MS)),
+    ]);
+  try {
+    return asLatLng(await fix(Location.Accuracy.Balanced));
+  } catch (err) {
+    if (last) return asLatLng(last);
+    try {
+      return asLatLng(await fix(Location.Accuracy.Low));
+    } catch {
+      console.warn("Position", err);
+      throw new Error(t("geolocationDenied"));
+    }
+  }
 }
 
 /**
