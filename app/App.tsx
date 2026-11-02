@@ -11,6 +11,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-cont
 import { SearchingLady } from "./src/components/SearchingLady";
 import { SwipeDeck } from "./src/components/SwipeDeck";
 import { PlaceList } from "./src/components/PlaceList";
+import { MainMenu, type ViewMode } from "./src/components/MainMenu";
 import { PollSheet } from "./src/components/PollSheet";
 import { RestaurantMap } from "./src/components/RestaurantMap";
 import { updateWidget } from "./src/lib/widget";
@@ -39,7 +40,6 @@ SplashScreen.preventAutoHideAsync();
 type Phase = "locating" | "searching" | "done" | "error";
 
 /** Le paquet de cartes à glisser, ou la liste qu'on fait défiler ; choix retenu par l'iPhone. */
-type ViewMode = "cards" | "list";
 const VIEW_MODE_KEY = "viewMode";
 const savedViewMode = (): ViewMode => (Platform.OS === "ios" && Settings.get(VIEW_MODE_KEY) === "list" ? "list" : "cards");
 // « Ouverts » : seulement les restos ouverts (par défaut), ou tous ceux d'à côté. Retenu d'une fois sur l'autre.
@@ -254,16 +254,14 @@ function Main() {
     }
   }, [top]);
 
-  const toggleOpenOnly = () => {
-    Haptics.selectionAsync();
-    const next = !openOnly;
-    setOpenOnly(next);
-    if (Platform.OS === "ios") Settings.set({ [OPEN_ONLY_KEY]: next ? 1 : 0 });
+  // Le menu « ⋯ » : montrer aussi les restos fermés, c'est couper le filtre « ouverts seulement ».
+  const changeShowClosed = (show: boolean) => {
+    setOpenOnly(!show);
+    if (Platform.OS === "ios") Settings.set({ [OPEN_ONLY_KEY]: show ? 0 : 1 });
   };
 
   const changeViewMode = (mode: ViewMode) => {
     if (mode === viewMode) return;
-    Haptics.selectionAsync();
     setViewMode(mode);
     if (Platform.OS === "ios") Settings.set({ [VIEW_MODE_KEY]: mode });
   };
@@ -366,34 +364,15 @@ function Main() {
             <Text style={styles.modeIcon}>🧑‍🤝‍🧑</Text>
           </Pressable>
         )}
-        {/* Cartes à glisser ou liste : le choix reste d'une fois sur l'autre. */}
-        <View style={styles.modeSwitch} accessibilityRole="tablist" accessibilityLabel={t("viewMode")}>
-          {(["cards", "list"] as const).map((mode) => (
-            <Pressable
-              key={mode}
-              style={[styles.modeOption, viewMode === mode && styles.modeOptionOn]}
-              onPress={() => changeViewMode(mode)}
-              accessibilityRole="tab"
-              accessibilityLabel={t(mode === "cards" ? "modeCards" : "modeList")}
-              accessibilityState={{ selected: viewMode === mode }}
-            >
-              <Text style={[styles.modeIcon, mode === "list" && styles.modeIconLines]}>{mode === "cards" ? "❤️" : "☰"}</Text>
-            </Pressable>
-          ))}
-        </View>
+        {/* Le reste dans un menu : la vue (swipe ou liste) et les restos fermés. Les choix restent d'une fois sur l'autre. */}
+        <MainMenu
+          top={insets.top + 56}
+          viewMode={viewMode}
+          onViewMode={changeViewMode}
+          showClosed={!openOnly}
+          onShowClosed={changeShowClosed}
+        />
       </View>
-
-      {/* Le filtre « Ouverts », sous les boutons du haut : coupé, tous les restos d'à côté, fermés compris. */}
-      <Pressable
-        style={({ pressed }) => [styles.openFilter, { top: insets.top + 58 }, openOnly && styles.openFilterOn, pressed && styles.pressed]}
-        onPress={toggleOpenOnly}
-        accessibilityRole="switch"
-        accessibilityLabel={t("openOnlyLabel")}
-        accessibilityState={{ checked: openOnly }}
-      >
-        <View style={[styles.openDot, openOnly && styles.openDotOn]} />
-        <Text style={[styles.openText, openOnly && styles.openTextOn]}>{t("openOnly")}</Text>
-      </Pressable>
 
       {/* Même sans position (lien de vote ouvert à froid) : on peut voter, pas encore en lancer un. */}
       <PollSheet
@@ -542,41 +521,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 1 },
   },
-  openFilter: {
-    position: "absolute",
-    right: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 999,
-    backgroundColor: "rgba(251, 246, 239, 0.94)",
-    shadowColor: colors.ink,
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 1 },
-  },
-  openFilterOn: { backgroundColor: colors.accent },
-  openDot: { width: 8, height: 8, borderRadius: 4, borderWidth: 1.5, borderColor: colors.muted },
-  openDotOn: { backgroundColor: "#fff", borderColor: "#fff" },
-  openText: { fontFamily: fonts.medium, fontSize: 13, color: colors.muted },
-  openTextOn: { color: "#fff" },
-  modeSwitch: {
-    flexDirection: "row",
-    padding: 3,
-    borderRadius: 999,
-    backgroundColor: "rgba(251, 246, 239, 0.94)",
-    shadowColor: colors.ink,
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 1 },
-  },
-  modeOption: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
-  modeOptionOn: { backgroundColor: colors.accentSoft },
   modeIcon: { fontSize: 18 },
-  // ☰ est un caractère, pas un emoji : on lui donne la couleur et la taille de l'emoji voisin.
-  modeIconLines: { fontSize: 20, lineHeight: 24, color: colors.ink },
   listArea: { flex: 1 },
   panel: {
     position: "absolute",
