@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import MapView, { Marker, type Region } from "react-native-maps";
 import { distanceMeters, type Box, type LatLng, type Restaurant } from "../lib/places";
-import { MapDot } from "./MapDot";
+import { clusterize, regionOf } from "../lib/clusters";
+import { ClusterDot, MapDot } from "./MapDot";
 import { colors } from "../theme";
 
 type Props = {
@@ -16,6 +17,8 @@ type Props = {
   onSelect: (id: string) => void;
   /** La carte s'est arrêtée (cadrage, ou déplacée au doigt) : la zone visible, pour y charger les restos. */
   onView?: (box: Box) => void;
+  /** Des restos à cadrer dès qu'ils changent (les résultats d'une recherche par nom), sans toi. */
+  frame?: Restaurant[];
   height?: number;
 };
 
@@ -51,7 +54,7 @@ function regionAround(points: LatLng[]): Region {
  * restos d'à côté ; un resto touché, elle va dessus ; la sélection change, elle cadre tous les cochés (sans
  * toi). Chaque fois qu'elle s'arrête, elle donne sa zone visible (onView) : on y charge tous les restos.
  */
-export function PollMap({ home, places, picked, focused, onSelect, onView, height = 190 }: Props) {
+export function PollMap({ home, places, picked, focused, onSelect, onView, frame, height = 190 }: Props) {
   const map = useRef<MapView>(null);
   // La carte n'accepte un cadrage qu'une fois prête (avant, il était perdu : carte trop dézoomée).
   const [ready, setReady] = useState(false);
@@ -63,6 +66,9 @@ export function PollMap({ home, places, picked, focused, onSelect, onView, heigh
   // principale d'abord, puis les restos d'à côté (fermés compris), souvent plus proches.
   const touched = useRef(false);
   const pickedIds = picked.map((r) => r.id);
+  // La vue où la carte s'est arrêtée et sa largeur : pour regrouper les restos trop proches à ce zoom.
+  const [region, setRegion] = useState<Region | null>(null);
+  const [width, setWidth] = useState(0);
 
   /** Cadre ces points ; avec `withHome`, toi aussi. */
   const fit = (points: LatLng[], withHome = true) => {
@@ -101,11 +107,29 @@ export function PollMap({ home, places, picked, focused, onSelect, onView, heigh
     if (picked.length) fit(picked.map((r) => r.location), false);
   }, [pickedKey, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Les cochés d'abord (dessinés par-dessus), puis les autres restos proposés.
-  const shown = [...picked, ...places.filter((r) => !pickedIds.includes(r.id))];
+  // Une recherche par nom a trouvé des restos : on les cadre (sans toi : ils sont peut-être à l'autre bout de la ville).
+  const frameKey = frame?.map((r) => r.id).join() ?? "";
+  useEffect(() => {
+    if (!ready || !frame?.length) return;
+    touched.current = true;
+    fit(frame.map((r) => r.location), false);
+  }, [frameKey, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Les cochés d'abord (dessinés par-dessus), puis les autres restos proposés : ceux-là, regroupés quand ils sont
+  // trop serrés (les cochés et celui qu'on regarde restent toujours seuls).
+  const { singles, clusters } = useMemo(
+    () => clusterize(places.filter((r) => !pickedIds.includes(r.id) && r.id !== focused), region, width),
+    [places, pickedKey, focused, region, width], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const focusedSpot = places.find((r) => r.id === focused && !pickedIds.includes(r.id));
+  const shown = [...picked, ...(focusedSpot ? [focusedSpot] : []), ...singles];
 
   return (
-    <View style={[styles.box, { height }]} onTouchStart={() => (finger.current = true)}>
+    <View
+      style={[styles.box, { height }]}
+      onTouchStart={() => (finger.current = true)}
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+    >
       <MapView
         ref={map}
         style={StyleSheet.absoluteFill}
@@ -118,6 +142,7 @@ export function PollMap({ home, places, picked, focused, onSelect, onView, heigh
         onMapReady={() => setReady(true)}
         onRegionChangeComplete={(region) => {
           if (!ready) return;
+          setRegion(region);
           if (finger.current) touched.current = true;
           onView?.(region);
         }}
@@ -132,10 +157,26 @@ export function PollMap({ home, places, picked, focused, onSelect, onView, heigh
               tracksViewChanges={state === "selected"}
               zIndex={state === "selected" ? 200 : state === "picked" ? 100 : 50 - Math.min(i, 49)}
             >
-              <MapDot state={state} />
+              {/* Au vote, tout est neutre sauf les cochés : ouvert ou fermé, c'est la liste qui le dit. */}
+              <MapDot state={state} open={r.open} neutral={state !== "picked" && !pickedIds.includes(r.id)} />
             </Marker>
           );
         })}
+        {clusters.map((c) => (
+          <Marker
+            key={`${c.key}-${c.members.length}-${c.open}`}
+            coordinate={c.location}
+            onPress={() => {
+              touched.current = true;
+              finger.current = false;
+              map.current?.animateToRegion(regionOf(c.members), 350);
+            }}
+            tracksViewChanges={false}
+            zIndex={60}
+          >
+            <ClusterDot count={c.members.length} open={false} />
+          </Marker>
+        ))}
       </MapView>
     </View>
   );

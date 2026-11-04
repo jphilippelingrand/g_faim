@@ -1,10 +1,23 @@
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cuisineLabel } from "../lib/osm";
 import type { MapsApp } from "../lib/mapsApp";
-import { distanceMeters, formatDistance, inView, nearest, PAGE, type Box, type LatLng, type Restaurant } from "../lib/places";
+import { byName, distanceMeters, formatDistance, inView, nearest, PAGE, type Box, type LatLng, type Restaurant } from "../lib/places";
 import {
   createPoll,
   myPolls,
@@ -54,6 +67,12 @@ const TTL_LABEL = { "1h": "pollTtlHour", "1d": "pollTtlDay", "1w": "pollTtlWeek"
  */
 export function PollSheet({ visible, places, home, preselected, initialPoll, onMapsApp, onClose }: Props) {
   const insets = useSafeAreaInsets();
+  // La carte prend une bonne part de la feuille : on y voit assez de rues pour s'y retrouver. Pendant qu'on tape
+  // un nom, le clavier prend le bas : la carte rapetisse, la durée et le bouton s'effacent, pour que la liste des
+  // résultats reste visible.
+  const { height: screenHeight } = useWindowDimensions();
+  const [typing, setTyping] = useState(false);
+  const mapHeight = typing ? 150 : Math.round(Math.min(Math.max(screenHeight * 0.36, 220), 380));
   // Les restos cochés eux-mêmes (pas seulement leur identifiant) : ils restent cochés quand la liste change de zone.
   const [picked, setPicked] = useState<Restaurant[]>(() => places.filter((r) => r.id === preselected));
   const [focused, setFocused] = useState<string | null>(null);
@@ -85,7 +104,37 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onM
   }, [visible, home.latitude, home.longitude]);
   // La carte s'est arrêtée : tous les restos de la zone visible, du plus proche au plus loin de soi. La carte
   // et la liste montrent ainsi la même chose.
-  const showView = (box: Box) => load(() => inView(box, home));
+  const showView = (box: Box) => {
+    if (!active) load(() => inView(box, home));
+  };
+
+  // La recherche par nom : tant qu'elle est tapée, la liste et la carte montrent ses résultats (la carte les
+  // cadre), plus la zone visible. Effacée, on revient à la zone visible.
+  const [query, setQuery] = useState("");
+  // La dernière réponse reçue, avec ce qui avait été tapé : on garde la précédente le temps que la suivante arrive.
+  const [result, setResult] = useState<{ text: string; list: Restaurant[] } | null>(null);
+  const text = query.trim();
+  const active = text.length >= 2;
+  const found = active ? (result?.list ?? []) : null;
+  const searching = active && result?.text !== text;
+  useEffect(() => {
+    if (!active) return;
+    let stale = false;
+    // Un petit temps après la dernière lettre : pas une recherche par touche.
+    const timer = setTimeout(() => {
+      byName(text, home)
+        .then((list) => !stale && setResult({ text, list }))
+        .catch((err) => {
+          console.error(err);
+          if (!stale) setResult({ text, list: [] });
+        });
+    }, 250);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+  }, [active, text, home]);
+  const listed = found ?? choices;
 
   // Où en sont ses sondages : une lecture chacun à l'ouverture, et au retour des résultats.
   useEffect(() => {
@@ -145,7 +194,7 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onM
   const ready = picked.length >= POLL_MIN;
   const shown = running.filter((p) => statuses[p.url] !== "expired");
   // Les restos cochés en tête de liste (dans l'ordre où on les a cochés), les autres suivent.
-  const ordered = [...picked, ...choices.filter((r) => !isPicked(r.id))];
+  const ordered = [...picked, ...listed.filter((r) => !isPicked(r.id))];
 
   // Ses votes : une rangée de pastilles qui défile de côté, pour laisser la place à la carte et à la liste.
   const runningSection = shown.length > 0 && (
@@ -177,7 +226,7 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onM
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={[styles.sheet, { paddingBottom: insets.bottom + 12 }]}>
+      <KeyboardAvoidingView behavior="padding" style={[styles.sheet, { paddingBottom: typing ? 8 : insets.bottom + 12 }]}>
         <View style={styles.header}>
           <Text style={styles.title}>{t("pollTitle")}</Text>
           <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel={t("cancel")}>
@@ -191,15 +240,51 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onM
           <>
             {runningSection}
 
-            <PollMap home={home} places={choices} picked={picked} focused={focused} onSelect={focusFromMap} onView={showView} />
+            <PollMap
+              home={home}
+              places={listed}
+              picked={picked}
+              focused={focused}
+              onSelect={focusFromMap}
+              onView={showView}
+              frame={found ?? undefined}
+              height={mapHeight}
+            />
 
-            <Text style={styles.sub}>{t("pollPickHint", { max: POLL_MAX })}</Text>
+            <View style={styles.search}>
+              <Text style={styles.searchIcon}>🔍</Text>
+              <TextInput
+                style={styles.searchInput}
+                value={query}
+                onChangeText={setQuery}
+                placeholder={t("pollSearch")}
+                placeholderTextColor={colors.muted}
+                returnKeyType="search"
+                autoCorrect={false}
+                accessibilityLabel={t("pollSearch")}
+                onFocus={() => setTyping(true)}
+                onBlur={() => setTyping(false)}
+              />
+              {searching ? (
+                <ActivityIndicator size="small" color={colors.accent} />
+              ) : (
+                query.length > 0 && (
+                  <Pressable onPress={() => setQuery("")} hitSlop={10} accessibilityRole="button" accessibilityLabel={t("cancel")}>
+                    <Text style={styles.searchClear}>✕</Text>
+                  </Pressable>
+                )
+              )}
+            </View>
 
             <FlatList
               ref={list}
               style={styles.list}
               data={ordered}
               keyExtractor={(r) => r.id}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              ListHeaderComponent={found === null ? <Text style={styles.sub}>{t("pollPickHint", { max: POLL_MAX })}</Text> : undefined}
+              ListEmptyComponent={found && !searching ? <Text style={styles.sub}>{t("pollNoMatch")}</Text> : undefined}
               onScrollToIndexFailed={({ index }) => list.current?.scrollToOffset({ offset: index * 62, animated: true })}
               ListFooterComponent={!choices.length ? <ActivityIndicator style={styles.more} color={colors.accent} /> : undefined}
               ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -244,33 +329,37 @@ export function PollSheet({ visible, places, home, preselected, initialPoll, onM
               }}
             />
 
-            <Text style={styles.label}>{t("pollTtl")}</Text>
-            <View style={styles.ttls}>
-              {POLL_TTLS.map((value) => (
-                <Pressable
-                  key={value}
-                  style={[styles.ttl, ttl === value && styles.ttlOn]}
-                  onPress={() => setTtl(value)}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: ttl === value }}
-                >
-                  <Text style={[styles.ttlText, ttl === value && styles.ttlTextOn]}>{t(TTL_LABEL[value])}</Text>
-                </Pressable>
-              ))}
-            </View>
+            {!typing && (
+              <>
+              <Text style={styles.label}>{t("pollTtl")}</Text>
+              <View style={styles.ttls}>
+                {POLL_TTLS.map((value) => (
+                  <Pressable
+                    key={value}
+                    style={[styles.ttl, ttl === value && styles.ttlOn]}
+                    onPress={() => setTtl(value)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: ttl === value }}
+                  >
+                    <Text style={[styles.ttlText, ttl === value && styles.ttlTextOn]}>{t(TTL_LABEL[value])}</Text>
+                  </Pressable>
+                ))}
+              </View>
 
-            {error && <Text style={styles.error}>{t("oops")}</Text>}
-            <Pressable
-              style={({ pressed }) => [styles.create, !ready && styles.createOff, pressed && ready && styles.pressed]}
-              onPress={create}
-              disabled={!ready || busy}
-              accessibilityRole="button"
-            >
-              {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.createText}>{t("pollCreate", { n: picked.length })}</Text>}
-            </Pressable>
+              {error && <Text style={styles.error}>{t("oops")}</Text>}
+              <Pressable
+                style={({ pressed }) => [styles.create, !ready && styles.createOff, pressed && ready && styles.pressed]}
+                onPress={create}
+                disabled={!ready || busy}
+                accessibilityRole="button"
+              >
+                {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.createText}>{t("pollCreate", { n: picked.length })}</Text>}
+              </Pressable>
+              </>
+            )}
           </>
         )}
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -280,7 +369,22 @@ const styles = StyleSheet.create({
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 2 },
   title: { fontFamily: fonts.grr, fontSize: 30, color: colors.ink },
   close: { fontSize: 22, color: colors.muted },
-  sub: { fontFamily: fonts.body, fontSize: 14, color: colors.muted, marginTop: 10 },
+  sub: { fontFamily: fonts.body, fontSize: 14, color: colors.muted, marginTop: 8, marginBottom: 2 },
+  search: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 10,
+    paddingHorizontal: 14,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.line,
+  },
+  searchIcon: { fontSize: 14 },
+  searchInput: { flex: 1, fontFamily: fonts.body, fontSize: 15.5, color: colors.ink, paddingVertical: 0 },
+  searchClear: { fontSize: 15, color: colors.muted },
   list: { flex: 1, marginTop: 4 },
   section: {
     fontFamily: fonts.medium,

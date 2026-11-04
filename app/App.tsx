@@ -4,7 +4,7 @@ import * as Haptics from "expo-haptics";
 import * as Location from "expo-location";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Image, Linking, Platform, Pressable, Settings, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -21,6 +21,7 @@ import { onPollNotification } from "./src/lib/notifications";
 import {
   distanceMeters,
   formatClosingTime,
+  inView,
   nearest,
   nearestInView,
   nearestOpen,
@@ -28,6 +29,7 @@ import {
   PAGE,
   travelTime,
   type Area,
+  type Box,
   type LatLng,
   type Restaurant,
   type Search,
@@ -104,6 +106,10 @@ function Main() {
   const [home, setHome] = useState<LatLng | null>(null);
   const [top, setTop] = useState<Restaurant[]>([]);
   const [area, setArea] = useState<Area | null>(null);
+  // Tous les restos de la zone visible de la carte (pas seulement la pile de cartes) : la carte les montre,
+  // regroupés quand ils sont serrés, pour qu'elle ne soit pas vide autour du centre quand on dézoome.
+  const [around, setAround] = useState<Restaurant[]>([]);
+  const aroundId = useRef(0);
   const [current, setCurrent] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -262,6 +268,20 @@ function Main() {
     [run, openOnly],
   );
 
+  // La carte s'est arrêtée (y compris sur nos recadrages) : on recharge tous les restos de sa zone visible.
+  const onMapStop = useCallback(
+    (box: Box) => {
+      if (!home) return;
+      const id = ++aroundId.current;
+      inView(box, home)
+        .then((list) => id === aroundId.current && setAround(list))
+        .catch(console.error);
+    },
+    [home],
+  );
+  // Avec le filtre « ouverts seulement », pas de restos fermés sur la carte (ceux aux horaires inconnus restent).
+  const aroundShown = useMemo(() => (openOnly ? around.filter((r) => r.open !== false) : around), [around, openOnly]);
+
   // La suite : on refait la recherche avec une page de plus. Ceux déjà vus gardent leur place (et leur numéro),
   // les nouveaux s'ajoutent derrière.
   const loadMore = useCallback(async () => {
@@ -317,9 +337,16 @@ function Main() {
   const onSelectFromMap = useCallback(
     (id: string) => {
       Haptics.selectionAsync();
-      show(top.findIndex((r) => r.id === id));
+      const index = top.findIndex((r) => r.id === id);
+      if (index >= 0) return show(index);
+      // Un resto de la carte qui n'est pas (encore) dans la pile : il s'y glisse juste après la carte du dessus.
+      const place = around.find((r) => r.id === id);
+      if (!place) return;
+      const at = top.length ? current + 1 : 0;
+      setTop([...top.slice(0, at), place, ...top.slice(at)]);
+      show(at);
     },
-    [show, top],
+    [show, top, around, current],
   );
 
   // L'appli de cartes retenue, qu'on peut changer en bas de l'écran.
@@ -366,6 +393,8 @@ function Main() {
         <RestaurantMap
           home={home}
           results={top}
+          around={aroundShown}
+          onMapStop={onMapStop}
           area={area}
           fitKey={fitKey}
           selectedId={top[current]?.id ?? null}
