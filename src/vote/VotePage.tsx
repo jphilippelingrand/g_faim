@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
 import { lang } from "../i18n";
+import { placeUrl } from "../lib/mapsApp";
 import { cuisineLabel } from "../lib/osm";
 import {
   API_BASE,
@@ -54,6 +55,7 @@ const TEXT = {
     closed: "Vote terminé",
     final: "🏆 Le groupe a choisi {name}",
     tie: "Égalité : à vous de trancher !",
+    onMaps: "Voir dans Maps",
   },
   en: {
     title: "Where should we eat?",
@@ -82,6 +84,7 @@ const TEXT = {
     closed: "Voting is over",
     final: "🏆 The group picked {name}",
     tie: "It's a tie: your call!",
+    onMaps: "Open in Maps",
   },
   es: {
     title: "¿Dónde comemos?",
@@ -110,6 +113,7 @@ const TEXT = {
     closed: "Votación terminada",
     final: "🏆 El grupo eligió {name}",
     tie: "Empate: ¡decidid vosotros!",
+    onMaps: "Ver en Maps",
   },
 }[lang];
 
@@ -117,7 +121,9 @@ const fill = (s: string, n: number) => s.replace("{n}", String(n));
 const THRESHOLD = 90;
 const FLY_MS = 240;
 const REFRESH_MS = 10_000;
-const IS_APPLE = /iPhone|iPad|Macintosh/.test(navigator.userAgent);
+
+// La carte (MapLibre) pèse lourd : chargée à part, la page s'affiche sans l'attendre.
+const VoteMap = lazy(() => import("./VoteMap").then((m) => ({ default: m.VoteMap })));
 
 const pollId = pagePollId();
 const pageUrl = () => `${location.origin}/v/${pollId}`;
@@ -127,13 +133,6 @@ function timeLeft(expiresAt: number): string {
   if (minutes < 60) return fill(TEXT.left.m, minutes);
   if (minutes < 48 * 60) return fill(TEXT.left.h, Math.round(minutes / 60));
   return fill(TEXT.left.d, Math.round(minutes / 1440));
-}
-
-/** La fiche du resto dans Plans (iPhone, Mac) ou Google Maps (le reste). */
-function mapsUrl(p: PollPlace): string {
-  const query = p.address ? `${p.name}, ${p.address}` : p.name;
-  if (IS_APPLE) return `https://maps.apple.com/?${new URLSearchParams({ q: query, ll: `${p.lat},${p.lng}` })}`;
-  return `https://www.google.com/maps/search/?${new URLSearchParams({ api: "1", query: p.address ? query : `${p.lat},${p.lng}` })}`;
 }
 
 /**
@@ -170,6 +169,10 @@ function Info({ place }: { place: PollPlace }) {
       )}
       <h2 className="vote-name">{place.name}</h2>
       {place.address && <p className="vote-address">{place.address}</p>}
+      {/* Sans lancer le swipe de la carte. */}
+      <a className="vote-maps" href={placeUrl(place)} target="_blank" rel="noreferrer" onPointerDown={(e) => e.stopPropagation()}>
+        📍 {TEXT.onMaps}
+      </a>
     </>
   );
 }
@@ -294,13 +297,18 @@ export function VotePage() {
           ) : sending || likes.length >= state.poll.places.length ? (
             <p className="vote-sub">{TEXT.sending}</p>
           ) : (
-            <Deck
+            <>
+              <Suspense fallback={<div className="vote-map" />}>
+                <VoteMap places={state.poll.places} selected={likes.length} />
+              </Suspense>
+              <Deck
               key={likes.length}
               place={state.poll.places[likes.length]}
               step={likes.length + 1}
               total={state.poll.places.length}
               onChoose={choose}
-            />
+              />
+            </>
           )}
         </>
       )}
@@ -377,6 +385,13 @@ function Standings({ poll, onRevote, onShare }: { poll: PollLive; onRevote: () =
         {poll.closed ? "" : `${top ? TEXT.verdict : TEXT.leading} · `}
         {poll.voters === 1 ? TEXT.votes.one : fill(TEXT.votes.many, poll.voters)}
       </p>
+      <Suspense fallback={<div className="vote-map" />}>
+        <VoteMap
+          places={poll.places}
+          selected={top ? poll.places.indexOf(top) : null}
+          labels={poll.places.map((p) => String(ranked.findIndex((r) => r.place === p) + 1))}
+        />
+      </Suspense>
       {ranked.map(({ place, hearts }, i) => (
         <div key={`${place.name}-${i}`} className={`vote-row${i === 0 && hearts > 0 ? " vote-row-top" : ""}`}>
           <div className="vote-row-head">
@@ -389,9 +404,13 @@ function Standings({ poll, onRevote, onShare }: { poll: PollLive; onRevote: () =
           <div className="vote-bar">
             <div style={{ width: `${(hearts / best) * 100}%` }} />
           </div>
-          {i === 0 && hearts > 0 && (
-            <a className="vote-button" href={mapsUrl(place)} target="_blank" rel="noreferrer">
-              {TEXT.go}
+          {i === 0 && hearts > 0 ? (
+            <a className="vote-button" href={placeUrl(place)} target="_blank" rel="noreferrer">
+              📍 {TEXT.go}
+            </a>
+          ) : (
+            <a className="vote-maps" href={placeUrl(place)} target="_blank" rel="noreferrer">
+              📍 {TEXT.onMaps}
             </a>
           )}
         </div>

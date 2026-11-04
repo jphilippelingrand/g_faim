@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
-import { lang } from "../i18n";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lang, t } from "../i18n";
 import { cuisineLabel } from "../lib/osm";
-import { distanceMeters, formatDistance, nearest, type LatLng, type Restaurant } from "../lib/places";
+import { byName, distanceMeters, formatDistance, inView, nearest, type Box, type LatLng, type Restaurant } from "../lib/places";
 import { createPoll, myPolls, POLL_MAX, POLL_MIN, POLL_TTLS, type PollTtl } from "../lib/polls";
 
 type Props = {
@@ -13,7 +13,10 @@ type Props = {
   onClose: () => void;
 };
 
-// Restos proposés à la fois ; le bouton « Plus de restos » en ajoute autant.
+// La carte (MapLibre) pèse lourd : chargée à part, à l'ouverture de la fenêtre.
+const PollMap = lazy(() => import("./PollMap").then((m) => ({ default: m.PollMap })));
+
+// Restos proposés à l'ouverture, le temps que la carte donne sa zone visible.
 const PAGE = 20;
 
 const TEXT = {
@@ -28,7 +31,6 @@ const TEXT = {
     close: "Fermer",
     error: "Oups, quelque chose a coincé. Réessaie dans un instant.",
     closedNow: "fermé en ce moment",
-    more: "Plus de restos",
   },
   en: {
     title: "Where should we eat?",
@@ -41,7 +43,6 @@ const TEXT = {
     close: "Close",
     error: "Oops, something went wrong. Try again in a moment.",
     closedNow: "closed right now",
-    more: "More places",
   },
   es: {
     title: "¿Dónde comemos?",
@@ -54,52 +55,101 @@ const TEXT = {
     close: "Cerrar",
     error: "Uy, algo ha fallado. Inténtalo de nuevo en un momento.",
     closedNow: "cerrado ahora",
-    more: "Más sitios",
   },
 }[lang];
 
 /**
  * « On mange où ? » sur le site : ses votes en cours (vers leur page), et un nouveau : on coche 2 à 5 restos,
  * on choisit la durée, et on arrive sur la page du vote (lien à copier, résultats, suppression). Comme la
- * feuille 🧑‍🤝‍🧑 de l'app. On vote souvent pour plus tard : la liste prend tous les restos autour, même fermés
- * en ce moment (c'est indiqué).
+ * feuille 🧑‍🤝‍🧑 de l'app : la carte des restos autour (cochés en corail), une recherche par nom, et la liste,
+ * ses restos cochés en tête : tous les restos de la zone visible de la carte, la liste suit quand on la
+ * déplace (les cochés restent). On vote souvent pour plus tard : la liste prend tous les restos autour, même
+ * fermés en ce moment (c'est indiqué).
+ * La case coche (la carte cadre alors tous les cochés) ; survoler une ligne grossit son resto sur la carte,
+ * cliquer dessus y emmène la carte ; un point touché sur la carte, la liste va à sa ligne.
  */
 export function PollDialog({ places, home, preselected, onClose }: Props) {
-  const [picked, setPicked] = useState<string[]>(preselected ? [preselected] : []);
+  // Les restos cochés eux-mêmes (pas seulement leur identifiant) : ils restent cochés quand la liste change de zone.
+  const [picked, setPicked] = useState<Restaurant[]>(() => places.filter((r) => r.id === preselected));
+  // Le resto survolé ou cliqué dans la liste (ou touché sur la carte) ; `fly` : la carte va dessus.
+  const [focus, setFocus] = useState<{ id: string; fly: boolean } | null>(null);
   const [ttl, setTtl] = useState<PollTtl>("1h");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
   const [running] = useState(myPolls);
   const [choices, setChoices] = useState(places);
-  const [count, setCount] = useState(PAGE);
-  const [hasMore, setHasMore] = useState(false);
+  const listRef = useRef<HTMLUListElement>(null);
+  // Seule la dernière recherche lancée a le droit d'afficher ses résultats.
+  const requestId = useRef(0);
 
-  // Les restos autour, fermés compris. Le resto coché d'office reste en tête.
+  const load = (find: () => Promise<Restaurant[]>) => {
+    const id = ++requestId.current;
+    find()
+      .then((found) => id === requestId.current && setChoices(found))
+      .catch(console.error);
+  };
+  // À l'ouverture : les plus proches, fermés compris, de quoi cadrer la carte. Ensuite, c'est la carte qui
+  // décide (showView).
   useEffect(() => {
-    let live = true;
-    nearest(home, count)
-      .then(({ list, hasMore }) => {
-        if (!live) return;
-        const kept = places.filter((r) => r.id === preselected);
-        setChoices([...kept, ...list.filter((r) => r.id !== preselected)]);
-        setHasMore(hasMore);
-      })
-      .catch(() => live && setHasMore(false));
-    return () => {
-      live = false;
-    };
-  }, [home, count, places, preselected]);
+    load(() => nearest(home, PAGE).then((found) => found.list));
+  }, [home]);
 
-  const toggle = (id: string) =>
-    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : p.length < POLL_MAX ? [...p, id] : p));
+  // La recherche par nom : tant qu'elle est tapée, la liste et la carte montrent ses résultats (la carte les
+  // cadre), plus la zone visible. Effacée, on revient à la zone visible.
+  const [query, setQuery] = useState("");
+  // La dernière réponse reçue, avec ce qui avait été tapé : on garde la précédente le temps que la suivante arrive.
+  const [result, setResult] = useState<{ text: string; list: Restaurant[] } | null>(null);
+  const text = query.trim();
+  const active = text.length >= 2;
+  const found = active ? (result?.list ?? []) : null;
+  const searching = active && result?.text !== text;
+  useEffect(() => {
+    if (!active) return;
+    let stale = false;
+    // Un petit temps après la dernière lettre : pas une recherche par touche.
+    const timer = setTimeout(() => {
+      byName(text, home)
+        .then((list) => !stale && setResult({ text, list }))
+        .catch((err) => {
+          console.error(err);
+          if (!stale) setResult({ text, list: [] });
+        });
+    }, 250);
+    return () => {
+      stale = true;
+      clearTimeout(timer);
+    };
+  }, [active, text, home]);
+
+  // La carte s'est arrêtée : tous les restos de la zone visible, du plus proche au plus loin de soi. La carte
+  // et la liste montrent ainsi la même chose (sauf pendant une recherche par nom).
+  const showView = (box: Box) => {
+    if (!active) load(() => inView(box, home));
+  };
+
+  const listed = found ?? choices;
+  const isPicked = (id: string) => picked.some((r) => r.id === id);
+  // Les restos cochés en tête de liste (dans l'ordre où on les a cochés), les autres suivent.
+  const ordered = [...picked, ...listed.filter((r) => !isPicked(r.id))];
+
+  // La case : cochée ou décochée (la carte cadre alors tous les cochés).
+  const toggle = (r: Restaurant) => {
+    setPicked((p) => (p.some((x) => x.id === r.id) ? p.filter((x) => x.id !== r.id) : p.length < POLL_MAX ? [...p, r] : p));
+    setFocus(null);
+  };
+  // Un point touché sur la carte : la liste va à sa ligne.
+  const focusFromMap = (id: string) => {
+    setFocus({ id, fly: false });
+    listRef.current?.querySelector(`[data-id="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  };
 
   async function create() {
     setBusy(true);
     setError(false);
     try {
-      // Dans l'ordre de la liste (du plus proche au plus loin), pas dans l'ordre des coches.
-      const chosen = choices
-        .filter((r) => picked.includes(r.id))
+      // Du plus proche au plus loin, pas dans l'ordre des coches.
+      const chosen = [...picked]
+        .sort((a, b) => distanceMeters(home, a.location) - distanceMeters(home, b.location))
         .map((r) => ({ name: r.name, cuisine: r.cuisine, address: r.address, lat: r.location.lat, lng: r.location.lng }));
       const poll = await createPoll(chosen, ttl, lang);
       location.assign(`/v/${poll.id}`);
@@ -133,31 +183,75 @@ export function PollDialog({ places, home, preselected, onClose }: Props) {
           </>
         )}
 
-        <p className="poll-how">{TEXT.howTo.replace("{min}", String(POLL_MIN)).replace("{max}", String(POLL_MAX))}</p>
-        <ul className="poll-places">
-          {choices.map((r) => {
+        <Suspense fallback={<div className="poll-map" />}>
+          <PollMap
+            home={home}
+            places={listed}
+            picked={picked}
+            focus={focus}
+            onSelect={focusFromMap}
+            onView={showView}
+            frame={found ?? undefined}
+          />
+        </Suspense>
+
+        <div className="poll-search">
+          <span className="poll-search-icon" aria-hidden="true">
+            🔍
+          </span>
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("pollSearch")}
+            aria-label={t("pollSearch")}
+            autoComplete="off"
+            spellCheck={false}
+          />
+          {searching ? (
+            <span className="poll-spinner" aria-hidden="true" />
+          ) : (
+            query.length > 0 && (
+              <button type="button" className="poll-search-clear" onClick={() => setQuery("")} aria-label={TEXT.close}>
+                ✕
+              </button>
+            )
+          )}
+        </div>
+
+        {found === null && <p className="poll-how">{TEXT.howTo.replace("{min}", String(POLL_MIN)).replace("{max}", String(POLL_MAX))}</p>}
+        {found && !searching && !found.length && <p className="poll-how">{t("pollNoMatch")}</p>}
+        <ul className="poll-places" ref={listRef}>
+          {ordered.map((r) => {
             const cuisine = r.cuisine ? cuisineLabel(r.cuisine) : null;
-            const on = picked.includes(r.id);
+            const on = isPicked(r.id);
             return (
-              <li key={r.id}>
-                <label className={on ? "on" : undefined}>
-                  <input type="checkbox" checked={on} disabled={!on && picked.length >= POLL_MAX} onChange={() => toggle(r.id)} />
+              // Survolée, la ligne grossit son resto sur la carte ; cliquée, la carte y va ; la case le coche.
+              <li
+                key={r.id}
+                data-id={r.id}
+                className={focus?.id === r.id ? "focused" : undefined}
+                onMouseEnter={() => setFocus({ id: r.id, fly: false })}
+              >
+                <input
+                  type="checkbox"
+                  aria-label={r.name}
+                  checked={on}
+                  disabled={!on && picked.length >= POLL_MAX}
+                  onChange={() => toggle(r)}
+                />
+                <button type="button" className="poll-place-main" onClick={() => setFocus({ id: r.id, fly: true })}>
                   <span className="poll-place-name">{r.name}</span>
                   <span className="poll-place-info">
                     {[cuisine && `${cuisine.emoji} ${cuisine.label}`, formatDistance(distanceMeters(home, r.location)), r.open === false && TEXT.closedNow]
                       .filter(Boolean)
                       .join(" · ")}
                   </span>
-                </label>
+                </button>
               </li>
             );
           })}
         </ul>
-        {hasMore && (
-          <button type="button" className="poll-more" onClick={() => setCount((c) => c + PAGE)}>
-            {TEXT.more}
-          </button>
-        )}
 
         <p className="poll-section">{TEXT.ttl}</p>
         <div className="poll-ttls" role="radiogroup" aria-label={TEXT.ttl}>

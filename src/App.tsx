@@ -10,9 +10,11 @@ import {
   formatDistance,
   geocode,
   getBrowserPosition,
+  inView,
   nearestOpen,
   nearestOpenInView,
   type Area,
+  type Box,
   type LatLng,
   type Restaurant,
 } from "./lib/places";
@@ -34,6 +36,10 @@ export default function App() {
   const [home, setHome] = useState<LatLng | null>(null);
   const [top, setTop] = useState<Restaurant[]>([]);
   const [area, setArea] = useState<Area | null>(null);
+  // Tous les restos de la zone visible de la carte (pas seulement la pile de cartes) : la carte les montre,
+  // regroupés quand ils sont serrés, pour qu'elle ne soit pas vide autour du centre quand on dézoome.
+  const [around, setAround] = useState<Restaurant[]>([]);
+  const aroundId = useRef(0);
   const [current, setCurrent] = useState(0);
   // Incrémenté quand la carte doit se recadrer sur toi + la fiche affichée.
   const [fitKey, setFitKey] = useState(0);
@@ -118,13 +124,37 @@ export default function App() {
   // L'utilisateur déplace ou zoome la carte : les 5 plus proches du centre, sans la recadrer.
   const onViewportChange = useCallback((view: Area) => run(() => nearestOpenInView(view), false), [run]);
 
+  // La carte s'est arrêtée (y compris sur nos recadrages) : on recharge tous les restos de sa zone visible.
+  const onMapStop = useCallback(
+    (box: Box) => {
+      if (!home) return;
+      const id = ++aroundId.current;
+      inView(box, home)
+        .then((list) => id === aroundId.current && setAround(list))
+        .catch(console.error);
+    },
+    [home],
+  );
+
   // Une autre fiche (glissée, cliquée, ou son épingle touchée) : la carte la suit.
   const show = useCallback((index: number) => {
     if (index < 0) return;
     setCurrent(index);
     setFitKey((k) => k + 1);
   }, []);
-  const onSelectFromMap = useCallback((id: string) => show(top.findIndex((r) => r.id === id)), [show, top]);
+  const onSelectFromMap = useCallback(
+    (id: string) => {
+      const index = top.findIndex((r) => r.id === id);
+      if (index >= 0) return show(index);
+      // Un resto de la carte qui n'est pas (encore) dans la pile : il s'y glisse juste après la fiche affichée.
+      const place = around.find((r) => r.id === id);
+      if (!place) return;
+      const at = top.length ? current + 1 : 0;
+      setTop([...top.slice(0, at), place, ...top.slice(at)]);
+      show(at);
+    },
+    [show, top, around, current],
+  );
 
   // Sur iPhone : l'appli de cartes retenue, qu'on peut changer en bas de l'écran.
   const [mapsApp, setMapsAppState] = useState(getMapsApp);
@@ -165,6 +195,8 @@ export default function App() {
           <RestaurantMap
             home={home}
             results={top}
+            around={around}
+            onMapStop={onMapStop}
             area={area}
             fitKey={fitKey}
             selectedId={top[current]?.id ?? null}

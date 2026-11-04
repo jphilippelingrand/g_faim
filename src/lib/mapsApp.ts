@@ -58,3 +58,13 @@ export function openDirections(url: string) {
   if (tab) tab.opener = null;
   else location.assign(url);
 }
+
+/**
+ * La fiche du commerce dans l'appli de cartes (pas un itinéraire) : Google Maps, sauf sur iPhone si on y a
+ * choisi Plans. Avec l'adresse, la recherche tombe sur la fiche ; sans, sur la position.
+ */
+export function placeUrl(p: { name: string; address?: string; lat: number; lng: number }, app: MapsApp = getMapsApp() ?? "google"): string {
+  const query = p.address ? `${p.name}, ${p.address}` : `${p.lat},${p.lng}`;
+  if (app === "apple") return `https://maps.apple.com/?${new URLSearchParams({ q: p.address ? query : p.name, ll: `${p.lat},${p.lng}` })}`;
+  return `https://www.google.com/maps/search/?${new URLSearchParams({ api: "1", query })}`;
+}

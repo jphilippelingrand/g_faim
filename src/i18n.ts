@@ -75,6 +75,8 @@ const fr = {
   you: "Toi",
   privacy: "Confidentialité",
   friends: "Faire voter les copains",
+  pollSearch: "Chercher un resto par son nom",
+  pollNoMatch: "Aucun resto à ce nom autour.",
   language: "Langue",
 };
 
@@ -119,6 +121,8 @@ const en: Dict = {
   you: "You",
   privacy: "Privacy",
   friends: "Let friends vote",
+  pollSearch: "Search a place by name",
+  pollNoMatch: "No place by that name around.",
   language: "Language",
 };
 
@@ -161,6 +165,8 @@ const es: Dict = {
   you: "Tú",
   privacy: "Privacidad",
   friends: "Que voten los amigos",
+  pollSearch: "Buscar un sitio por su nombre",
+  pollNoMatch: "Ningún sitio con ese nombre por aquí.",
   language: "Idioma",
 };
 

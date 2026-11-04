@@ -1,0 +1,76 @@
+/*
+ * Les restos (comme dans l'app) : des bulles en dégradé corail, taupe pour les fermés, cerclées de blanc, dans
+ * une lueur douce, avec un petit reflet qui les bombe. Les restos seuls (des anneaux) sont dessinés par la
+ * carte elle-même (mapDots.ts) ; ici, les bulles : le resto montré, les cochés d'un vote et les groupes.
+ */
+.bubble {
+  --light: #ff8a5c;
+  --dark: #e2583e;
+  --glow: rgb(226 88 62 / .35);
+  --halo: rgb(226 88 62 / .15);
+  --size: 24px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--light), var(--dark));
+  border: max(2.5px, calc(var(--size) / 11)) solid #fff;
+  box-shadow: 0 0 calc(var(--size) * .3) calc(var(--size) * .12) var(--glow), 0 1px 3px rgb(43 33 28 / .2);
+  cursor: pointer;
+}
+.bubble.cold { --light: #b3a59a; --dark: #8a7b70; --glow: rgb(138 123 112 / .35); --halo: rgb(138 123 112 / .15); }
+/* Le reflet, en haut à gauche. */
+.bubble::before {
+  content: "";
+  position: absolute;
+  left: 21%;
+  top: 19%;
+  width: 26%;
+  height: 26%;
+  border-radius: 50%;
+  background: rgb(255 255 255 / .22);
+  pointer-events: none;
+}
+/* La coche : dessinée sur toute la bulle, bordure comprise (2,5 px pour une petite bulle). */
+.bubble svg { position: absolute; inset: -2.5px; width: var(--size); height: var(--size); }
+/* Un groupe : son nombre, en blanc, dans la police de la marque. */
+.bubble.cluster { font: italic 900 15px/1 "Fraunces", Georgia, serif; color: #fff; letter-spacing: -.3px; }
+.bubble.cluster.long { font-size: 13px; }
+/* Le resto montré : plus gros, un cœur de cible blanc, un petit rebond à l'arrivée, puis un halo qui respire. */
+.bubble.selected { --size: 32px; border-width: 3px; animation: bubble-pop .45s cubic-bezier(.3, 1.6, .5, 1); }
+.bubble.selected::after { content: ""; width: 9px; height: 9px; border-radius: 50%; background: #fff; }
+.bubble-halo {
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 3px solid var(--dark);
+  background: var(--halo);
+  opacity: 0;
+  pointer-events: none;
+  animation: bubble-halo 1.8s ease-out .45s infinite;
+}
+@keyframes bubble-pop { from { transform: scale(.6); } }
+@keyframes bubble-halo {
+  from { opacity: .4; transform: scale(1); }
+  to { opacity: 0; transform: scale(2.2); }
+}
+
+.home-pin {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #3b82f6;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 0 rgb(59 130 246 / .5);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  70% { box-shadow: 0 0 0 14px rgb(59 130 246 / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(59 130 246 / 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-pin, .bubble.selected, .bubble-halo { animation: none !important; }
+}

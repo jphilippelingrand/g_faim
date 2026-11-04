@@ -31,6 +31,8 @@ body {
 
 .shell { position: fixed; inset: 0; }
 .map-wrap, .map { position: absolute; inset: 0; }
+/* Les marqueurs (z-index entre eux) restent sous la fiche, la marque et les étiquettes. */
+.map { isolation: isolate; }
 /* MapLibre se met en position relative : on garde la carte plein écran. */
 .map-wrap > .map { position: absolute; width: 100%; height: 100%; }
 .map { background: var(--accent-soft); }
@@ -287,42 +289,6 @@ body {
 
 /* ============ Carte ============ */
 
-/* Un point gris par resto ; celui de la fiche affichée passe au rouge, en plus gros (comme dans l'app). */
-.pin {
-  width: 16px;
-  height: 16px;
-  box-sizing: border-box;
-  border-radius: 50%;
-  background: var(--muted);
-  border: 2.5px solid #fff;
-  box-shadow: 0 1px 4px rgb(0 0 0 / .25);
-  cursor: pointer;
-  transition: transform .2s, background .2s;
-}
-/* Le resto montré : plus gros, un petit rebond à l'arrivée, puis un halo qui respire doucement. */
-.pin.selected {
-  background: var(--accent); transform: scale(1.9); border-width: 2px;
-  animation: pin-pop .35s cubic-bezier(.3, 1.6, .5, 1), pin-halo 1.8s ease-out .35s infinite;
-}
-@keyframes pin-pop { from { transform: scale(1); } }
-@keyframes pin-halo {
-  from { box-shadow: 0 1px 4px rgb(0 0 0 / .25), 0 0 0 0 rgb(226 88 62 / .4); }
-  to { box-shadow: 0 1px 4px rgb(0 0 0 / .25), 0 0 0 9px rgb(226 88 62 / 0); }
-}
-
-.home-pin {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #3b82f6;
-  border: 3px solid #fff;
-  box-shadow: 0 0 0 0 rgb(59 130 246 / .5);
-  animation: pulse 2s infinite;
-}
-@keyframes pulse {
-  70% { box-shadow: 0 0 0 14px rgb(59 130 246 / 0); }
-  100% { box-shadow: 0 0 0 0 rgb(59 130 246 / 0); }
-}
 /* Sous le bouton 🧑‍🤝‍🧑 (en haut à droite). */
 /* (plus précis que la règle de MapLibre, chargée après celle-ci.) */
 .maplibregl-map .maplibregl-ctrl-top-right { top: calc(env(safe-area-inset-top) + 58px); }
@@ -468,7 +434,7 @@ input:focus { border-color: var(--accent); }
 .legal button[aria-current="true"] { color: var(--ink); font-weight: 600; }
 
 @media (prefers-reduced-motion: reduce) {
-  .lady *, .lady svg, .home-pin, .pin.selected { animation: none !important; }
+  .lady *, .lady svg, .home-pin, .bubble.selected, .bubble-halo { animation: none !important; }
   .grr span { opacity: 1; }
 }
 
@@ -502,6 +468,9 @@ input:focus { border-color: var(--accent); }
   width: min(460px, 100%);
   max-height: 88vh;
   overflow: auto;
+  /* La liste prend la place qui reste (et défile seule) : la carte reste en vue. */
+  display: flex;
+  flex-direction: column;
   padding: 20px 18px calc(env(safe-area-inset-bottom) + 18px);
   background: var(--bg);
   border-radius: 22px 22px 0 0;
@@ -515,12 +484,36 @@ input:focus { border-color: var(--accent); }
 .poll-how { margin: 12px 0 6px; color: var(--muted); font-size: .95rem; }
 .poll-running, .poll-places { list-style: none; margin: 0; padding: 0; }
 .poll-running a { display: block; padding: 10px 12px; margin-bottom: 6px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--ink); font: 700 1rem "Fraunces", Georgia, serif; text-decoration: none; }
-.poll-places label { display: grid; grid-template-columns: auto 1fr; column-gap: 12px; align-items: center; padding: 10px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
-.poll-places input { width: 20px; height: 20px; accent-color: var(--accent); grid-row: span 2; }
+.poll-dialog > * { flex-shrink: 0; }
+.poll-places { flex: 1 1 auto; min-height: 150px; overflow-y: auto; }
+/* content-visibility : des milliers de lignes quand la carte est dézoomée, seules celles à l'écran sont dessinées. */
+.poll-places li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 12px;
+  align-items: center;
+  padding: 2px 4px;
+  border-bottom: 1px solid var(--line);
+  border-radius: 10px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 58px;
+}
+.poll-places li.focused { background: var(--accent-soft); }
+.poll-places input { width: 20px; height: 20px; accent-color: var(--accent); cursor: pointer; }
+.poll-place-main { display: grid; min-width: 0; padding: 8px 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .poll-place-name { font: 700 1rem "Fraunces", Georgia, serif; }
 .poll-place-info { font-size: .8rem; color: var(--muted); }
 .poll-over { color: var(--muted); font-size: .85rem; }
-.poll-more { display: block; margin: 10px auto 0; padding: 8px 16px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--accent); font: 600 .9rem "Inter", system-ui, sans-serif; cursor: pointer; }
+/* La carte du vote : une bonne part de la fenêtre, de quoi s'y retrouver dans les rues. */
+.poll-map { position: relative; isolation: isolate; height: clamp(200px, 30vh, 360px); margin-top: 12px; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: var(--accent-soft); }
+/* La recherche par nom, sous la carte. */
+.poll-search { display: flex; align-items: center; gap: 8px; height: 44px; margin-top: 10px; padding: 0 14px; border: 1px solid var(--line); border-radius: 22px; background: var(--card); }
+.poll-search:focus-within { border-color: var(--accent); }
+.poll-search input[type="text"] { flex: 1; min-width: 0; padding: 0; border: 0; border-radius: 0; background: none; font-size: .97rem; }
+.poll-search-icon { font-size: .875rem; }
+.poll-search-clear { border: 0; background: none; padding: 0; color: var(--muted); font-size: .95rem; cursor: pointer; }
+.poll-spinner { width: 16px; height: 16px; border: 2px solid var(--accent-soft); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .poll-ttls { display: flex; gap: 8px; }
 .poll-ttls button { flex: 1; padding: 10px 0; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--muted); font: 500 .9rem "Inter", system-ui, sans-serif; cursor: pointer; }
 .poll-ttls button.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }

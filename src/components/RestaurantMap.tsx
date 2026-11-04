@@ -1,16 +1,21 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { distanceMeters, type Area, type LatLng, type Restaurant } from "../lib/places";
+import { distanceMeters, type Area, type Box, type LatLng, type Restaurant } from "../lib/places";
+import { boxOf, clusteredPlaces, marker, selectedDot } from "./mapDots";
 import { t } from "../i18n";
 
 // Fond de carte OpenFreeMap : gratuit, sans clé ni quota, données OpenStreetMap.
-const STYLE = "https://tiles.openfreemap.org/styles/positron";
+export const STYLE = "https://tiles.openfreemap.org/styles/positron";
 const ACCENT = "#e2583e";
 
 type Props = {
   home: LatLng;
   results: Restaurant[];
+  /** Les autres restos de la zone visible : montrés aussi (regroupés quand ils sont serrés), derrière la pile. */
+  around: Restaurant[];
+  /** La carte s'est arrêtée, nos recadrages compris : sa zone visible, pour y charger `around`. */
+  onMapStop: (box: Box) => void;
   area: Area | null;
   /** Incrémenté quand il faut recadrer la carte sur toi + le resto choisi. */
   fitKey: number;
@@ -47,29 +52,18 @@ function viewportCircle(map: maplibregl.Map): Area {
   return { center, radius: Math.round(radius) };
 }
 
-/**
- * Un marqueur dont le contenu est dans un enfant : MapLibre écrit sa position dans le transform de
- * l'élément racine, on garde donc celui de l'enfant pour nos effets (sélection, pulsation).
- */
-function marker(className: string, position: LatLng, text = "") {
-  const root = document.createElement("div");
-  const el = document.createElement("div");
-  el.className = className;
-  el.textContent = text;
-  root.append(el);
-  return { el, marker: new maplibregl.Marker({ element: root }).setLngLat(position) };
-}
-
-export function RestaurantMap({ home, results, area, fitKey, selectedId, insets, onSelect, onViewportChange, children }: Props) {
+export function RestaurantMap(props: Props) {
+  const { home, results, around, area, fitKey, selectedId, insets, onSelect, onMapStop, onViewportChange, children } = props;
   const divRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<maplibregl.Map | null>(null);
-  const pins = useRef(new Map<string, HTMLElement>());
+  // Les restos de la carte (pile et alentours), regroupés quand ils sont serrés.
+  const places = useRef<ReturnType<typeof clusteredPlaces> | null>(null);
   // Vrai pendant nos propres recadrages, qui ne doivent pas relancer de recherche.
   const programmatic = useRef(false);
 
-  const callbacks = useRef({ onSelect, onViewportChange });
+  const callbacks = useRef({ onSelect, onMapStop, onViewportChange });
   useEffect(() => {
-    callbacks.current = { onSelect, onViewportChange };
+    callbacks.current = { onSelect, onMapStop, onViewportChange };
   });
 
   // Création de la carte.
@@ -94,9 +88,15 @@ export function RestaurantMap({ home, results, area, fitKey, selectedId, insets,
       m.addLayer({ id: "area-line", type: "line", source: "area", paint: { "line-color": ACCENT, "line-opacity": 0.5, "line-width": 1.5 } });
       // Les crédits s'ouvrent déplié et cachent le bas de la carte : on les replie derrière leur bouton ⓘ.
       m.getContainer().querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show");
+      places.current = clusteredPlaces(m, "places", { onSelect: (id) => callbacks.current.onSelect(id) });
       setMap(m);
+      callbacks.current.onMapStop(boxOf(m));
     });
-    m.on("moveend", () => !programmatic.current && callbacks.current.onViewportChange(viewportCircle(m)));
+    m.on("moveend", () => {
+      // Tous les restos de la zone visible, à chaque arrêt (nos recadrages compris) : sans relancer de recherche.
+      callbacks.current.onMapStop(boxOf(m));
+      if (!programmatic.current) callbacks.current.onViewportChange(viewportCircle(m));
+    });
     // Accès pour les tests manuels dans la console (retiré du build de production).
     if (import.meta.env.DEV) (window as unknown as { __groublMap: maplibregl.Map }).__groublMap = m;
     return () => {
@@ -123,25 +123,25 @@ export function RestaurantMap({ home, results, area, fitKey, selectedId, insets,
     source?.setData(area ? circlePolygon(area) : { type: "FeatureCollection", features: [] });
   }, [map, area]);
 
-  // Les restos, le premier par-dessus les autres.
+  // Les restos de la pile et ceux d'alentour, regroupés quand ils sont serrés ; le resto montré reste toujours
+  // seul (jamais dans un groupe), en grosse bulle par-dessus.
   useEffect(() => {
     if (!map) return;
-    const markers = [...results].reverse().map((r) => {
-      const { el, marker: m } = marker("pin", r.location);
-      el.title = r.name;
-      el.addEventListener("click", () => callbacks.current.onSelect(r.id));
-      pins.current.set(r.id, el);
-      return m.addTo(map);
-    });
-    return () => {
-      markers.forEach((m) => m.remove());
-      pins.current.clear();
-    };
-  }, [map, results]);
+    const inDeck = new Set(results.map((r) => r.id));
+    const all = [...results, ...around.filter((r) => !inDeck.has(r.id))];
+    places.current?.set(all.filter((r) => r.id !== selectedId));
+  }, [map, results, around, selectedId]);
 
   useEffect(() => {
-    pins.current.forEach((el, id) => el.classList.toggle("selected", id === selectedId));
-  }, [map, selectedId, results]);
+    const place = results.find((r) => r.id === selectedId);
+    if (!map || !place) return;
+    const { el, marker: m } = selectedDot(place);
+    el.addEventListener("click", () => callbacks.current.onSelect(place.id));
+    m.addTo(map);
+    return () => {
+      m.remove();
+    };
+  }, [map, results, selectedId]);
 
   // Recadrage sur toi + le resto de la fiche affichée, quand fitKey change (nouvelle recherche, fiche glissée).
   useEffect(() => {

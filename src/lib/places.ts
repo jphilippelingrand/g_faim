@@ -152,9 +152,15 @@ const DUPLICATE_DISTANCE = 100;
 /** Garde le premier de chaque nom à moins de DUPLICATE_DISTANCE d'un homonyme déjà gardé. */
 function withoutDuplicates(list: Restaurant[]): Restaurant[] {
   const kept: Restaurant[] = [];
+  // Rangés par nom : on ne compare qu'aux homonymes (des milliers de restos quand la carte est dézoomée).
+  const byName = new Map<string, Restaurant[]>();
   for (const r of list) {
     const name = r.name.toLowerCase();
-    if (!kept.some((k) => k.name.toLowerCase() === name && distanceMeters(k.location, r.location) < DUPLICATE_DISTANCE)) kept.push(r);
+    const same = byName.get(name) ?? [];
+    if (same.some((k) => distanceMeters(k.location, r.location) < DUPLICATE_DISTANCE)) continue;
+    same.push(r);
+    byName.set(name, same);
+    kept.push(r);
   }
   return kept;
 }
@@ -216,6 +222,63 @@ export async function nearest(center: LatLng, count: number): Promise<{ list: Re
     if (list.length >= count) break;
   }
   return { list, hasMore: list.length >= count };
+}
+
+/** Un rectangle de carte : ses bords sud, ouest, nord et est (en degrés). */
+export type Box = { south: number; west: number; north: number; east: number };
+
+// Garde-fou : la carte regroupe les restos proches, elle peut donc tous les montrer, même dézoomée ; au-delà
+// de ça seulement, on garde les plus proches.
+const MAX_IN_VIEW = 3000;
+
+/**
+ * Tous les restos dans le rectangle visible de la carte, ouverts ou non, du plus proche de `from` au plus loin
+ * (au plus MAX_IN_VIEW, la carte les regroupe ; la zone est plafonnée à MAX_RADIUS, trop de fichiers sinon). Pour
+ * que la carte et la liste montrent la même chose : aucun coin de carte vide alors qu'il y a des restos.
+ */
+export async function inView(box: Box, from: LatLng): Promise<Restaurant[]> {
+  const center = { lat: (box.south + box.north) / 2, lng: (box.west + box.east) / 2 };
+  const radius = Math.min(distanceMeters(center, { lat: box.north, lng: box.east }), MAX_RADIUS);
+  const inside = (r: Restaurant) =>
+    r.location.lat >= box.south && r.location.lat <= box.north && r.location.lng >= box.west && r.location.lng <= box.east;
+  // Chaque distance calculée une fois (le tri en redemanderait des dizaines de milliers).
+  const list = (await restaurantsAround({ center, radius }))
+    .filter(inside)
+    .map((r) => ({ r, meters: distanceMeters(from, r.location) }))
+    .sort((a, b) => a.meters - b.meters)
+    .map(({ r, meters }) => ({ ...r, open: openOnArrival(r, meters) }));
+  return withoutDuplicates(list).slice(0, MAX_IN_VIEW);
+}
+
+// Une recherche par nom : au plus tant de résultats, du plus proche au plus loin.
+const MAX_BY_NAME = 60;
+
+/** « Café Olimpico » → « cafe olimpico » : on compare sans accents ni majuscules. */
+const plain = (text: string) =>
+  text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+/**
+ * Les restos dont le nom contient `query` (sans tenir compte des accents ni des majuscules), jusqu'à MAX_RADIUS
+ * autour de `from`, ouverts ou non, du plus proche au plus loin. Chaque mot tapé doit s'y trouver (« pizza
+ * dany » trouve « Chez Dany Pizza »).
+ */
+export async function byName(query: string, from: LatLng): Promise<Restaurant[]> {
+  const words = plain(query).split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const list = (await restaurantsAround({ center: from, radius: MAX_RADIUS }))
+    .filter((r) => {
+      const name = plain(r.name);
+      return words.every((w) => name.includes(w));
+    })
+    .map((r) => ({ r, meters: distanceMeters(from, r.location) }))
+    .filter(({ meters }) => meters <= MAX_RADIUS)
+    .sort((a, b) => a.meters - b.meters)
+    .map(({ r, meters }) => ({ ...r, open: openOnArrival(r, meters) }));
+  return withoutDuplicates(list).slice(0, MAX_BY_NAME);
 }
 
 // Grosso modo : 4,8 km/h à pied, en voiture 24 km/h en ville plus 3 min pour se garer ; les rues font
