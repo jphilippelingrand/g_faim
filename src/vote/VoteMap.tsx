@@ -7,7 +7,7 @@ import { STYLE } from "../components/RestaurantMap";
 
 type Props = {
   places: PollPlace[];
-  /** Le resto mis en avant (la carte qu'on swipe, ou l'élu) : la grosse bulle. */
+  /** Le resto mis en avant (survolé ou touché, sinon l'élu) : la grosse bulle. */
   selected: number | null;
   /** Les numéros sur les bulles (le classement), dans l'ordre de `places` ; sans : de simples bulles. */
   labels?: string[];
@@ -21,7 +21,7 @@ const at = (p: PollPlace) => ({ lat: p.lat, lng: p.lng });
 
 /**
  * La carte de la page de vote : les restos proposés, cadrés tous ensemble, celui qu'on regarde en grosse
- * bulle. Pendant le vote, elle suit la carte qu'on swipe ; au classement, les bulles portent leur rang.
+ * bulle. Les bulles portent le rang de chaque resto dès le premier vote.
  */
 export function VoteMap({ places, selected, labels, onSelect }: Props) {
   const divRef = useRef<HTMLDivElement>(null);

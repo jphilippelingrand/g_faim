@@ -477,6 +477,12 @@ input:focus { border-color: var(--accent); }
   text-align: left;
 }
 @media (min-width: 700px) { .poll-dialog { border-radius: 22px; } }
+/* Grand écran : une vraie fenêtre, la carte en grand à gauche, la recherche, la liste et la durée à droite. */
+@media (min-width: 960px) {
+  /* (Une marge en % se compterait sur la largeur de l'écran : la largeur de la carte est donc calculée.) */
+  .poll-dialog { --w: min(1120px, 94vw); --map: calc(var(--w) * .58); position: relative; width: var(--w); height: min(780px, 90vh); max-height: none; padding: 22px 22px 22px calc(var(--map) + 40px); overflow: hidden; }
+  .poll-dialog > .poll-map { position: absolute; left: 18px; top: 18px; bottom: 18px; width: var(--map); height: auto; margin: 0; }
+}
 .poll-head { display: flex; justify-content: space-between; align-items: center; }
 .poll-head h2 { margin: 0; font: italic 900 1.8rem "Fraunces", Georgia, serif; }
 .poll-close { border: 0; background: none; font-size: 1.3rem; color: var(--muted); cursor: pointer; }

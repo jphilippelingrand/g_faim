@@ -85,16 +85,21 @@ async function friend(): Promise<{ context: BrowserContext; page: Page }> {
   return { context, page };
 }
 
-/** Swipe chaque carte avec les boutons ❤️ / ✕, puis attend le classement. */
+/** Met ou retire les ❤️ pour arriver à ce vote (on touche les restos), puis attend que le serveur l'ait reçu. */
 async function voteOnPage(page: Page, likes: boolean[]) {
-  for (const like of likes) {
-    await page.waitForSelector(".vote-card");
-    const step = await page.$eval(".vote-step", (el) => el.textContent);
-    await page.click(like ? ".vote-heart" : ".vote-round:not(.vote-heart)");
-    // La carte suivante (ou le classement) remplace celle-ci.
-    await page.waitForFunction((before) => document.querySelector(".vote-step")?.textContent !== before, {}, step);
+  await page.waitForSelector(".vote-row");
+  for (const [i, like] of likes.entries()) {
+    const button = `.vote-row[data-index="${i}"] .vote-row-main`;
+    const on = await page.$eval(button, (el) => el.getAttribute("aria-checked") === "true");
+    if (on !== like) await page.click(button);
   }
-  await page.waitForSelector(".vote-results");
+  await page.waitForFunction(
+    (wanted) =>
+      document.querySelector(".vote-results")?.getAttribute("data-synced") === "true" &&
+      wanted.every((like, i) => document.querySelector(`.vote-row[data-index="${i}"] .vote-row-main`)?.getAttribute("aria-checked") === String(like)),
+    { timeout: 10_000 },
+    likes,
+  );
 }
 
 /** Le classement affiché : nom (sans 🏆) → nombre de ❤️, et le nombre de votes annoncé. */
@@ -141,8 +146,8 @@ describe("Sondage lancé depuis l'app", () => {
     assert.equal(pollIdFrom(url), id);
     const { context, page } = await friend();
     await page.goto(url);
-    await page.waitForSelector(".vote-card");
-    assert.equal(await page.$eval(".vote-name", (el) => el.textContent), "La Banquise");
+    await page.waitForSelector(".vote-row");
+    assert.equal(await page.$eval('.vote-row[data-index="0"] .vote-row-name', (el) => el.textContent), "La Banquise");
     // Pas lancé depuis ce navigateur : pas de quoi le supprimer.
     assert.equal(await page.$(".vote-owner"), null);
     await context.close();
@@ -193,7 +198,7 @@ describe("Sondage lancé depuis l'app", () => {
     const { context, page } = await friend();
     await page.goto(url);
     await page.waitForSelector(".vote-notice");
-    assert.equal(await page.$(".vote-card"), null);
+    assert.equal(await page.$(".vote-row"), null);
     await context.close();
   });
 });
@@ -243,7 +248,7 @@ describe("Sondage lancé depuis le web", () => {
     // Le lien copié s'ouvre ailleurs sur le même vote.
     const { context, page: other } = await friend();
     await other.goto(copied);
-    await other.waitForSelector(".vote-card");
+    await other.waitForSelector(".vote-row");
     await context.close();
   });
 
@@ -254,24 +259,24 @@ describe("Sondage lancé depuis le web", () => {
     await other.goto(url);
     await voteOnPage(other, [true, true]);
     const seen = await standings(other);
-    assert.match(seen.kicker, /2/);
-    assert.equal(Object.values(seen.hearts).join(","), "2,1");
+    assert.match(seen.kicker, /2 votes/);
+    assert.equal(Object.values(seen.hearts).sort((a, b) => b - a).join(","), "2,1");
     assert.ok(seen.trophy, "un gagnant");
     await context.close();
     // La page du créateur se met à jour toute seule (toutes les 10 s).
-    await page.waitForFunction(() => /2/.test(document.querySelector(".vote-kicker")?.textContent ?? ""), { timeout: 15_000 });
+    await page.waitForFunction(() => /2 votes/.test(document.querySelector(".vote-kicker")?.textContent ?? ""), { timeout: 15_000 });
   });
 
   test("user web change d'avis : son vote est remplacé", async () => {
     const { page } = creator;
     const before = live(await apiResults(base, id));
-    await page.click(".vote-link");
+    // Il touche juste ses restos : pas de bouton « changer d'avis ».
     await voteOnPage(page, [false, true]);
     const results = live(await apiResults(base, id));
     assert.equal(results.voters, before.voters, "toujours le même nombre de votants");
     assert.deepEqual(results.hearts, [before.hearts[0] - 1, before.hearts[1] + 1]);
     const seen = await standings(page);
-    assert.equal(Object.values(seen.hearts).join(","), "2,1");
+    assert.equal(Object.values(seen.hearts).sort((a, b) => b - a).join(","), "2,1");
   });
 
   test("user web partage le résultat", async () => {
@@ -314,7 +319,6 @@ describe("Notifications au créateur", () => {
     assert.equal(pushes[0].data.url, `${base}/v/${id}`);
 
     // Il change d'avis : « Quelqu'un a changé d'avis ».
-    await page.click(".vote-link");
     await voteOnPage(page, [true, false, false]);
     assert.equal(pushes.length, 2);
     assert.equal(pushes[1].title, "🔄 Quelqu'un a changé d'avis");
@@ -358,13 +362,13 @@ describe("Vote terminé", () => {
     await assert.rejects(apiVote(base, id, "copain-1", [false, true, false]), /410/);
     assert.equal(live(await apiResults(base, id)).voters, 2);
 
-    // La page : l'élu en grand, pas de cartes à swiper, pas de « changer d'avis ».
+    // La page : l'élu en grand, les restos ne se touchent plus.
     const { context, page } = await friend();
     await page.goto(url);
     await page.waitForSelector(".vote-final");
     assert.match(await page.$eval(".vote-final", (el) => el.textContent!), /La Banquise/);
-    assert.equal(await page.$(".vote-card"), null);
-    assert.equal(await page.$(".vote-link"), null);
+    assert.ok(await page.$$eval(".vote-row-main", (els) => els.length > 0 && els.every((el) => (el as HTMLButtonElement).disabled)));
+    assert.equal(await page.$(".vote-sub"), null);
     await context.close();
   });
 
