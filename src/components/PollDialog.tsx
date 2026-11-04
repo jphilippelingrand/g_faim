@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { lang, t } from "../i18n";
+import { placeUrl } from "../lib/mapsApp";
 import { cuisineLabel } from "../lib/osm";
 import { byName, distanceMeters, formatDistance, inView, nearest, type Box, type LatLng, type Restaurant } from "../lib/places";
 import { createPoll, myPolls, POLL_MAX, POLL_MIN, POLL_TTLS, type PollTtl } from "../lib/polls";
@@ -31,6 +32,7 @@ const TEXT = {
     close: "Fermer",
     error: "Oups, quelque chose a coincé. Réessaie dans un instant.",
     closedNow: "fermé en ce moment",
+    onMaps: "Voir dans Maps",
   },
   en: {
     title: "Where should we eat?",
@@ -43,6 +45,7 @@ const TEXT = {
     close: "Close",
     error: "Oops, something went wrong. Try again in a moment.",
     closedNow: "closed right now",
+    onMaps: "Open in Maps",
   },
   es: {
     title: "¿Dónde comemos?",
@@ -55,6 +58,7 @@ const TEXT = {
     close: "Cerrar",
     error: "Uy, algo ha fallado. Inténtalo de nuevo en un momento.",
     closedNow: "cerrado ahora",
+    onMaps: "Ver en Maps",
   },
 }[lang];
 
@@ -248,6 +252,20 @@ export function PollDialog({ places, home, preselected, onClose }: Props) {
                       .join(" · ")}
                   </span>
                 </button>
+                {/* Sa fiche dans Maps (avis, photos, horaires), dans un nouvel onglet. */}
+                <a
+                  className="poll-maps"
+                  href={placeUrl({ name: r.name, address: r.address, ...r.location })}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={TEXT.onMaps}
+                  aria-label={`${TEXT.onMaps} : ${r.name}`}
+                >
+                  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                    <path d="M6 3H3v10h10v-3M9 2.5h4.5V7M13.5 2.5 7.5 8.5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  <span>Maps</span>
+                </a>
               </li>
             );
           })}

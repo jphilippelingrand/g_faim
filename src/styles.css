@@ -495,7 +495,7 @@ input:focus { border-color: var(--accent); }
 /* content-visibility : des milliers de lignes quand la carte est dézoomée, seules celles à l'écran sont dessinées. */
 .poll-places li {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto 1fr auto;
   column-gap: 12px;
   align-items: center;
   padding: 2px 4px;
@@ -507,6 +507,8 @@ input:focus { border-color: var(--accent); }
 .poll-places li.focused { background: var(--accent-soft); }
 .poll-places input { width: 20px; height: 20px; accent-color: var(--accent); cursor: pointer; }
 .poll-place-main { display: grid; min-width: 0; padding: 8px 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.poll-maps { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 6px 8px; border-radius: 10px; color: var(--muted); font-size: .68rem; text-decoration: none; }
+.poll-maps:hover { color: var(--accent); background: var(--accent-soft); }
 .poll-place-name { font: 700 1rem "Fraunces", Georgia, serif; }
 .poll-place-info { font-size: .8rem; color: var(--muted); }
 .poll-over { color: var(--muted); font-size: .85rem; }
