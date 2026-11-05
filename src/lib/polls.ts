@@ -32,15 +32,20 @@ function store(key: string, value: string) {
   }
 }
 
+// Gardé aussi en mémoire : si le navigateur refuse le stockage (certains navigateurs intégrés aux applis), on
+// garderait sinon un nouvel identifiant à chaque appel, et chaque ❤️ compterait comme un nouveau votant.
+let voter: string | null = null;
+
 /** L'identifiant anonyme de ce navigateur, le même pour tous les sondages. */
 export function voterId(): string {
+  if (voter) return voter;
   let id = load(VOTER_KEY);
   if (!id) {
     // Pas crypto.randomUUID : il n'existe qu'en HTTPS, et le serveur de dev est en http sur le Wi-Fi.
     id = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
     store(VOTER_KEY, id);
   }
-  return id;
+  return (voter = id);
 }
 
 /** Les sondages lancés d'ici, en cours ou terminés depuis peu, le plus récent d'abord. */
