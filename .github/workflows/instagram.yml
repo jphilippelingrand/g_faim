@@ -2,8 +2,9 @@
 name: Instagram
 
 on:
-  schedule:
-    - cron: "*/15 * * * *"
+  # Arrêté le 2026-11-06 (posts pas assez drôles). Remettre pour relancer :
+  # schedule:
+  #   - cron: "*/15 * * * *"
   workflow_dispatch:
 
 concurrency:
